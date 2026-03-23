@@ -50,10 +50,14 @@ fn routing_engine_matches_and_renames_exact_routes() {
     )
     .expect("packet should parse");
 
-    let dispatches = engine.route(&source).expect("routing should succeed");
-    assert_eq!(dispatches.len(), 1);
-    assert_eq!(dispatches[0].destination.target, "udp_renderer");
-    assert_eq!(dispatches[0].packet.address(), Some("/render/camera/fov"));
+    let outcome = engine.route(&source);
+    assert!(outcome.failures.is_empty());
+    assert_eq!(outcome.dispatches.len(), 1);
+    assert_eq!(outcome.dispatches[0].destination.target, "udp_renderer");
+    assert_eq!(
+        outcome.dispatches[0].packet.address(),
+        Some("/render/camera/fov")
+    );
 }
 
 #[test]
@@ -119,7 +123,82 @@ fn traversal_wildcard_matches_in_extended_mode() {
     )
     .expect("packet should parse");
 
-    let dispatches = engine.route(&source).expect("routing should succeed");
-    assert_eq!(dispatches.len(), 1);
-    assert_eq!(dispatches[0].packet.address(), Some("/td/rig/tracking"));
+    let outcome = engine.route(&source);
+    assert!(outcome.failures.is_empty());
+    assert_eq!(outcome.dispatches.len(), 1);
+    assert_eq!(
+        outcome.dispatches[0].packet.address(),
+        Some("/td/rig/tracking")
+    );
+}
+
+#[test]
+fn transform_failure_is_isolated_to_the_failing_route() {
+    let engine = RoutingEngine::new(vec![
+        RouteSpec {
+            id: "rename_bundle".to_owned(),
+            enabled: true,
+            mode: CompatibilityMode::Osc1_0Strict,
+            class: TrafficClass::StatefulControl,
+            match_spec: RouteMatchSpec {
+                ingress_ids: vec![],
+                source_endpoints: vec![],
+                address_patterns: vec![],
+                protocols: vec![TransportSelector::OscUdp],
+            },
+            transform: TransformSpec {
+                rename_address: Some("/renamed".to_owned()),
+            },
+            destinations: vec![DestinationRef {
+                target: "renamed".to_owned(),
+                transport: TransportSelector::Internal,
+                enabled: true,
+            }],
+        },
+        RouteSpec {
+            id: "tap_bundle".to_owned(),
+            enabled: true,
+            mode: CompatibilityMode::Osc1_0Strict,
+            class: TrafficClass::Telemetry,
+            match_spec: RouteMatchSpec {
+                ingress_ids: vec![],
+                source_endpoints: vec![],
+                address_patterns: vec![],
+                protocols: vec![TransportSelector::OscUdp],
+            },
+            transform: TransformSpec::default(),
+            destinations: vec![DestinationRef {
+                target: "tap".to_owned(),
+                transport: TransportSelector::Internal,
+                enabled: true,
+            }],
+        },
+    ])
+    .expect("routes should compile");
+
+    let source = PacketEnvelope::parse_osc(
+        encode_packet(&ParsedOscPacket::Bundle(rosc_osc::OscBundle {
+            timetag: 1,
+            elements: vec![ParsedOscPacket::Message(OscMessage {
+                address: "/foo".to_owned(),
+                type_tag_source: TypeTagSource::Explicit,
+                arguments: vec![OscArgument::Int32(42)],
+            })],
+        }))
+        .unwrap(),
+        IngressMetadata {
+            ingress_id: "udp_bundle_in".to_owned(),
+            transport: TransportKind::OscUdp,
+            source_endpoint: None,
+            compatibility_mode: CompatibilityMode::Osc1_0Strict,
+            received_at: SystemTime::UNIX_EPOCH,
+        },
+    )
+    .expect("bundle should parse");
+
+    let outcome = engine.route(&source);
+    assert_eq!(outcome.dispatches.len(), 1);
+    assert_eq!(outcome.dispatches[0].destination.target, "tap");
+    assert_eq!(outcome.failures.len(), 1);
+    assert_eq!(outcome.failures[0].route_id, "rename_bundle");
 }

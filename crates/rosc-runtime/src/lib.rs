@@ -7,7 +7,7 @@ use std::time::{Duration, Instant, SystemTime};
 use async_trait::async_trait;
 use rosc_osc::CompatibilityMode;
 use rosc_packet::{IngressMetadata, PacketBuildError, PacketEnvelope, TransportKind};
-use rosc_route::{RouteDispatch, RoutingEngine};
+use rosc_route::{RouteDispatch, RoutingEngine, RoutingOutcome};
 use rosc_telemetry::{BreakerStateSnapshot, BrokerEvent, TelemetrySink};
 use thiserror::Error;
 use tokio::net::UdpSocket;
@@ -123,8 +123,6 @@ pub enum DestinationSendError {
 
 #[derive(Debug, Error)]
 pub enum RuntimeDispatchError {
-    #[error(transparent)]
-    Routing(#[from] rosc_route::RoutingError),
     #[error("destination `{0}` is not registered")]
     MissingDestination(String),
     #[error(transparent)]
@@ -201,14 +199,10 @@ impl<TTelemetry> Runtime<TTelemetry>
 where
     TTelemetry: TelemetrySink,
 {
-    pub fn route_packet(&self, packet: &PacketEnvelope) -> Result<usize, rosc_route::RoutingError> {
-        let dispatches = self.routing.route(packet)?;
-        for dispatch in &dispatches {
-            self.telemetry.emit(BrokerEvent::RouteMatched {
-                route_id: dispatch.route_id.clone(),
-            });
-        }
-        Ok(dispatches.len())
+    pub fn route_packet(&self, packet: &PacketEnvelope) -> usize {
+        let outcome = self.routing.route(packet);
+        self.emit_routing_events(&outcome);
+        outcome.dispatches.len()
     }
 
     pub async fn dispatch_packet(
@@ -216,14 +210,26 @@ where
         packet: &PacketEnvelope,
         destinations: &DestinationRegistry,
     ) -> Result<usize, RuntimeDispatchError> {
-        let dispatches = self.routing.route(packet)?;
-        for dispatch in &dispatches {
+        let outcome = self.routing.route(packet);
+        self.emit_routing_events(&outcome);
+
+        for dispatch in &outcome.dispatches {
+            destinations.dispatch(dispatch.clone()).await?;
+        }
+        Ok(outcome.dispatches.len())
+    }
+
+    fn emit_routing_events(&self, outcome: &RoutingOutcome) {
+        for dispatch in &outcome.dispatches {
             self.telemetry.emit(BrokerEvent::RouteMatched {
                 route_id: dispatch.route_id.clone(),
             });
-            destinations.dispatch(dispatch.clone()).await?;
         }
-        Ok(dispatches.len())
+        for failure in &outcome.failures {
+            self.telemetry.emit(BrokerEvent::RouteTransformFailed {
+                route_id: failure.route_id.clone(),
+            });
+        }
     }
 }
 

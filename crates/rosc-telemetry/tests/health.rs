@@ -9,6 +9,9 @@ fn in_memory_telemetry_renders_prometheus_text() {
     telemetry.emit(BrokerEvent::RouteMatched {
         route_id: "camera_fov".to_owned(),
     });
+    telemetry.emit(BrokerEvent::RouteTransformFailed {
+        route_id: "camera_fov".to_owned(),
+    });
     telemetry.emit(BrokerEvent::QueueDepthChanged {
         queue_id: "udp_renderer".to_owned(),
         depth: 3,
@@ -31,6 +34,7 @@ fn in_memory_telemetry_renders_prometheus_text() {
     let text = telemetry.render_prometheus();
     assert!(text.contains("rosc_ingress_packets_total{ingress_id=\"udp_localhost_in\"} 1"));
     assert!(text.contains("rosc_route_matches_total{route_id=\"camera_fov\"} 1"));
+    assert!(text.contains("rosc_route_transform_failures_total{route_id=\"camera_fov\"} 1"));
     assert!(text.contains("rosc_queue_depth{queue_id=\"udp_renderer\"} 3"));
     assert!(text.contains("rosc_destination_send_total{destination_id=\"udp_renderer\"} 1"));
     assert!(text.contains("rosc_destination_breaker_state{destination_id=\"udp_renderer\"} 2"));

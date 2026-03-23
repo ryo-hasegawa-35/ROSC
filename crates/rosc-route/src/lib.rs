@@ -92,6 +92,18 @@ pub struct RouteDispatch {
     pub packet: PacketEnvelope,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RouteFailure {
+    pub route_id: String,
+    pub error: RoutingError,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct RoutingOutcome {
+    pub dispatches: Vec<RouteDispatch>,
+    pub failures: Vec<RouteFailure>,
+}
+
 #[derive(Debug, Error)]
 pub enum RouteBuildError {
     #[error("route `{route_id}` has no destinations")]
@@ -108,7 +120,7 @@ enum PatternCompileError {
     Regex(#[from] regex::Error),
 }
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum RoutingError {
     #[error("route `{route_id}` requires a transform that cannot be applied safely")]
     TransformNotAllowed { route_id: String },
@@ -127,18 +139,27 @@ impl RoutingEngine {
         Ok(Self { routes })
     }
 
-    pub fn route(&self, packet: &PacketEnvelope) -> Result<Vec<RouteDispatch>, RoutingError> {
-        let mut dispatches = Vec::new();
+    pub fn route(&self, packet: &PacketEnvelope) -> RoutingOutcome {
+        let mut outcome = RoutingOutcome::default();
 
         for route in &self.routes {
             if !route.matches(packet) {
                 continue;
             }
 
-            let routed_packet = route.apply_transform(packet)?;
+            let routed_packet = match route.apply_transform(packet) {
+                Ok(routed_packet) => routed_packet,
+                Err(error) => {
+                    outcome.failures.push(RouteFailure {
+                        route_id: route.spec.id.clone(),
+                        error,
+                    });
+                    continue;
+                }
+            };
             for destination in &route.spec.destinations {
                 if destination.enabled {
-                    dispatches.push(RouteDispatch {
+                    outcome.dispatches.push(RouteDispatch {
                         route_id: route.spec.id.clone(),
                         destination: destination.clone(),
                         packet: routed_packet.clone(),
@@ -147,7 +168,7 @@ impl RoutingEngine {
             }
         }
 
-        Ok(dispatches)
+        outcome
     }
 }
 

@@ -166,6 +166,95 @@ async fn failing_destination_opens_breaker_without_blocking_healthy_peer() {
 }
 
 #[tokio::test]
+async fn route_transform_failure_does_not_block_other_matching_routes() {
+    let config = BrokerConfig::from_toml_str(
+        r#"
+        [[routes]]
+        id = "rename_bundle"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+        [routes.match]
+        protocols = ["osc_udp"]
+        [routes.transform]
+        rename_address = "/renamed"
+        [[routes.destinations]]
+        target = "broken"
+        transport = "internal"
+
+        [[routes]]
+        id = "tap_bundle"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "Telemetry"
+        [routes.match]
+        protocols = ["osc_udp"]
+        [[routes.destinations]]
+        target = "healthy"
+        transport = "internal"
+        "#,
+    )
+    .unwrap();
+
+    let routing = rosc_route::RoutingEngine::new(config.routes).unwrap();
+    let telemetry = InMemoryTelemetry::default();
+    let runtime = Runtime {
+        routing,
+        telemetry: telemetry.clone(),
+    };
+
+    let healthy = Arc::new(RecordingSink::default());
+    let broken = Arc::new(RecordingSink::default());
+    let mut destinations = DestinationRegistry::default();
+    destinations.register(DestinationWorkerHandle::spawn(
+        "healthy",
+        DestinationPolicy::default(),
+        healthy.clone(),
+        Arc::new(telemetry.clone()),
+    ));
+    destinations.register(DestinationWorkerHandle::spawn(
+        "broken",
+        DestinationPolicy::default(),
+        broken,
+        Arc::new(telemetry.clone()),
+    ));
+
+    let packet = PacketEnvelope::parse_osc(
+        encode_packet(&ParsedOscPacket::Bundle(rosc_osc::OscBundle {
+            timetag: 1,
+            elements: vec![ParsedOscPacket::Message(OscMessage {
+                address: "/foo".to_owned(),
+                type_tag_source: TypeTagSource::Explicit,
+                arguments: vec![OscArgument::Int32(1)],
+            })],
+        }))
+        .unwrap(),
+        IngressMetadata {
+            ingress_id: "udp_in".to_owned(),
+            transport: TransportKind::OscUdp,
+            source_endpoint: None,
+            compatibility_mode: CompatibilityMode::Osc1_0Strict,
+            received_at: SystemTime::UNIX_EPOCH,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(
+        runtime
+            .dispatch_packet(&packet, &destinations)
+            .await
+            .unwrap(),
+        1
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+
+    assert_eq!(healthy.sent.lock().unwrap().len(), 1);
+    let health = telemetry.render_prometheus();
+    assert!(health.contains("rosc_route_matches_total{route_id=\"tap_bundle\"} 1"));
+    assert!(health.contains("rosc_route_transform_failures_total{route_id=\"rename_bundle\"} 1"));
+}
+
+#[tokio::test]
 async fn udp_ingress_binding_receives_and_parses_datagrams() {
     let binding = UdpIngressBinding::bind(
         "127.0.0.1:0",

@@ -33,6 +33,9 @@ pub enum BrokerEvent {
     RouteMatched {
         route_id: String,
     },
+    RouteTransformFailed {
+        route_id: String,
+    },
     QueueDepthChanged {
         queue_id: String,
         depth: usize,
@@ -73,6 +76,7 @@ pub struct HealthSnapshot {
     pub ingress_packets_total: BTreeMap<String, u64>,
     pub ingress_drops_total: BTreeMap<(String, String), u64>,
     pub route_matches_total: BTreeMap<String, u64>,
+    pub route_transform_failures_total: BTreeMap<String, u64>,
     pub queue_depth: BTreeMap<String, usize>,
     pub destination_sent_total: BTreeMap<String, u64>,
     pub destination_send_failures_total: BTreeMap<(String, String), u64>,
@@ -115,6 +119,13 @@ impl InMemoryTelemetry {
             let _ = writeln!(
                 output,
                 "rosc_route_matches_total{{route_id=\"{route_id}\"}} {count}"
+            );
+        }
+
+        for (route_id, count) in snapshot.route_transform_failures_total {
+            let _ = writeln!(
+                output,
+                "rosc_route_transform_failures_total{{route_id=\"{route_id}\"}} {count}"
             );
         }
 
@@ -186,6 +197,12 @@ impl TelemetrySink for InMemoryTelemetry {
             }
             BrokerEvent::RouteMatched { route_id } => {
                 *snapshot.route_matches_total.entry(route_id).or_default() += 1;
+            }
+            BrokerEvent::RouteTransformFailed { route_id } => {
+                *snapshot
+                    .route_transform_failures_total
+                    .entry(route_id)
+                    .or_default() += 1;
             }
             BrokerEvent::QueueDepthChanged { queue_id, depth } => {
                 snapshot.queue_depth.insert(queue_id, depth);
