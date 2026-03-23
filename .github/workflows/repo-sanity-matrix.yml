@@ -43,10 +43,20 @@ jobs:
               "CONTRIBUTING.ja.md",
               "SECURITY.md",
               "SECURITY.ja.md",
+              ".agent/AGENT.md",
+              ".agent/AGENTS.md",
+              ".agents/AGENT.md",
+              ".agents/AGENTS.md",
+              ".skill/SKILL.md",
+              ".skill/SKILLS.md",
+              ".skills/SKILL.md",
+              ".skills/SKILLS.md",
               "docs/concepts/en/license-and-contributor-policy.md",
               "docs/concepts/ja/license-and-contributor-policy.md",
               "docs/concepts/en/ci-expansion-and-required-check-roadmap.md",
               "docs/concepts/ja/ci-expansion-and-required-check-roadmap.md",
+              "docs/concepts/en/ai-collaboration-and-agent-interop-plan.md",
+              "docs/concepts/ja/ai-collaboration-and-agent-interop-plan.md",
               "docs/design/en/rust-workspace-and-crate-boundaries.md",
               "docs/design/ja/rust-workspace-and-crate-boundaries.md",
               "docs/design/en/osc-conformance-corpus-plan.md",
@@ -79,6 +89,33 @@ jobs:
           if len(en_adrs) != len(ja_adrs):
               print("ADR trees are not mirrored between English and Japanese.", file=sys.stderr)
               sys.exit(1)
+
+          for left, right in [
+              (root / ".agent", root / ".agents"),
+              (root / ".skill", root / ".skills"),
+          ]:
+              left_files = {p.relative_to(left).as_posix() for p in left.rglob("*.md")}
+              right_files = {p.relative_to(right).as_posix() for p in right.rglob("*.md")}
+              if left_files != right_files:
+                  print(f"Mirrored AI trees differ: {left} vs {right}", file=sys.stderr)
+                  sys.exit(1)
+              for rel in sorted(left_files):
+                  if (left / rel).read_text(encoding="utf-8") != (right / rel).read_text(encoding="utf-8"):
+                      print(
+                          f"Mirrored AI files differ: {(left / rel).relative_to(root)} vs {(right / rel).relative_to(root)}",
+                          file=sys.stderr,
+                      )
+                      sys.exit(1)
+
+          for left, right in [
+              (root / ".agent/AGENT.md", root / ".agent/AGENTS.md"),
+              (root / ".agents/AGENT.md", root / ".agents/AGENTS.md"),
+              (root / ".skill/SKILL.md", root / ".skill/SKILLS.md"),
+              (root / ".skills/SKILL.md", root / ".skills/SKILLS.md"),
+          ]:
+              if left.read_text(encoding="utf-8") != right.read_text(encoding="utf-8"):
+                  print(f"Alias files diverged: {left.relative_to(root)} vs {right.relative_to(root)}", file=sys.stderr)
+                  sys.exit(1)
 
           print("Repository readiness artifacts look good.")
           PY

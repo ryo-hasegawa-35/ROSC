@@ -62,6 +62,16 @@ Project-level documents should exist in both English and Japanese.
 At minimum, when adding or changing documents under `docs/concepts/` or
 `docs/design/`, contributors should preserve the English and Japanese pair.
 
+## AI Collaboration Files
+
+If a change touches `.agent/`, `.agents/`, `.skill/`, or `.skills/`:
+
+- update the mirrored tree in the same pull request
+- keep `AGENT.md` and `AGENTS.md` aligned in meaning
+- keep `SKILL.md` and `SKILLS.md` aligned in meaning
+- update the relevant `docs/` files if repository policy or workflow meaning
+  changed
+
 ## Design Governance Rule
 
 If a PR changes the meaning of a normative design document, it should reference

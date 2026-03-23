@@ -62,6 +62,7 @@ Important interpretation notes:
 - [CI Expansion And Required-Check Roadmap](./ci-expansion-and-required-check-roadmap.md)
 - [GitHub Foundation And Collaboration Plan](./github-foundation-and-collaboration-plan.md)
 - [GitHub Backlog Map](./github-backlog-map.md)
+- [AI Collaboration And Agent Interop Plan](./ai-collaboration-and-agent-interop-plan.md)
 
 ## Related Design Specs
 

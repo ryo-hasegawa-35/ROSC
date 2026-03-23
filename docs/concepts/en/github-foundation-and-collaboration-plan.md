@@ -57,8 +57,13 @@ At minimum, the repository should clearly separate:
 - test assets and conformance vectors
 - examples and sample configurations
 - GitHub policy files and templates
+- AI collaboration entry trees
 
 The existing `docs/concepts` and `docs/design` split should be preserved.
+
+The repository should also keep mirrored AI entry trees in `.agent/`,
+`.agents/`, `.skill/`, and `.skills/` so different tools discover the same
+working rules.
 
 ## Required GitHub Baseline Files
 
