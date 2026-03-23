@@ -77,6 +77,10 @@ pub fn proxy_status_from_config(config: &BrokerConfig) -> Result<UdpProxyStatusS
     let mut warnings = Vec::new();
 
     for route in &config.routes {
+        if !route.enabled {
+            continue;
+        }
+
         if route.match_spec.ingress_ids.is_empty() {
             for route_ids in route_ids_by_ingress.values_mut() {
                 route_ids.insert(route.id.clone());
@@ -183,6 +187,7 @@ pub fn proxy_status_from_config(config: &BrokerConfig) -> Result<UdpProxyStatusS
     let fallback_routes = config
         .routes
         .iter()
+        .filter(|route| route.enabled)
         .map(|route| {
             let direct_udp_targets = route
                 .destinations

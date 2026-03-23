@@ -114,3 +114,45 @@ async fn live_proxy_status_exposes_bound_local_addr_when_requested() {
         .expect("live status should resolve bound address");
     assert!(bound.starts_with("127.0.0.1:"));
 }
+
+#[test]
+fn proxy_status_excludes_disabled_routes_from_active_usage_summary() {
+    let config = BrokerConfig::from_toml_str(
+        r#"
+        [[udp_ingresses]]
+        id = "udp_localhost_in"
+        bind = "127.0.0.1:9000"
+        mode = "osc1_0_strict"
+
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "0.0.0.0:0"
+        target = "127.0.0.1:9001"
+
+        [[routes]]
+        id = "camera"
+        enabled = false
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+
+        [routes.match]
+        ingress_ids = ["udp_localhost_in"]
+        address_patterns = ["/ue5/camera/fov"]
+        protocols = ["osc_udp"]
+
+        [[routes.destinations]]
+        target = "udp_renderer"
+        transport = "osc_udp"
+        "#,
+    )
+    .unwrap();
+
+    let status = proxy_status_from_config(&config).unwrap();
+
+    assert_eq!(status.routes.len(), 1);
+    assert!(!status.routes[0].enabled);
+    assert!(status.ingresses[0].route_ids.is_empty());
+    assert!(status.destinations[0].route_ids.is_empty());
+    assert!(status.fallback_routes.is_empty());
+    assert!(status.warnings.is_empty());
+}
