@@ -20,6 +20,8 @@ enum Command {
     },
     ProxyStatus {
         config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
     },
     WatchConfig {
         path: PathBuf,
@@ -56,11 +58,21 @@ async fn main() -> Result<()> {
                 config.routes.len()
             );
         }
-        Command::ProxyStatus { config } => {
+        Command::ProxyStatus {
+            config,
+            resolve_bindings,
+        } => {
             let content = fs::read_to_string(&config)
                 .with_context(|| format!("failed to read config file {}", config.display()))?;
             let config = rosc_config::BrokerConfig::from_toml_str(&content)?;
-            let status = rosc_broker::proxy_status_from_config(&config)?;
+            let status = if resolve_bindings {
+                let app =
+                    rosc_broker::UdpProxyApp::from_config(&config, InMemoryTelemetry::default())
+                        .await?;
+                app.status_snapshot()
+            } else {
+                rosc_broker::proxy_status_from_config(&config)?
+            };
             println!("{}", serde_json::to_string_pretty(&status)?);
         }
         Command::WatchConfig { path, poll_ms } => {

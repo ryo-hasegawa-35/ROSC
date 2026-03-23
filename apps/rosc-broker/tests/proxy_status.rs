@@ -1,5 +1,6 @@
-use rosc_broker::proxy_status_from_config;
+use rosc_broker::{UdpProxyApp, proxy_status_from_config};
 use rosc_config::BrokerConfig;
+use rosc_telemetry::InMemoryTelemetry;
 
 #[test]
 fn proxy_status_summarizes_sidecar_routes_and_fallback_targets() {
@@ -64,4 +65,52 @@ fn proxy_status_summarizes_sidecar_routes_and_fallback_targets() {
         vec!["127.0.0.1:9001"]
     );
     assert!(status.warnings.is_empty());
+}
+
+#[tokio::test]
+async fn live_proxy_status_exposes_bound_local_addr_when_requested() {
+    let destination_listener = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let destination_addr = destination_listener.local_addr().unwrap();
+
+    let config = BrokerConfig::from_toml_str(&format!(
+        r#"
+        [[udp_ingresses]]
+        id = "udp_localhost_in"
+        bind = "127.0.0.1:0"
+        mode = "osc1_0_strict"
+
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "127.0.0.1:0"
+        target = "{destination_addr}"
+
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+
+        [routes.match]
+        ingress_ids = ["udp_localhost_in"]
+        address_patterns = ["/ue5/camera/fov"]
+        protocols = ["osc_udp"]
+
+        [[routes.destinations]]
+        target = "udp_renderer"
+        transport = "osc_udp"
+        "#
+    ))
+    .unwrap();
+
+    let app = UdpProxyApp::from_config(&config, InMemoryTelemetry::default())
+        .await
+        .unwrap();
+    let status = app.status_snapshot();
+
+    assert_eq!(status.ingresses.len(), 1);
+    let bound = status.ingresses[0]
+        .bound_local_addr
+        .as_ref()
+        .expect("live status should resolve bound address");
+    assert!(bound.starts_with("127.0.0.1:"));
 }
