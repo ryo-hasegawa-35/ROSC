@@ -119,11 +119,8 @@ where
                     .packet
                     .capabilities
                     .contains(rosc_packet::PacketCapabilities::CACHEABLE_CANDIDATE)
+                && let Some(address) = dispatch.packet.address()
             {
-                let Some(address) = dispatch.packet.address() else {
-                    continue;
-                };
-
                 let cached_at = SystemTime::now();
                 let expires_at = dispatch
                     .cache

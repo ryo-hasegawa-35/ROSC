@@ -100,6 +100,12 @@ impl Default for UdpDestinationPolicyConfig {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ConfigDiff {
+    pub added_ingresses: Vec<String>,
+    pub removed_ingresses: Vec<String>,
+    pub changed_ingresses: Vec<String>,
+    pub added_destinations: Vec<String>,
+    pub removed_destinations: Vec<String>,
+    pub changed_destinations: Vec<String>,
     pub added_routes: Vec<String>,
     pub removed_routes: Vec<String>,
     pub changed_routes: Vec<String>,
@@ -107,7 +113,13 @@ pub struct ConfigDiff {
 
 impl ConfigDiff {
     pub fn is_empty(&self) -> bool {
-        self.added_routes.is_empty()
+        self.added_ingresses.is_empty()
+            && self.removed_ingresses.is_empty()
+            && self.changed_ingresses.is_empty()
+            && self.added_destinations.is_empty()
+            && self.removed_destinations.is_empty()
+            && self.changed_destinations.is_empty()
+            && self.added_routes.is_empty()
             && self.removed_routes.is_empty()
             && self.changed_routes.is_empty()
     }
@@ -272,6 +284,20 @@ impl ConfigManager {
         Ok(match &self.current {
             Some(current) => diff_configs(&current.config, &candidate),
             None => ConfigDiff {
+                added_ingresses: candidate
+                    .udp_ingresses
+                    .iter()
+                    .map(|ingress| ingress.id.clone())
+                    .collect(),
+                removed_ingresses: Vec::new(),
+                changed_ingresses: Vec::new(),
+                added_destinations: candidate
+                    .udp_destinations
+                    .iter()
+                    .map(|destination| destination.id.clone())
+                    .collect(),
+                removed_destinations: Vec::new(),
+                changed_destinations: Vec::new(),
                 added_routes: candidate
                     .routes
                     .iter()
@@ -288,6 +314,20 @@ impl ConfigManager {
         let diff = match &self.current {
             Some(current) => diff_configs(&current.config, &candidate),
             None => ConfigDiff {
+                added_ingresses: candidate
+                    .udp_ingresses
+                    .iter()
+                    .map(|ingress| ingress.id.clone())
+                    .collect(),
+                removed_ingresses: Vec::new(),
+                changed_ingresses: Vec::new(),
+                added_destinations: candidate
+                    .udp_destinations
+                    .iter()
+                    .map(|destination| destination.id.clone())
+                    .collect(),
+                removed_destinations: Vec::new(),
+                changed_destinations: Vec::new(),
                 added_routes: candidate
                     .routes
                     .iter()
@@ -311,42 +351,78 @@ impl ConfigManager {
 }
 
 fn diff_configs(current: &BrokerConfig, candidate: &BrokerConfig) -> ConfigDiff {
-    let current_routes: BTreeMap<&str, &RouteSpec> = current
-        .routes
-        .iter()
-        .map(|route| (route.id.as_str(), route))
-        .collect();
-    let candidate_routes: BTreeMap<&str, &RouteSpec> = candidate
-        .routes
-        .iter()
-        .map(|route| (route.id.as_str(), route))
-        .collect();
+    let (added_ingresses, removed_ingresses, changed_ingresses) = diff_named(
+        current
+            .udp_ingresses
+            .iter()
+            .map(|ingress| (ingress.id.as_str(), ingress)),
+        candidate
+            .udp_ingresses
+            .iter()
+            .map(|ingress| (ingress.id.as_str(), ingress)),
+    );
+    let (added_destinations, removed_destinations, changed_destinations) = diff_named(
+        current
+            .udp_destinations
+            .iter()
+            .map(|destination| (destination.id.as_str(), destination)),
+        candidate
+            .udp_destinations
+            .iter()
+            .map(|destination| (destination.id.as_str(), destination)),
+    );
+    let (added_routes, removed_routes, changed_routes) = diff_named(
+        current
+            .routes
+            .iter()
+            .map(|route| (route.id.as_str(), route)),
+        candidate
+            .routes
+            .iter()
+            .map(|route| (route.id.as_str(), route)),
+    );
 
-    let mut added_routes = Vec::new();
-    let mut removed_routes = Vec::new();
-    let mut changed_routes = Vec::new();
+    ConfigDiff {
+        added_ingresses,
+        removed_ingresses,
+        changed_ingresses,
+        added_destinations,
+        removed_destinations,
+        changed_destinations,
+        added_routes,
+        removed_routes,
+        changed_routes,
+    }
+}
 
-    for route_id in candidate_routes.keys() {
-        match current_routes.get(route_id) {
-            None => added_routes.push((*route_id).to_owned()),
-            Some(current_route) if *current_route != candidate_routes[route_id] => {
-                changed_routes.push((*route_id).to_owned())
+fn diff_named<'a, T: Eq + 'a>(
+    current: impl IntoIterator<Item = (&'a str, &'a T)>,
+    candidate: impl IntoIterator<Item = (&'a str, &'a T)>,
+) -> (Vec<String>, Vec<String>, Vec<String>) {
+    let current: BTreeMap<&str, &T> = current.into_iter().collect();
+    let candidate: BTreeMap<&str, &T> = candidate.into_iter().collect();
+
+    let mut added = Vec::new();
+    let mut removed = Vec::new();
+    let mut changed = Vec::new();
+
+    for id in candidate.keys() {
+        match current.get(id) {
+            None => added.push((*id).to_owned()),
+            Some(current_value) if *current_value != candidate[id] => {
+                changed.push((*id).to_owned())
             }
             Some(_) => {}
         }
     }
 
-    for route_id in current_routes.keys() {
-        if !candidate_routes.contains_key(route_id) {
-            removed_routes.push((*route_id).to_owned());
+    for id in current.keys() {
+        if !candidate.contains_key(id) {
+            removed.push((*id).to_owned());
         }
     }
 
-    ConfigDiff {
-        added_routes,
-        removed_routes,
-        changed_routes,
-    }
+    (added, removed, changed)
 }
 
 const fn default_schema_version() -> u32 {

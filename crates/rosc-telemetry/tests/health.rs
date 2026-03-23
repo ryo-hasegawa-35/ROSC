@@ -50,6 +50,12 @@ fn in_memory_telemetry_renders_prometheus_text() {
     });
     telemetry.emit(BrokerEvent::ConfigApplied {
         revision: 4,
+        added_ingresses: 1,
+        removed_ingresses: 0,
+        changed_ingresses: 2,
+        added_destinations: 3,
+        removed_destinations: 0,
+        changed_destinations: 4,
         added_routes: 1,
         removed_routes: 0,
         changed_routes: 2,
@@ -74,5 +80,9 @@ fn in_memory_telemetry_renders_prometheus_text() {
     assert!(text.contains("rosc_destination_send_total{destination_id=\"udp_renderer\"} 1"));
     assert!(text.contains("rosc_destination_breaker_state{destination_id=\"udp_renderer\"} 2"));
     assert!(text.contains("rosc_config_revision 4"));
+    assert!(text.contains("rosc_config_added_ingresses_total 1"));
+    assert!(text.contains("rosc_config_changed_ingresses_total 2"));
+    assert!(text.contains("rosc_config_added_destinations_total 3"));
+    assert!(text.contains("rosc_config_changed_destinations_total 4"));
     assert!(text.contains("rosc_config_rejections_total 1"));
 }

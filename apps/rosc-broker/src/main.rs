@@ -58,8 +58,10 @@ async fn main() -> Result<()> {
             let mut supervisor = rosc_broker::ConfigFileSupervisor::new(&path, telemetry);
             let applied = supervisor.load_initial()?;
             println!(
-                "loaded initial config: revision={} added_routes={}",
+                "loaded initial config: revision={} added_ingresses={} added_destinations={} added_routes={}",
                 applied.revision,
+                applied.diff.added_ingresses.join(","),
+                applied.diff.added_destinations.join(","),
                 applied.diff.added_routes.join(",")
             );
 
@@ -71,8 +73,14 @@ async fn main() -> Result<()> {
                             rosc_broker::ConfigReloadOutcome::Unchanged => {}
                             rosc_broker::ConfigReloadOutcome::Applied(applied) => {
                                 println!(
-                                    "applied config revision={} added_routes={} removed_routes={} changed_routes={}",
+                                    "applied config revision={} added_ingresses={} removed_ingresses={} changed_ingresses={} added_destinations={} removed_destinations={} changed_destinations={} added_routes={} removed_routes={} changed_routes={}",
                                     applied.revision,
+                                    applied.diff.added_ingresses.join(","),
+                                    applied.diff.removed_ingresses.join(","),
+                                    applied.diff.changed_ingresses.join(","),
+                                    applied.diff.added_destinations.join(","),
+                                    applied.diff.removed_destinations.join(","),
+                                    applied.diff.changed_destinations.join(","),
                                     applied.diff.added_routes.join(","),
                                     applied.diff.removed_routes.join(","),
                                     applied.diff.changed_routes.join(","),
@@ -107,6 +115,18 @@ async fn main() -> Result<()> {
             let diff = manager.preview_toml_diff(&candidate_content)?;
 
             println!("current_revision={}", applied.revision);
+            println!("added_ingresses={}", diff.added_ingresses.join(","));
+            println!("removed_ingresses={}", diff.removed_ingresses.join(","));
+            println!("changed_ingresses={}", diff.changed_ingresses.join(","));
+            println!("added_destinations={}", diff.added_destinations.join(","));
+            println!(
+                "removed_destinations={}",
+                diff.removed_destinations.join(",")
+            );
+            println!(
+                "changed_destinations={}",
+                diff.changed_destinations.join(",")
+            );
             println!("added_routes={}", diff.added_routes.join(","));
             println!("removed_routes={}", diff.removed_routes.join(","));
             println!("changed_routes={}", diff.changed_routes.join(","));
@@ -121,6 +141,12 @@ async fn main() -> Result<()> {
                 let applied = manager.apply_toml_str(&content)?;
                 telemetry.emit(BrokerEvent::ConfigApplied {
                     revision: applied.revision,
+                    added_ingresses: applied.diff.added_ingresses.len(),
+                    removed_ingresses: applied.diff.removed_ingresses.len(),
+                    changed_ingresses: applied.diff.changed_ingresses.len(),
+                    added_destinations: applied.diff.added_destinations.len(),
+                    removed_destinations: applied.diff.removed_destinations.len(),
+                    changed_destinations: applied.diff.changed_destinations.len(),
                     added_routes: applied.diff.added_routes.len(),
                     removed_routes: applied.diff.removed_routes.len(),
                     changed_routes: applied.diff.changed_routes.len(),

@@ -108,11 +108,58 @@ fn config_supervisor_applies_changed_valid_config() {
         ConfigReloadOutcome::Applied(applied) => {
             assert_eq!(applied.revision, 2);
             assert_eq!(applied.diff.added_routes, vec!["tracking"]);
+            assert!(applied.diff.added_destinations.is_empty());
         }
         other => panic!("expected applied config, got {other:?}"),
     }
 
     assert_eq!(supervisor.current_revision(), Some(2));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn config_supervisor_reports_destination_policy_only_changes() {
+    let path = unique_config_path();
+    fs::write(&path, base_config()).unwrap();
+
+    let mut supervisor = ConfigFileSupervisor::new(&path, InMemoryTelemetry::default());
+    supervisor.load_initial().unwrap();
+
+    fs::write(
+        &path,
+        r#"
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "0.0.0.0:0"
+        target = "127.0.0.1:9001"
+        [udp_destinations.policy]
+        queue_depth = 32
+
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+        [routes.match]
+        address_patterns = ["/ue5/camera/fov"]
+        protocols = ["osc_udp"]
+        [[routes.destinations]]
+        target = "udp_renderer"
+        transport = "osc_udp"
+        "#,
+    )
+    .unwrap();
+
+    let outcome = supervisor.poll_once().unwrap();
+    match outcome {
+        ConfigReloadOutcome::Applied(applied) => {
+            assert_eq!(applied.revision, 2);
+            assert_eq!(applied.diff.changed_destinations, vec!["udp_renderer"]);
+            assert!(applied.diff.changed_routes.is_empty());
+        }
+        other => panic!("expected applied config, got {other:?}"),
+    }
 
     let _ = fs::remove_file(path);
 }

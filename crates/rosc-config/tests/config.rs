@@ -199,6 +199,66 @@ fn config_manager_reports_route_diff() {
     assert_eq!(diff.added_routes, vec!["tracking"]);
     assert_eq!(diff.changed_routes, vec!["camera"]);
     assert!(diff.removed_routes.is_empty());
+    assert_eq!(diff.added_destinations, vec!["tap"]);
+    assert!(diff.changed_destinations.is_empty());
+    assert!(diff.removed_destinations.is_empty());
+}
+
+#[test]
+fn config_manager_reports_destination_policy_only_diff() {
+    let mut manager = ConfigManager::default();
+    manager
+        .apply_toml_str(
+            r#"
+            [[udp_destinations]]
+            id = "udp_renderer"
+            bind = "0.0.0.0:0"
+            target = "127.0.0.1:9001"
+            [udp_destinations.policy]
+            queue_depth = 16
+
+            [[routes]]
+            id = "camera"
+            enabled = true
+            mode = "osc1_0_strict"
+            class = "StatefulControl"
+            [routes.match]
+            [[routes.destinations]]
+            target = "udp_renderer"
+            transport = "osc_udp"
+            "#,
+        )
+        .unwrap();
+
+    let diff = manager
+        .preview_toml_diff(
+            r#"
+            [[udp_destinations]]
+            id = "udp_renderer"
+            bind = "0.0.0.0:0"
+            target = "127.0.0.1:9001"
+            [udp_destinations.policy]
+            queue_depth = 32
+
+            [[routes]]
+            id = "camera"
+            enabled = true
+            mode = "osc1_0_strict"
+            class = "StatefulControl"
+            [routes.match]
+            [[routes.destinations]]
+            target = "udp_renderer"
+            transport = "osc_udp"
+            "#,
+        )
+        .unwrap();
+
+    assert!(diff.added_routes.is_empty());
+    assert!(diff.changed_routes.is_empty());
+    assert!(diff.removed_routes.is_empty());
+    assert_eq!(diff.changed_destinations, vec!["udp_renderer"]);
+    assert!(diff.added_destinations.is_empty());
+    assert!(diff.removed_destinations.is_empty());
 }
 
 #[test]

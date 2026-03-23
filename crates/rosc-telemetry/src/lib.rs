@@ -82,6 +82,12 @@ pub enum BrokerEvent {
     },
     ConfigApplied {
         revision: u64,
+        added_ingresses: usize,
+        removed_ingresses: usize,
+        changed_ingresses: usize,
+        added_destinations: usize,
+        removed_destinations: usize,
+        changed_destinations: usize,
         added_routes: usize,
         removed_routes: usize,
         changed_routes: usize,
@@ -122,6 +128,12 @@ pub struct HealthSnapshot {
     pub destination_send_failures_total: BTreeMap<(String, String), u64>,
     pub destination_breaker_state: BTreeMap<String, BreakerStateSnapshot>,
     pub config_revision: u64,
+    pub config_added_ingresses_total: u64,
+    pub config_removed_ingresses_total: u64,
+    pub config_changed_ingresses_total: u64,
+    pub config_added_destinations_total: u64,
+    pub config_removed_destinations_total: u64,
+    pub config_changed_destinations_total: u64,
     pub config_added_routes_total: u64,
     pub config_removed_routes_total: u64,
     pub config_changed_routes_total: u64,
@@ -251,6 +263,36 @@ impl InMemoryTelemetry {
         let _ = writeln!(output, "rosc_config_revision {}", snapshot.config_revision);
         let _ = writeln!(
             output,
+            "rosc_config_added_ingresses_total {}",
+            snapshot.config_added_ingresses_total
+        );
+        let _ = writeln!(
+            output,
+            "rosc_config_removed_ingresses_total {}",
+            snapshot.config_removed_ingresses_total
+        );
+        let _ = writeln!(
+            output,
+            "rosc_config_changed_ingresses_total {}",
+            snapshot.config_changed_ingresses_total
+        );
+        let _ = writeln!(
+            output,
+            "rosc_config_added_destinations_total {}",
+            snapshot.config_added_destinations_total
+        );
+        let _ = writeln!(
+            output,
+            "rosc_config_removed_destinations_total {}",
+            snapshot.config_removed_destinations_total
+        );
+        let _ = writeln!(
+            output,
+            "rosc_config_changed_destinations_total {}",
+            snapshot.config_changed_destinations_total
+        );
+        let _ = writeln!(
+            output,
             "rosc_config_added_routes_total {}",
             snapshot.config_added_routes_total
         );
@@ -372,11 +414,23 @@ impl TelemetrySink for InMemoryTelemetry {
             }
             BrokerEvent::ConfigApplied {
                 revision,
+                added_ingresses,
+                removed_ingresses,
+                changed_ingresses,
+                added_destinations,
+                removed_destinations,
+                changed_destinations,
                 added_routes,
                 removed_routes,
                 changed_routes,
             } => {
                 snapshot.config_revision = revision;
+                snapshot.config_added_ingresses_total += added_ingresses as u64;
+                snapshot.config_removed_ingresses_total += removed_ingresses as u64;
+                snapshot.config_changed_ingresses_total += changed_ingresses as u64;
+                snapshot.config_added_destinations_total += added_destinations as u64;
+                snapshot.config_removed_destinations_total += removed_destinations as u64;
+                snapshot.config_changed_destinations_total += changed_destinations as u64;
                 snapshot.config_added_routes_total += added_routes as u64;
                 snapshot.config_removed_routes_total += removed_routes as u64;
                 snapshot.config_changed_routes_total += changed_routes as u64;

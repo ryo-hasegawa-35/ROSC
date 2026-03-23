@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -78,7 +78,7 @@ impl UdpProxyApp {
                 .with_context(|| format!("invalid udp target address {}", destination.target))?;
             if let Some((ingress_id, ingress_addr)) = ingress_addrs
                 .iter()
-                .find(|(_, ingress_addr)| **ingress_addr == target)
+                .find(|(_, ingress_addr)| ingress_receives_target(**ingress_addr, target))
             {
                 anyhow::bail!(
                     "udp destination `{}` targets ingress `{}` at {}; refusing proxy self-loop",
@@ -298,10 +298,36 @@ where
     fn emit_config_applied(&self, applied: &ConfigApplyResult) {
         self.telemetry.emit(BrokerEvent::ConfigApplied {
             revision: applied.revision,
+            added_ingresses: applied.diff.added_ingresses.len(),
+            removed_ingresses: applied.diff.removed_ingresses.len(),
+            changed_ingresses: applied.diff.changed_ingresses.len(),
+            added_destinations: applied.diff.added_destinations.len(),
+            removed_destinations: applied.diff.removed_destinations.len(),
+            changed_destinations: applied.diff.changed_destinations.len(),
             added_routes: applied.diff.added_routes.len(),
             removed_routes: applied.diff.removed_routes.len(),
             changed_routes: applied.diff.changed_routes.len(),
         });
+    }
+}
+
+fn ingress_receives_target(ingress_addr: SocketAddr, target: SocketAddr) -> bool {
+    if ingress_addr.port() != target.port() {
+        return false;
+    }
+
+    if ingress_addr.ip() == target.ip() {
+        return true;
+    }
+
+    match (ingress_addr.ip(), target.ip()) {
+        (IpAddr::V4(ingress_ip), IpAddr::V4(target_ip)) => {
+            ingress_ip.is_unspecified() && (target_ip.is_loopback() || target_ip.is_unspecified())
+        }
+        (IpAddr::V6(ingress_ip), IpAddr::V6(target_ip)) => {
+            ingress_ip.is_unspecified() && (target_ip.is_loopback() || target_ip.is_unspecified())
+        }
+        _ => false,
     }
 }
 
