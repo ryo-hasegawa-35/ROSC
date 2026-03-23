@@ -64,6 +64,10 @@ pub trait TelemetrySink: Send + Sync {
     fn emit(&self, event: BrokerEvent);
 }
 
+pub trait HealthReporter: Send + Sync {
+    fn render_prometheus(&self) -> String;
+}
+
 #[derive(Default)]
 pub struct NoopTelemetry;
 
@@ -176,6 +180,12 @@ impl InMemoryTelemetry {
         );
 
         output
+    }
+}
+
+impl HealthReporter for InMemoryTelemetry {
+    fn render_prometheus(&self) -> String {
+        Self::render_prometheus(self)
     }
 }
 

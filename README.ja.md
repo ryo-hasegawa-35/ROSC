@@ -35,6 +35,7 @@ repository は現在、最初の実装フェーズに入りました。
 cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
+cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
 ```
 
 Docker 経由で同じ確認を行う場合:
@@ -55,6 +56,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - bounded ingress queue と UDP ingress binding
 - breaker 付き per-destination egress worker と isolation
 - Prometheus text に落とせる in-memory health / metrics export
+- 初期ローカルトラブルシュート向けの HTTP `/healthz` と `/metrics` endpoint
 - config diff と last-known-good を持つ safe apply 基盤
 
 ## ドキュメント入口

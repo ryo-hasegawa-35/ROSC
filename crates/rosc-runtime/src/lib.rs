@@ -8,9 +8,10 @@ use async_trait::async_trait;
 use rosc_osc::CompatibilityMode;
 use rosc_packet::{IngressMetadata, PacketBuildError, PacketEnvelope, TransportKind};
 use rosc_route::{RouteDispatch, RoutingEngine, RoutingOutcome};
-use rosc_telemetry::{BreakerStateSnapshot, BrokerEvent, TelemetrySink};
+use rosc_telemetry::{BreakerStateSnapshot, BrokerEvent, HealthReporter, TelemetrySink};
 use thiserror::Error;
-use tokio::net::UdpSocket;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream, UdpSocket};
 use tokio::sync::{Notify, mpsc};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -265,6 +266,14 @@ impl UdpEgressSink {
         let socket = UdpSocket::bind(bind_address).await?;
         Ok(Self { socket, target })
     }
+}
+
+pub async fn serve_health_http_once(
+    listener: &TcpListener,
+    reporter: Arc<dyn HealthReporter>,
+) -> Result<(), io::Error> {
+    let (stream, _) = listener.accept().await?;
+    handle_health_http_connection(stream, reporter).await
 }
 
 #[async_trait]
@@ -625,4 +634,40 @@ fn open_breaker(
         state: BreakerStateSnapshot::Open,
         reason: reason.to_owned(),
     });
+}
+
+async fn handle_health_http_connection(
+    mut stream: TcpStream,
+    reporter: Arc<dyn HealthReporter>,
+) -> Result<(), io::Error> {
+    let mut buffer = [0u8; 2048];
+    let size = stream.read(&mut buffer).await?;
+    let request = String::from_utf8_lossy(&buffer[..size]);
+    let path = request
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .unwrap_or("/");
+
+    let (status, content_type, body) = match path {
+        "/healthz" => ("200 OK", "text/plain; charset=utf-8", "ok\n".to_owned()),
+        "/metrics" => (
+            "200 OK",
+            "text/plain; version=0.0.4; charset=utf-8",
+            reporter.render_prometheus(),
+        ),
+        _ => (
+            "404 Not Found",
+            "text/plain; charset=utf-8",
+            "not found\n".to_owned(),
+        ),
+    };
+
+    let response = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    stream.write_all(response.as_bytes()).await?;
+    stream.shutdown().await
 }

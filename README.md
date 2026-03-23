@@ -37,6 +37,7 @@ Run the current workspace locally:
 cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
+cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
 ```
 
 Run the same workspace inside Docker:
@@ -57,6 +58,7 @@ Current Phase 01 runtime coverage:
 - bounded ingress queue and UDP ingress binding
 - bounded per-destination egress workers with breaker-based isolation
 - in-memory health/metrics export rendered in Prometheus text format
+- minimal HTTP `/healthz` and `/metrics` endpoint for early local troubleshooting
 - safe config diffing and last-known-good config apply semantics
 
 ## Documentation Entry Points
