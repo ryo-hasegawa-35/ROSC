@@ -5,6 +5,7 @@ mod proxy_status;
 pub use config_supervisor::{ConfigFileSupervisor, ConfigReloadOutcome};
 pub use proxy_app::UdpProxyApp;
 pub use proxy_status::{
-    UdpProxyDestinationStatus, UdpProxyFallbackStatus, UdpProxyIngressStatus, UdpProxyRouteStatus,
-    UdpProxyStatusSnapshot, proxy_status_from_config,
+    UdpProxyDestinationRuntimeStatus, UdpProxyDestinationStatus, UdpProxyFallbackStatus,
+    UdpProxyIngressStatus, UdpProxyRouteAssessment, UdpProxyRouteStatus, UdpProxyRuntimeStatus,
+    UdpProxyStatusSnapshot, UdpProxySummary, attach_runtime_status, proxy_status_from_config,
 };

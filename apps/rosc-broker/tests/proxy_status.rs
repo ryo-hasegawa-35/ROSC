@@ -1,5 +1,6 @@
 use rosc_broker::{UdpProxyApp, proxy_status_from_config};
 use rosc_config::BrokerConfig;
+use rosc_osc::{OscArgument, OscMessage, ParsedOscPacket, TypeTagSource, encode_packet};
 use rosc_telemetry::InMemoryTelemetry;
 
 #[test]
@@ -58,6 +59,7 @@ fn proxy_status_summarizes_sidecar_routes_and_fallback_targets() {
     assert_eq!(status.summary.active_destinations, 1);
     assert_eq!(status.summary.fallback_ready_routes, 1);
     assert_eq!(status.summary.fallback_missing_routes, 0);
+    assert!(status.runtime.is_none());
     assert_eq!(status.ingresses.len(), 1);
     assert_eq!(status.ingresses[0].route_ids, vec!["camera"]);
     assert_eq!(status.destinations.len(), 1);
@@ -106,6 +108,18 @@ async fn live_proxy_status_exposes_bound_local_addr_when_requested() {
         address_patterns = ["/ue5/camera/fov"]
         protocols = ["osc_udp"]
 
+        [routes.transform]
+        rename_address = "/render/camera/fov"
+
+        [routes.cache]
+        policy = "last_value_per_address"
+        ttl_ms = 10000
+        persist = "warm"
+
+        [routes.recovery]
+        late_joiner = "latest"
+        rehydrate_on_connect = true
+
         [[routes.destinations]]
         target = "udp_renderer"
         transport = "osc_udp"
@@ -116,6 +130,25 @@ async fn live_proxy_status_exposes_bound_local_addr_when_requested() {
     let app = UdpProxyApp::from_config(&config, InMemoryTelemetry::default())
         .await
         .unwrap();
+    let ingress_addr = app.ingress_local_addr("udp_localhost_in").unwrap();
+    let source = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let payload = encode_packet(&ParsedOscPacket::Message(OscMessage {
+        address: "/ue5/camera/fov".to_owned(),
+        type_tag_source: TypeTagSource::Explicit,
+        arguments: vec![OscArgument::Float32(80.0)],
+    }))
+    .unwrap();
+    source.send_to(&payload, ingress_addr).await.unwrap();
+    assert_eq!(app.relay_once("udp_localhost_in").await.unwrap(), 1);
+    let mut buffer = [0u8; 2048];
+    let _ = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        destination_listener.recv_from(&mut buffer),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+
     let status = app.status_snapshot();
 
     assert_eq!(status.ingresses.len(), 1);
@@ -124,6 +157,17 @@ async fn live_proxy_status_exposes_bound_local_addr_when_requested() {
         .as_ref()
         .expect("live status should resolve bound address");
     assert!(bound.starts_with("127.0.0.1:"));
+    let runtime = status
+        .runtime
+        .expect("live status should include runtime snapshot");
+    assert_eq!(
+        runtime.ingress_packets_total.get("udp_localhost_in"),
+        Some(&1)
+    );
+    assert_eq!(runtime.route_matches_total.get("camera"), Some(&1));
+    assert_eq!(runtime.destinations.len(), 1);
+    assert_eq!(runtime.destinations[0].destination_id, "udp_renderer");
+    assert_eq!(runtime.destinations[0].send_total, 1);
 }
 
 #[test]

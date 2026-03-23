@@ -3,11 +3,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::Result;
 use rosc_config::{BrokerConfig, DropPolicyConfig};
 use rosc_route::{CachePolicy, CapturePolicy, TrafficClass, TransportSelector};
+use rosc_telemetry::{BreakerStateSnapshot, HealthSnapshot};
 use serde::Serialize;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct UdpProxyStatusSnapshot {
     pub summary: UdpProxySummary,
+    pub runtime: Option<UdpProxyRuntimeStatus>,
     pub ingresses: Vec<UdpProxyIngressStatus>,
     pub destinations: Vec<UdpProxyDestinationStatus>,
     pub routes: Vec<UdpProxyRouteStatus>,
@@ -26,6 +28,24 @@ pub struct UdpProxySummary {
     pub fallback_ready_routes: usize,
     pub fallback_missing_routes: usize,
     pub warning_count: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct UdpProxyRuntimeStatus {
+    pub ingress_packets_total: BTreeMap<String, u64>,
+    pub ingress_drops_total: BTreeMap<String, u64>,
+    pub route_matches_total: BTreeMap<String, u64>,
+    pub route_transform_failures_total: BTreeMap<String, u64>,
+    pub destinations: Vec<UdpProxyDestinationRuntimeStatus>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct UdpProxyDestinationRuntimeStatus {
+    pub destination_id: String,
+    pub queue_depth: usize,
+    pub send_total: u64,
+    pub send_failures_total: u64,
+    pub breaker_state: Option<BreakerStateSnapshot>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -276,6 +296,7 @@ pub fn proxy_status_from_config(config: &BrokerConfig) -> Result<UdpProxyStatusS
 
     Ok(UdpProxyStatusSnapshot {
         summary,
+        runtime: None,
         ingresses,
         destinations,
         routes,
@@ -283,6 +304,20 @@ pub fn proxy_status_from_config(config: &BrokerConfig) -> Result<UdpProxyStatusS
         route_assessments,
         warnings,
     })
+}
+
+pub fn attach_runtime_status(
+    mut status: UdpProxyStatusSnapshot,
+    snapshot: &HealthSnapshot,
+) -> UdpProxyStatusSnapshot {
+    status.runtime = Some(UdpProxyRuntimeStatus {
+        ingress_packets_total: snapshot.ingress_packets_total.clone(),
+        ingress_drops_total: collapse_reason_counts(&snapshot.ingress_drops_total),
+        route_matches_total: snapshot.route_matches_total.clone(),
+        route_transform_failures_total: snapshot.route_transform_failures_total.clone(),
+        destinations: destination_runtime(snapshot),
+    });
+    status
 }
 
 fn assess_route(
@@ -320,4 +355,52 @@ fn assess_route(
         warning_count: warnings.len(),
         warnings,
     }
+}
+
+fn collapse_reason_counts(counts: &BTreeMap<(String, String), u64>) -> BTreeMap<String, u64> {
+    let mut collapsed = BTreeMap::new();
+    for ((id, _reason), count) in counts {
+        *collapsed.entry(id.clone()).or_default() += count;
+    }
+    collapsed
+}
+
+fn destination_runtime(snapshot: &HealthSnapshot) -> Vec<UdpProxyDestinationRuntimeStatus> {
+    let mut destination_ids = BTreeSet::new();
+    destination_ids.extend(snapshot.queue_depth.keys().cloned());
+    destination_ids.extend(snapshot.destination_sent_total.keys().cloned());
+    destination_ids.extend(
+        snapshot
+            .destination_send_failures_total
+            .keys()
+            .map(|(destination_id, _reason)| destination_id.clone()),
+    );
+    destination_ids.extend(snapshot.destination_breaker_state.keys().cloned());
+
+    destination_ids
+        .into_iter()
+        .map(|destination_id| UdpProxyDestinationRuntimeStatus {
+            queue_depth: snapshot
+                .queue_depth
+                .get(&destination_id)
+                .copied()
+                .unwrap_or_default(),
+            send_total: snapshot
+                .destination_sent_total
+                .get(&destination_id)
+                .copied()
+                .unwrap_or_default(),
+            send_failures_total: snapshot
+                .destination_send_failures_total
+                .iter()
+                .filter(|((id, _), _)| id == &destination_id)
+                .map(|(_, count)| *count)
+                .sum(),
+            breaker_state: snapshot
+                .destination_breaker_state
+                .get(&destination_id)
+                .cloned(),
+            destination_id,
+        })
+        .collect()
 }

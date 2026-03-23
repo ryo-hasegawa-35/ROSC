@@ -9,9 +9,11 @@ use rosc_runtime::{
     BreakerPolicy, DestinationPolicy, DestinationRegistry, DestinationWorkerHandle, DropPolicy,
     IngressQueue, QueuePolicy, Runtime, UdpEgressSink, UdpIngressBinding, UdpIngressConfig,
 };
-use rosc_telemetry::{BrokerEvent, InMemoryTelemetry, TelemetrySink};
+use rosc_telemetry::{BrokerEvent, HealthSnapshot, InMemoryTelemetry, TelemetrySink};
 
-use crate::proxy_status::{UdpProxyStatusSnapshot, proxy_status_from_config};
+use crate::proxy_status::{
+    UdpProxyStatusSnapshot, attach_runtime_status, proxy_status_from_config,
+};
 
 pub struct UdpProxyApp {
     runtime: Arc<Runtime<InMemoryTelemetry>>,
@@ -51,7 +53,11 @@ impl UdpProxyApp {
     }
 
     pub fn status_snapshot(&self) -> UdpProxyStatusSnapshot {
-        self.status.clone()
+        attach_runtime_status(self.status.clone(), &self.telemetry_snapshot())
+    }
+
+    pub fn telemetry_snapshot(&self) -> HealthSnapshot {
+        self.runtime.telemetry.snapshot()
     }
 
     pub fn ingress_local_addr(&self, ingress_id: &str) -> Option<SocketAddr> {
