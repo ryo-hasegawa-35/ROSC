@@ -103,6 +103,7 @@ fn recovery_engine_evicts_stale_entries_before_rehydrate() {
     assert_eq!(outcome.stale_evictions, 1);
     let metrics = telemetry.render_prometheus();
     assert!(metrics.contains("rosc_cache_evictions_total{route_id=\"camera\",reason=\"stale\"} 1"));
+    assert!(metrics.contains("rosc_cache_entries{route_id=\"camera\"} 0"));
 }
 
 #[test]

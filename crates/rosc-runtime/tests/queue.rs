@@ -348,6 +348,59 @@ async fn destination_breaker_recovers_after_cooldown_and_successful_probe() {
     assert_eq!(status.sent_total, 1);
 }
 
+#[tokio::test]
+async fn drop_newest_is_not_counted_as_successful_dispatch() {
+    let config = BrokerConfig::from_toml_str(
+        r#"
+        [[udp_destinations]]
+        id = "saturated"
+        bind = "0.0.0.0:0"
+        target = "127.0.0.1:9001"
+
+        [[routes]]
+        id = "fov"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+        [routes.match]
+        address_patterns = ["/ue5/camera/fov"]
+        protocols = ["osc_udp"]
+        [[routes.destinations]]
+        target = "saturated"
+        transport = "osc_udp"
+        "#,
+    )
+    .unwrap();
+
+    let routing = rosc_route::RoutingEngine::new(config.routes).unwrap();
+    let telemetry = InMemoryTelemetry::default();
+    let runtime = Runtime {
+        routing,
+        telemetry: telemetry.clone(),
+    };
+
+    let mut destinations = DestinationRegistry::default();
+    destinations.register(DestinationWorkerHandle::spawn(
+        "saturated",
+        DestinationPolicy {
+            queue_depth: 0,
+            drop_policy: DropPolicy::DropNewest,
+            ..DestinationPolicy::default()
+        },
+        Arc::new(RecordingSink::default()),
+        Arc::new(telemetry),
+    ));
+
+    let outcome = runtime
+        .dispatch_packet(&sample_packet("/ue5/camera/fov"), &destinations)
+        .await;
+
+    assert_eq!(outcome.dispatched, 0);
+    assert!(outcome.successful_dispatches.is_empty());
+    assert_eq!(outcome.failures.len(), 1);
+    assert_eq!(outcome.failures[0].reason, "destination_queue_drop_newest");
+}
+
 fn sample_packet(address: &str) -> PacketEnvelope {
     PacketEnvelope::parse_osc(
         encode_packet(&ParsedOscPacket::Message(OscMessage {

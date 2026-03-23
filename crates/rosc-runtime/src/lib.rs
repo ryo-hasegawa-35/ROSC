@@ -245,11 +245,18 @@ where
 
         for dispatch in &outcome.dispatches {
             match destinations.dispatch(dispatch.clone()).await {
-                Ok(_enqueue_outcome) => {
+                Ok(EnqueueOutcome::Enqueued | EnqueueOutcome::DroppedOldest) => {
                     dispatch_outcome.dispatched += 1;
                     dispatch_outcome
                         .successful_dispatches
                         .push(dispatch.clone());
+                }
+                Ok(EnqueueOutcome::DroppedNewest) => {
+                    dispatch_outcome.failures.push(DispatchFailure {
+                        route_id: dispatch.route_id.clone(),
+                        destination_id: dispatch.destination.destination_id().to_owned(),
+                        reason: "destination_queue_drop_newest".to_owned(),
+                    });
                 }
                 Err(error) => dispatch_outcome.failures.push(DispatchFailure {
                     route_id: dispatch.route_id.clone(),
