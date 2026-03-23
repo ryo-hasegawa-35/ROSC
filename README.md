@@ -67,6 +67,7 @@ Current Phase 01 runtime coverage:
 - bounded capture, sandbox replay, and recovery audit primitives kept distinct from live routing
 - configurable per-destination queue, drop, and breaker policy from TOML
 - polling-based safe config watch flow that preserves the last-known-good revision
+- startup-time proxy loop prevention for UDP destinations that point back into a bound ingress
 
 ## Documentation Entry Points
 

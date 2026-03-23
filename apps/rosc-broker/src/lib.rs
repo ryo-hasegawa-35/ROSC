@@ -44,12 +44,50 @@ impl UdpProxyApp {
         });
         let recovery = Arc::new(RecoveryEngine::new(telemetry.clone()));
 
+        let mut ingresses = BTreeMap::new();
+        for ingress in &config.udp_ingresses {
+            let binding = UdpIngressBinding::bind(
+                &ingress.bind,
+                UdpIngressConfig {
+                    ingress_id: ingress.id.clone(),
+                    compatibility_mode: ingress.mode,
+                    max_packet_size: ingress.max_packet_size,
+                },
+            )
+            .await?;
+            ingresses.insert(ingress.id.clone(), binding);
+        }
+
+        let ingress_addrs = ingresses
+            .iter()
+            .map(|(ingress_id, binding)| {
+                binding
+                    .local_addr()
+                    .map(|addr| (ingress_id.clone(), addr))
+                    .with_context(|| {
+                        format!("failed to inspect local address for ingress `{ingress_id}`")
+                    })
+            })
+            .collect::<Result<BTreeMap<_, _>>>()?;
+
         let mut destinations = DestinationRegistry::default();
         for destination in &config.udp_destinations {
             let target: SocketAddr = destination
                 .target
                 .parse()
                 .with_context(|| format!("invalid udp target address {}", destination.target))?;
+            if let Some((ingress_id, ingress_addr)) = ingress_addrs
+                .iter()
+                .find(|(_, ingress_addr)| **ingress_addr == target)
+            {
+                anyhow::bail!(
+                    "udp destination `{}` targets ingress `{}` at {}; refusing proxy self-loop",
+                    destination.id,
+                    ingress_id,
+                    ingress_addr
+                );
+            }
+
             let sink = Arc::new(UdpEgressSink::bind(&destination.bind, target).await?);
             destinations.register(DestinationWorkerHandle::spawn(
                 destination.id.clone(),
@@ -76,20 +114,6 @@ impl UdpProxyApp {
                 sink,
                 Arc::new(telemetry.clone()),
             ));
-        }
-
-        let mut ingresses = BTreeMap::new();
-        for ingress in &config.udp_ingresses {
-            let binding = UdpIngressBinding::bind(
-                &ingress.bind,
-                UdpIngressConfig {
-                    ingress_id: ingress.id.clone(),
-                    compatibility_mode: ingress.mode,
-                    max_packet_size: ingress.max_packet_size,
-                },
-            )
-            .await?;
-            ingresses.insert(ingress.id.clone(), binding);
         }
 
         Ok(Self {

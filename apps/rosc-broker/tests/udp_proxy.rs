@@ -277,3 +277,47 @@ async fn udp_proxy_replays_captured_state_to_a_sandbox_destination() {
     };
     assert_eq!(message.address, "/render/camera/fov");
 }
+
+#[tokio::test]
+async fn udp_proxy_rejects_destination_that_loops_back_into_an_ingress() {
+    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let loop_addr = reserved.local_addr().unwrap();
+    drop(reserved);
+
+    let config = BrokerConfig::from_toml_str(&format!(
+        r#"
+        [[udp_ingresses]]
+        id = "udp_localhost_in"
+        bind = "{loop_addr}"
+        mode = "osc1_0_strict"
+
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "127.0.0.1:0"
+        target = "{loop_addr}"
+
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+
+        [routes.match]
+        ingress_ids = ["udp_localhost_in"]
+        address_patterns = ["/ue5/camera/fov"]
+        protocols = ["osc_udp"]
+
+        [[routes.destinations]]
+        target = "udp_renderer"
+        transport = "osc_udp"
+        "#
+    ))
+    .unwrap();
+
+    let error = match UdpProxyApp::from_config(&config, InMemoryTelemetry::default()).await {
+        Ok(_) => panic!("proxy self-loop should be rejected"),
+        Err(error) => error,
+    };
+
+    assert!(error.to_string().contains("refusing proxy self-loop"));
+}

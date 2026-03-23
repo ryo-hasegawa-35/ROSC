@@ -65,6 +65,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - live routing と分離した bounded capture / sandbox replay / recovery audit の最小土台
 - TOML から調整できる per-destination queue / drop / breaker policy
 - last-known-good を維持する polling-based safe config watch flow
+- bound 済み ingress へ戻る UDP destination を startup 時点で弾く proxy loop prevention
 
 ## ドキュメント入口
 
