@@ -58,6 +58,7 @@ collaboration の準備方針をまとめています。
 - [工数とリスク](./effort-and-risks.md)
 - [詳細デリバリープラン](./detailed-delivery-plan.md)
 - [GitHub Foundation And Collaboration Plan](./github-foundation-and-collaboration-plan.md)
+- [GitHub Backlog Map](./github-backlog-map.md)
 
 ## 関連する設計仕様
 

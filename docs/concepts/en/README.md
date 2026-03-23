@@ -59,6 +59,7 @@ Important interpretation notes:
 - [Effort And Risks](./effort-and-risks.md)
 - [Detailed Delivery Plan](./detailed-delivery-plan.md)
 - [GitHub Foundation And Collaboration Plan](./github-foundation-and-collaboration-plan.md)
+- [GitHub Backlog Map](./github-backlog-map.md)
 
 ## Related Design Specs
 
