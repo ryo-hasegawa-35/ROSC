@@ -32,6 +32,8 @@ repository は現在、実装前の準備フェーズにあります。
 - [Concepts / Planning (Japanese)](./docs/concepts/ja/README.md)
 - [Design Specs (English)](./docs/design/en/README.md)
 - [Design Specs (Japanese)](./docs/design/ja/README.md)
+- [Changelog](./CHANGELOG.md)
+- [Changelog (Japanese)](./CHANGELOG.ja.md)
 
 ## AI 協業の入口
 
@@ -41,6 +43,8 @@ repository は現在、実装前の準備フェーズにあります。
 - [Skill Catalog (Plural Alias)](./.skills/SKILLS.md)
 - [AI Collaboration And Agent Interop Plan](./docs/concepts/en/ai-collaboration-and-agent-interop-plan.md)
 - [AI Collaboration And Agent Interop Plan (Japanese)](./docs/concepts/ja/ai-collaboration-and-agent-interop-plan.md)
+- [Maintainer Approval And Merge Behavior](./docs/concepts/ja/maintainer-approval-and-merge-behavior.md)
+- [Release Note And Changelog Policy](./docs/concepts/ja/release-note-and-changelog-policy.md)
 
 おすすめの読み順:
 

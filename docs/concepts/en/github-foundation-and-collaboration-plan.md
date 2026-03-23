@@ -14,6 +14,8 @@ Related documents:
 
 - [Detailed Delivery Plan](./detailed-delivery-plan.md)
 - [Effort And Risks](./effort-and-risks.md)
+- [Maintainer Approval And Merge Behavior](./maintainer-approval-and-merge-behavior.md)
+- [Release Note And Changelog Policy](./release-note-and-changelog-policy.md)
 - [Implementation Readiness Checklist](../../design/en/implementation-readiness-checklist.md)
 - [Architecture Decision Record Index](../../design/en/architecture-decision-record-index.md)
 
@@ -185,6 +187,21 @@ Later stages should add:
 - tags should map to meaningful release or preview states
 - release notes should link to evidence, not only summaries
 - compatibility-sensitive changes should be highlighted explicitly
+
+See also:
+
+- [Release Note And Changelog Policy](./release-note-and-changelog-policy.md)
+
+## Maintainer Approval Behavior
+
+In a single-owner repository, self-authored PRs will not gain an independent
+approval from the same GitHub account. If admin enforcement is disabled,
+GitHub may therefore offer an admin bypass path even when review requirements
+exist.
+
+See:
+
+- [Maintainer Approval And Merge Behavior](./maintainer-approval-and-merge-behavior.md)
 
 ## Security And Disclosure Baseline
 
