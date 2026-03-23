@@ -7,7 +7,7 @@ workflows even under heavy real-time pressure.
 
 ## Current Status
 
-The repository is currently in the pre-implementation phase.
+The repository has entered the first implementation phase.
 
 What exists now:
 
@@ -18,13 +18,36 @@ What exists now:
 - an initial ADR set in English and Japanese
 - pre-implementation conformance and benchmark fixture inventories
 - cross-platform repository-sanity CI scaffolding
+- a Rust workspace bootstrap for the Phase 01 core crates
+- an initial OSC parser/encoder core with conformance tests
+- initial route, config, and bounded-queue primitives for the broker core
 
 What does not exist yet:
 
-- production Rust crates
+- production-ready runtime behavior
 - protocol adapters
 - benchmark harness implementation
 - native integrations
+
+## Getting Started
+
+Run the current workspace locally:
+
+```bash
+cargo test --workspace
+cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
+```
+
+Run the same workspace inside Docker:
+
+```bash
+docker compose run --rm rosc-dev cargo test --workspace
+```
+
+Development container entry points:
+
+- [Docker Compose](./compose.yaml)
+- [Devcontainer](./.devcontainer/devcontainer.json)
 
 ## Documentation Entry Points
 

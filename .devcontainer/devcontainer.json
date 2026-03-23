@@ -1,0 +1,15 @@
+{
+  "name": "ROSC Dev",
+  "dockerComposeFile": "../compose.yaml",
+  "service": "rosc-dev",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "root",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml"
+      ]
+    }
+  }
+}

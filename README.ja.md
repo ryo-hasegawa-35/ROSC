@@ -7,7 +7,7 @@ docs-first な Rust プロジェクトです。重いリアルタイム環境で
 
 ## 現在の状態
 
-repository は現在、実装前の準備フェーズにあります。
+repository は現在、最初の実装フェーズに入りました。
 
 いま存在するもの:
 
@@ -16,13 +16,36 @@ repository は現在、実装前の準備フェーズにあります。
 - repository governance と delivery planning 文書
 - 次の実装フェーズに向けた GitHub workflow と review ルール
 - 初期 ADR、conformance corpus 計画、benchmark fixture 計画
+- Phase 01 向け Rust workspace bootstrap
+- conformance fixture に接続した初期 OSC parser / encoder core
+- route / config / bounded queue の最小実装
 
 まだ存在しないもの:
 
-- production Rust crate 実装
+- production-ready な runtime 挙動
 - protocol adapter 実装
 - benchmark harness の実装
 - native integration の実装
+
+## 開発の始め方
+
+ローカルで workspace を確認する場合:
+
+```bash
+cargo test --workspace
+cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
+```
+
+Docker 経由で同じ確認を行う場合:
+
+```bash
+docker compose run --rm rosc-dev cargo test --workspace
+```
+
+開発コンテナ関連:
+
+- [Docker Compose](./compose.yaml)
+- [Devcontainer](./.devcontainer/devcontainer.json)
 
 ## ドキュメント入口
 

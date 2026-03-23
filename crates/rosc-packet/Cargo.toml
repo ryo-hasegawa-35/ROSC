@@ -1,0 +1,11 @@
+[package]
+name = "rosc-packet"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bitflags.workspace = true
+rosc-osc = { path = "../rosc-osc" }
+thiserror.workspace = true

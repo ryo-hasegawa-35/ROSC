@@ -1,0 +1,18 @@
+[package]
+name = "rosc-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+rosc-packet = { path = "../rosc-packet" }
+rosc-route = { path = "../rosc-route" }
+rosc-telemetry = { path = "../rosc-telemetry" }
+rosc-osc = { path = "../rosc-osc" }
+thiserror.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+rosc-config = { path = "../rosc-config" }
+rosc-osc = { path = "../rosc-osc" }

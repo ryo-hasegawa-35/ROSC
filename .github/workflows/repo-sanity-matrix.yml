@@ -48,6 +48,13 @@ jobs:
               ".github/workflows/gemini-pr-review.yml",
               ".github/scripts/gemini-pr-review.mjs",
               ".github/release.yml",
+              "Cargo.toml",
+              "rust-toolchain.toml",
+              ".cargo/config.toml",
+              "compose.yaml",
+              "docker/dev/Dockerfile",
+              ".devcontainer/devcontainer.json",
+              "examples/phase-01-basic.toml",
               ".agent/AGENT.md",
               ".agent/AGENTS.md",
               ".agents/AGENT.md",
@@ -132,3 +139,22 @@ jobs:
 
           print("Repository readiness artifacts look good.")
           PY
+
+      - name: Check Rust formatting
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Run workspace tests
+        shell: bash
+        run: cargo test --workspace
+
+      - name: Validate Docker Compose config
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: docker compose config
