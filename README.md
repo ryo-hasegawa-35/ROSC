@@ -46,6 +46,7 @@ What does not exist yet:
 - [Skill Catalog (Plural Alias)](./.skills/SKILLS.md)
 - [AI Collaboration And Agent Interop Plan](./docs/concepts/en/ai-collaboration-and-agent-interop-plan.md)
 - [AI Collaboration And Agent Interop Plan (Japanese)](./docs/concepts/ja/ai-collaboration-and-agent-interop-plan.md)
+- [Gemini PR Review Assistant](./docs/concepts/en/gemini-pr-review-assistant.md)
 - [Maintainer Approval And Merge Behavior](./docs/concepts/en/maintainer-approval-and-merge-behavior.md)
 - [Release Note And Changelog Policy](./docs/concepts/en/release-note-and-changelog-policy.md)
 

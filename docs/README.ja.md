@@ -41,6 +41,8 @@
   - [GitHub Foundation And Collaboration Plan (Japanese)](./concepts/ja/github-foundation-and-collaboration-plan.md)
   - [AI Collaboration And Agent Interop Plan (English)](./concepts/en/ai-collaboration-and-agent-interop-plan.md)
   - [AI Collaboration And Agent Interop Plan (Japanese)](./concepts/ja/ai-collaboration-and-agent-interop-plan.md)
+  - [Gemini PR Review Assistant (English)](./concepts/en/gemini-pr-review-assistant.md)
+  - [Gemini PR Review Assistant (Japanese)](./concepts/ja/gemini-pr-review-assistant.md)
   - [Maintainer Approval And Merge Behavior (English)](./concepts/en/maintainer-approval-and-merge-behavior.md)
   - [Maintainer Approval And Merge Behavior (Japanese)](./concepts/ja/maintainer-approval-and-merge-behavior.md)
   - [License And Contributor Policy (English)](./concepts/en/license-and-contributor-policy.md)
