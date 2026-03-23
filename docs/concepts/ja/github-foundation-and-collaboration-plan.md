@@ -55,8 +55,12 @@ cross-platform infrastructure product を目指しています。なので GitHu
 - test asset と conformance vector
 - example と sample configuration
 - GitHub policy file と template
+- AI collaboration entry tree
 
 既存の `docs/concepts` / `docs/design` 分離はそのまま維持します。
+
+加えて、異なるツールが同じ前提を読めるように、`.agent/`、`.agents/`、
+`.skill/`、`.skills/` の mirror も維持します。
 
 ## 先に揃えたい GitHub Baseline File
 

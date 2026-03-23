@@ -61,6 +61,16 @@ project-level document は英語版と日本語版をそろえます。
 少なくとも `docs/concepts/` と `docs/design/` 配下の文書を追加・更新するときは、
 英日ペアを維持してください。root の主要文書も、できるだけ英日対応にします。
 
+## AI 協業ファイルのルール
+
+`.agent/`、`.agents/`、`.skill/`、`.skills/` に触れる場合は:
+
+- 互換ミラー側も同じ pull request で更新する
+- `AGENT.md` と `AGENTS.md` の意味をずらさない
+- `SKILL.md` と `SKILLS.md` の意味をずらさない
+- repository policy や workflow の意味が変わるなら、関連する `docs/`
+  側の正式文書も更新する
+
 ## Design Governance Rule
 
 normative な design document の意味を変える PR は、次のどちらかであるべきです。

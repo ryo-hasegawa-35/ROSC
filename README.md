@@ -36,6 +36,15 @@ What does not exist yet:
 - [Design Specs (English)](./docs/design/en/README.md)
 - [Design Specs (Japanese)](./docs/design/ja/README.md)
 
+## AI Collaboration Entry Points
+
+- [Agent Brief](./.agent/AGENT.md)
+- [Agent Brief (Plural Alias)](./.agents/AGENTS.md)
+- [Skill Catalog](./.skill/SKILL.md)
+- [Skill Catalog (Plural Alias)](./.skills/SKILLS.md)
+- [AI Collaboration And Agent Interop Plan](./docs/concepts/en/ai-collaboration-and-agent-interop-plan.md)
+- [AI Collaboration And Agent Interop Plan (Japanese)](./docs/concepts/ja/ai-collaboration-and-agent-interop-plan.md)
+
 Recommended reading order:
 
 1. [Design Reading Order](./docs/design/ja/reading-order.md)
@@ -50,6 +59,7 @@ Recommended reading order:
 - Keep the routing core deterministic and independently testable.
 - Make observability and recovery first-class, not afterthoughts.
 - Keep all core project documents available in both English and Japanese.
+- Keep AI entry-point trees mirrored so different tools receive the same rules.
 
 ## Collaboration Rules
 

@@ -42,6 +42,29 @@ jobs:
               for rel in missing_in_en:
                   errors.append(f"Missing English pair for {base/'ja'/rel}")
 
+          def ensure_mirrored_tree(a: Path, b: Path):
+              a_files = {p.relative_to(a).as_posix() for p in a.rglob("*.md")}
+              b_files = {p.relative_to(b).as_posix() for p in b.rglob("*.md")}
+              missing_in_b = sorted(a_files - b_files)
+              missing_in_a = sorted(b_files - a_files)
+              for rel in missing_in_b:
+                  errors.append(f"Missing mirrored file in {b.relative_to(root)}: {rel}")
+              for rel in missing_in_a:
+                  errors.append(f"Missing mirrored file in {a.relative_to(root)}: {rel}")
+              for rel in sorted(a_files & b_files):
+                  a_text = (a / rel).read_text(encoding="utf-8")
+                  b_text = (b / rel).read_text(encoding="utf-8")
+                  if a_text != b_text:
+                      errors.append(
+                          f"Mirrored files differ: {a.relative_to(root) / rel} vs {b.relative_to(root) / rel}"
+                      )
+
+          def ensure_equal_files(a: Path, b: Path):
+              if a.read_text(encoding="utf-8") != b.read_text(encoding="utf-8"):
+                  errors.append(
+                      f"Files should match exactly: {a.relative_to(root)} vs {b.relative_to(root)}"
+                  )
+
           def check_links(md_path: Path):
               text = md_path.read_text(encoding="utf-8")
               for match in re.finditer(r"\[[^\]]+\]\(([^)]+)\)", text):
@@ -65,6 +88,14 @@ jobs:
               root / "CODEOWNERS",
               root / "docs" / "README.md",
               root / "docs" / "README.ja.md",
+              root / ".agent" / "AGENT.md",
+              root / ".agent" / "AGENTS.md",
+              root / ".agents" / "AGENT.md",
+              root / ".agents" / "AGENTS.md",
+              root / ".skill" / "SKILL.md",
+              root / ".skill" / "SKILLS.md",
+              root / ".skills" / "SKILL.md",
+              root / ".skills" / "SKILLS.md",
           ]
           for req in required_files:
               if not req.exists():
@@ -72,6 +103,12 @@ jobs:
 
           ensure_pair_tree(root / "docs" / "concepts")
           ensure_pair_tree(root / "docs" / "design")
+          ensure_mirrored_tree(root / ".agent", root / ".agents")
+          ensure_mirrored_tree(root / ".skill", root / ".skills")
+          ensure_equal_files(root / ".agent" / "AGENT.md", root / ".agent" / "AGENTS.md")
+          ensure_equal_files(root / ".agents" / "AGENT.md", root / ".agents" / "AGENTS.md")
+          ensure_equal_files(root / ".skill" / "SKILL.md", root / ".skill" / "SKILLS.md")
+          ensure_equal_files(root / ".skills" / "SKILL.md", root / ".skills" / "SKILLS.md")
 
           for md in root.rglob("*.md"):
               check_links(md)

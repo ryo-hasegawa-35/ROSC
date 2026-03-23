@@ -40,10 +40,15 @@ All new project documents should have:
 - For GitHub and repository preparation before coding:
   - [GitHub Foundation And Collaboration Plan (English)](./concepts/en/github-foundation-and-collaboration-plan.md)
   - [GitHub Foundation And Collaboration Plan (Japanese)](./concepts/ja/github-foundation-and-collaboration-plan.md)
+  - [AI Collaboration And Agent Interop Plan (English)](./concepts/en/ai-collaboration-and-agent-interop-plan.md)
+  - [AI Collaboration And Agent Interop Plan (Japanese)](./concepts/ja/ai-collaboration-and-agent-interop-plan.md)
   - [License And Contributor Policy (English)](./concepts/en/license-and-contributor-policy.md)
   - [License And Contributor Policy (Japanese)](./concepts/ja/license-and-contributor-policy.md)
   - [CI Expansion And Required-Check Roadmap (English)](./concepts/en/ci-expansion-and-required-check-roadmap.md)
   - [CI Expansion And Required-Check Roadmap (Japanese)](./concepts/ja/ci-expansion-and-required-check-roadmap.md)
+- For multi-AI repository entry points:
+  - [Agent Brief](../.agent/AGENT.md)
+  - [Skill Catalog](../.skill/SKILL.md)
 - For technical architecture:
   - [Design Reading Order (English)](./design/en/reading-order.md)
   - [Design Reading Order (Japanese)](./design/ja/reading-order.md)

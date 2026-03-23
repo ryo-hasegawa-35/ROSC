@@ -33,6 +33,15 @@ repository は現在、実装前の準備フェーズにあります。
 - [Design Specs (English)](./docs/design/en/README.md)
 - [Design Specs (Japanese)](./docs/design/ja/README.md)
 
+## AI 協業の入口
+
+- [Agent Brief](./.agent/AGENT.md)
+- [Agent Brief (Plural Alias)](./.agents/AGENTS.md)
+- [Skill Catalog](./.skill/SKILL.md)
+- [Skill Catalog (Plural Alias)](./.skills/SKILLS.md)
+- [AI Collaboration And Agent Interop Plan](./docs/concepts/en/ai-collaboration-and-agent-interop-plan.md)
+- [AI Collaboration And Agent Interop Plan (Japanese)](./docs/concepts/ja/ai-collaboration-and-agent-interop-plan.md)
+
 おすすめの読み順:
 
 1. [Design Reading Order](./docs/design/ja/reading-order.md)
@@ -48,6 +57,7 @@ repository は現在、実装前の準備フェーズにあります。
 - ルーティングコアは決定的で、独立にテスト可能に保つ
 - observability と recovery を後付けではなく最初から重視する
 - プロジェクト文書は英語版と日本語版をそろえる
+- AI の入口ディレクトリはミラーさせ、どのツールでも同じ前提を読むようにする
 
 ## Collaboration Rule
 
