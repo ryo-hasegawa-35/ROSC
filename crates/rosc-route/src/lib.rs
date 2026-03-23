@@ -54,6 +54,37 @@ impl DestinationRef {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CachePolicy {
+    #[default]
+    NoCache,
+    LastValuePerAddress,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PersistPolicy {
+    #[default]
+    Ephemeral,
+    Warm,
+    Durable,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LateJoinerPolicy {
+    #[default]
+    Disabled,
+    Latest,
+}
+
+impl LateJoinerPolicy {
+    pub fn is_enabled(&self) -> bool {
+        !matches!(self, Self::Disabled)
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RouteMatchSpec {
     #[serde(default)]
@@ -71,6 +102,27 @@ pub struct TransformSpec {
     pub rename_address: Option<String>,
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RouteCacheSpec {
+    #[serde(default)]
+    pub policy: CachePolicy,
+    pub ttl_ms: Option<u64>,
+    #[serde(default)]
+    pub persist: PersistPolicy,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RouteRecoverySpec {
+    #[serde(default)]
+    pub late_joiner: LateJoinerPolicy,
+    #[serde(default)]
+    pub rehydrate_on_connect: bool,
+    #[serde(default)]
+    pub rehydrate_on_restart: bool,
+    #[serde(default)]
+    pub replay_allowed: bool,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RouteSpec {
     pub id: String,
@@ -82,6 +134,10 @@ pub struct RouteSpec {
     pub match_spec: RouteMatchSpec,
     #[serde(default)]
     pub transform: TransformSpec,
+    #[serde(default)]
+    pub cache: RouteCacheSpec,
+    #[serde(default)]
+    pub recovery: RouteRecoverySpec,
     pub destinations: Vec<DestinationRef>,
 }
 
@@ -90,6 +146,9 @@ pub struct RouteDispatch {
     pub route_id: String,
     pub destination: DestinationRef,
     pub packet: PacketEnvelope,
+    pub transform: TransformSpec,
+    pub cache: RouteCacheSpec,
+    pub recovery: RouteRecoverySpec,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -163,6 +222,9 @@ impl RoutingEngine {
                         route_id: route.spec.id.clone(),
                         destination: destination.clone(),
                         packet: routed_packet.clone(),
+                        transform: route.spec.transform.clone(),
+                        cache: route.spec.cache.clone(),
+                        recovery: route.spec.recovery.clone(),
                     });
                 }
             }

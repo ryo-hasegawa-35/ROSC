@@ -1,7 +1,8 @@
 use rosc_config::{BrokerConfig, ConfigError, ConfigManager};
 use rosc_osc::CompatibilityMode;
 use rosc_route::{
-    DestinationRef, RouteMatchSpec, RouteSpec, TrafficClass, TransformSpec, TransportSelector,
+    CachePolicy, DestinationRef, LateJoinerPolicy, PersistPolicy, RouteCacheSpec, RouteMatchSpec,
+    RouteRecoverySpec, RouteSpec, TrafficClass, TransformSpec, TransportSelector,
 };
 
 #[test]
@@ -31,6 +32,15 @@ fn config_loader_accepts_phase_01_style_routes() {
 
         [routes.transform]
         rename_address = "/render/camera/fov"
+
+        [routes.cache]
+        policy = "last_value_per_address"
+        ttl_ms = 10000
+        persist = "warm"
+
+        [routes.recovery]
+        late_joiner = "latest"
+        rehydrate_on_connect = true
 
         [[routes.destinations]]
         target = "udp_renderer"
@@ -206,6 +216,32 @@ fn config_loader_rejects_unknown_udp_destination_reference() {
     ));
 }
 
+#[test]
+fn config_loader_rejects_rehydrate_without_cache() {
+    let error = BrokerConfig::from_toml_str(
+        r#"
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+        [routes.match]
+        [routes.recovery]
+        late_joiner = "latest"
+        rehydrate_on_connect = true
+        [[routes.destinations]]
+        target = "loopback"
+        transport = "internal"
+        "#,
+    )
+    .expect_err("rehydrate requires cache policy");
+
+    assert!(matches!(
+        error,
+        ConfigError::RecoveryWithoutCache { route_id } if route_id == "camera"
+    ));
+}
+
 fn sample_route(id: &str, target: &str) -> RouteSpec {
     RouteSpec {
         id: id.to_owned(),
@@ -214,6 +250,17 @@ fn sample_route(id: &str, target: &str) -> RouteSpec {
         class: TrafficClass::StatefulControl,
         match_spec: RouteMatchSpec::default(),
         transform: TransformSpec::default(),
+        cache: RouteCacheSpec {
+            policy: CachePolicy::NoCache,
+            ttl_ms: None,
+            persist: PersistPolicy::Ephemeral,
+        },
+        recovery: RouteRecoverySpec {
+            late_joiner: LateJoinerPolicy::Disabled,
+            rehydrate_on_connect: false,
+            rehydrate_on_restart: false,
+            replay_allowed: false,
+        },
         destinations: vec![DestinationRef {
             target: target.to_owned(),
             transport: TransportSelector::OscUdp,

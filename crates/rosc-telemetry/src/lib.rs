@@ -36,6 +36,22 @@ pub enum BrokerEvent {
     RouteTransformFailed {
         route_id: String,
     },
+    CacheStored {
+        route_id: String,
+    },
+    CacheEvicted {
+        route_id: String,
+        reason: String,
+    },
+    CacheEntriesChanged {
+        route_id: String,
+        entries: usize,
+    },
+    RecoveryRehydrate {
+        route_id: String,
+        destination_id: String,
+        count: usize,
+    },
     QueueDepthChanged {
         queue_id: String,
         depth: usize,
@@ -81,6 +97,10 @@ pub struct HealthSnapshot {
     pub ingress_drops_total: BTreeMap<(String, String), u64>,
     pub route_matches_total: BTreeMap<String, u64>,
     pub route_transform_failures_total: BTreeMap<String, u64>,
+    pub cache_entries: BTreeMap<String, usize>,
+    pub cache_writes_total: BTreeMap<String, u64>,
+    pub cache_evictions_total: BTreeMap<(String, String), u64>,
+    pub recovery_rehydrate_total: BTreeMap<(String, String), u64>,
     pub queue_depth: BTreeMap<String, usize>,
     pub destination_sent_total: BTreeMap<String, u64>,
     pub destination_send_failures_total: BTreeMap<(String, String), u64>,
@@ -130,6 +150,34 @@ impl InMemoryTelemetry {
             let _ = writeln!(
                 output,
                 "rosc_route_transform_failures_total{{route_id=\"{route_id}\"}} {count}"
+            );
+        }
+
+        for (route_id, entries) in snapshot.cache_entries {
+            let _ = writeln!(
+                output,
+                "rosc_cache_entries{{route_id=\"{route_id}\"}} {entries}"
+            );
+        }
+
+        for (route_id, count) in snapshot.cache_writes_total {
+            let _ = writeln!(
+                output,
+                "rosc_cache_writes_total{{route_id=\"{route_id}\"}} {count}"
+            );
+        }
+
+        for ((route_id, reason), count) in snapshot.cache_evictions_total {
+            let _ = writeln!(
+                output,
+                "rosc_cache_evictions_total{{route_id=\"{route_id}\",reason=\"{reason}\"}} {count}"
+            );
+        }
+
+        for ((route_id, destination_id), count) in snapshot.recovery_rehydrate_total {
+            let _ = writeln!(
+                output,
+                "rosc_recovery_rehydrate_total{{route_id=\"{route_id}\",destination_id=\"{destination_id}\"}} {count}"
             );
         }
 
@@ -213,6 +261,28 @@ impl TelemetrySink for InMemoryTelemetry {
                     .route_transform_failures_total
                     .entry(route_id)
                     .or_default() += 1;
+            }
+            BrokerEvent::CacheStored { route_id } => {
+                *snapshot.cache_writes_total.entry(route_id).or_default() += 1;
+            }
+            BrokerEvent::CacheEvicted { route_id, reason } => {
+                *snapshot
+                    .cache_evictions_total
+                    .entry((route_id, reason))
+                    .or_default() += 1;
+            }
+            BrokerEvent::CacheEntriesChanged { route_id, entries } => {
+                snapshot.cache_entries.insert(route_id, entries);
+            }
+            BrokerEvent::RecoveryRehydrate {
+                route_id,
+                destination_id,
+                count,
+            } => {
+                *snapshot
+                    .recovery_rehydrate_total
+                    .entry((route_id, destination_id))
+                    .or_default() += count as u64;
             }
             BrokerEvent::QueueDepthChanged { queue_id, depth } => {
                 snapshot.queue_depth.insert(queue_id, depth);

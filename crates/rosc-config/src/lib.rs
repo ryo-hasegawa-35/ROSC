@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use rosc_route::{RouteBuildError, RouteSpec, RoutingEngine, TransportSelector};
+use rosc_route::{CachePolicy, RouteBuildError, RouteSpec, RoutingEngine, TransportSelector};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -102,6 +102,8 @@ pub enum ConfigError {
         route_id: String,
         destination_id: String,
     },
+    #[error("route `{route_id}` enables rehydrate without a cache policy")]
+    RecoveryWithoutCache { route_id: String },
     #[error(transparent)]
     RouteBuild(#[from] RouteBuildError),
 }
@@ -159,6 +161,16 @@ impl BrokerConfig {
             .collect();
 
         for route in &self.routes {
+            if route.cache.policy == CachePolicy::NoCache
+                && (route.recovery.rehydrate_on_connect
+                    || route.recovery.rehydrate_on_restart
+                    || route.recovery.late_joiner.is_enabled())
+            {
+                return Err(ConfigError::RecoveryWithoutCache {
+                    route_id: route.id.clone(),
+                });
+            }
+
             for ingress_id in &route.match_spec.ingress_ids {
                 if !ingress_ids.contains(ingress_id.as_str()) {
                     return Err(ConfigError::UnknownIngressReference {

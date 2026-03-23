@@ -22,6 +22,15 @@ protocols = ["osc_udp"]
 [routes.transform]
 rename_address = "/render/camera/fov"
 
+[routes.cache]
+policy = "last_value_per_address"
+ttl_ms = 10000
+persist = "warm"
+
+[routes.recovery]
+late_joiner = "latest"
+rehydrate_on_connect = true
+
 [[routes.destinations]]
 target = "udp_renderer"
 transport = "osc_udp"

@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use rosc_config::BrokerConfig;
+use rosc_recovery::{RecoveryEngine, RehydrateRequest};
 use rosc_runtime::{
     DestinationPolicy, DestinationRegistry, DestinationWorkerHandle, IngressQueue, QueuePolicy,
     Runtime, UdpEgressSink, UdpIngressBinding, UdpIngressConfig,
@@ -12,6 +13,7 @@ use rosc_telemetry::{BrokerEvent, InMemoryTelemetry, TelemetrySink};
 
 pub struct UdpProxyApp {
     runtime: Arc<Runtime<InMemoryTelemetry>>,
+    recovery: Arc<RecoveryEngine<InMemoryTelemetry>>,
     destinations: Arc<DestinationRegistry>,
     ingresses: BTreeMap<String, UdpIngressBinding>,
 }
@@ -25,6 +27,7 @@ impl UdpProxyApp {
             routing,
             telemetry: telemetry.clone(),
         });
+        let recovery = Arc::new(RecoveryEngine::new(telemetry.clone()));
 
         let mut destinations = DestinationRegistry::default();
         for destination in &config.udp_destinations {
@@ -57,6 +60,7 @@ impl UdpProxyApp {
 
         Ok(Self {
             runtime,
+            recovery,
             destinations: Arc::new(destinations),
             ingresses,
         })
@@ -81,6 +85,8 @@ impl UdpProxyApp {
             .runtime
             .dispatch_packet(&packet, &self.destinations)
             .await;
+        self.recovery
+            .observe_dispatches(&outcome.successful_dispatches);
         for failure in &outcome.failures {
             self.runtime.telemetry.emit(BrokerEvent::PacketDropped {
                 ingress_id: failure.destination_id.clone(),
@@ -90,16 +96,34 @@ impl UdpProxyApp {
         Ok(outcome.dispatched)
     }
 
+    pub async fn rehydrate_destination(&self, destination_id: &str) -> Result<usize> {
+        let outcome = self.recovery.rehydrate(RehydrateRequest {
+            route_id: None,
+            destination_id: Some(destination_id.to_owned()),
+        })?;
+
+        let mut dispatched = 0usize;
+        for dispatch in outcome.dispatches {
+            if self.destinations.dispatch(dispatch).await.is_ok() {
+                dispatched += 1;
+            }
+        }
+
+        Ok(dispatched)
+    }
+
     pub async fn spawn_ingress_tasks(&mut self, ingress_queue_depth: usize) {
         let (queue, mut rx) = IngressQueue::new(QueuePolicy {
             max_depth: ingress_queue_depth,
         });
 
         let runtime = Arc::clone(&self.runtime);
+        let recovery = Arc::clone(&self.recovery);
         let destinations = Arc::clone(&self.destinations);
         tokio::spawn(async move {
             while let Some(packet) = rx.recv().await {
                 let outcome = runtime.dispatch_packet(&packet, &destinations).await;
+                recovery.observe_dispatches(&outcome.successful_dispatches);
                 for failure in outcome.failures {
                     runtime.telemetry.emit(BrokerEvent::PacketDropped {
                         ingress_id: failure.destination_id,

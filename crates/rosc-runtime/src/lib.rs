@@ -137,10 +137,11 @@ pub struct DispatchFailure {
     pub reason: String,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub struct DispatchOutcome {
     pub dispatched: usize,
     pub failures: Vec<DispatchFailure>,
+    pub successful_dispatches: Vec<RouteDispatch>,
 }
 
 #[derive(Clone)]
@@ -239,12 +240,16 @@ where
                     reason: failure.error.to_string(),
                 })
                 .collect(),
+            successful_dispatches: Vec::new(),
         };
 
         for dispatch in &outcome.dispatches {
             match destinations.dispatch(dispatch.clone()).await {
                 Ok(_enqueue_outcome) => {
                     dispatch_outcome.dispatched += 1;
+                    dispatch_outcome
+                        .successful_dispatches
+                        .push(dispatch.clone());
                 }
                 Err(error) => dispatch_outcome.failures.push(DispatchFailure {
                     route_id: dispatch.route_id.clone(),

@@ -12,6 +12,18 @@ fn in_memory_telemetry_renders_prometheus_text() {
     telemetry.emit(BrokerEvent::RouteTransformFailed {
         route_id: "camera_fov".to_owned(),
     });
+    telemetry.emit(BrokerEvent::CacheStored {
+        route_id: "camera_fov".to_owned(),
+    });
+    telemetry.emit(BrokerEvent::CacheEntriesChanged {
+        route_id: "camera_fov".to_owned(),
+        entries: 2,
+    });
+    telemetry.emit(BrokerEvent::RecoveryRehydrate {
+        route_id: "camera_fov".to_owned(),
+        destination_id: "udp_renderer".to_owned(),
+        count: 2,
+    });
     telemetry.emit(BrokerEvent::QueueDepthChanged {
         queue_id: "udp_renderer".to_owned(),
         depth: 3,
@@ -35,6 +47,11 @@ fn in_memory_telemetry_renders_prometheus_text() {
     assert!(text.contains("rosc_ingress_packets_total{ingress_id=\"udp_localhost_in\"} 1"));
     assert!(text.contains("rosc_route_matches_total{route_id=\"camera_fov\"} 1"));
     assert!(text.contains("rosc_route_transform_failures_total{route_id=\"camera_fov\"} 1"));
+    assert!(text.contains("rosc_cache_entries{route_id=\"camera_fov\"} 2"));
+    assert!(text.contains("rosc_cache_writes_total{route_id=\"camera_fov\"} 1"));
+    assert!(text.contains(
+        "rosc_recovery_rehydrate_total{route_id=\"camera_fov\",destination_id=\"udp_renderer\"} 2"
+    ));
     assert!(text.contains("rosc_queue_depth{queue_id=\"udp_renderer\"} 3"));
     assert!(text.contains("rosc_destination_send_total{destination_id=\"udp_renderer\"} 1"));
     assert!(text.contains("rosc_destination_breaker_state{destination_id=\"udp_renderer\"} 2"));

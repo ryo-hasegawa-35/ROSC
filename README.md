@@ -62,6 +62,7 @@ Current Phase 01 runtime coverage:
 - minimal HTTP `/healthz` and `/metrics` endpoint for early local troubleshooting
 - safe config diffing and last-known-good config apply semantics
 - top-level UDP ingress / destination config with end-to-end localhost proxy relay coverage
+- first safe late-joiner recovery path with route-level cache policy and bounded rehydrate
 
 ## Documentation Entry Points
 

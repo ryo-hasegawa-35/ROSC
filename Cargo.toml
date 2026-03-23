@@ -4,6 +4,7 @@ members = [
   "crates/rosc-config",
   "crates/rosc-osc",
   "crates/rosc-packet",
+  "crates/rosc-recovery",
   "crates/rosc-route",
   "crates/rosc-runtime",
   "crates/rosc-telemetry",
