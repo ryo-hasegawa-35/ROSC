@@ -34,7 +34,8 @@ cross-platform infrastructure product を目指しています。なので GitHu
 ### Working Branch
 
 - short-lived branch を使う
-- 実装でも doc でも `codex/<topic>` を基本にすると、人間の作業と自動化作業を同じ規律で追いやすい
+- 人が作る branch は `feature/<topic>`、`docs/<topic>`、`fix/<topic>` のように、目的がすぐ分かる名前を基本にする
+- もし自動化ツールが独自の branch prefix を使う場合は、それは project 全体の命名規則ではなく tool 側の例外として扱う
 
 ### Protected Branch Rule
 

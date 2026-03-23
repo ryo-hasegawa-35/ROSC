@@ -22,7 +22,8 @@ Before opening a substantial pull request, read:
    execute the work.
 2. Align the work with the relevant design and planning documents.
 3. Create a short-lived branch from `main`.
-4. Use a branch name shaped like `codex/<topic>` or `<short-topic>`.
+4. Use a short branch name that describes the work, such as
+   `feature/<topic>`, `docs/<topic>`, or `fix/<topic>`.
 5. Make the smallest coherent change that advances the issue.
 6. Open a pull request using the repository PR template.
 7. Wait for final approval from `@ryo-hasegawa-35` before merging to `main`.

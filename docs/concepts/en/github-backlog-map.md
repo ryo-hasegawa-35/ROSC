@@ -33,13 +33,27 @@ Important nuance:
 
 ## Current Project Status
 
-Issue tracking is seeded and usable today.
+Issue tracking and project tracking are both seeded and usable today.
 
-GitHub Project setup is not fully complete yet because the current CLI token
-does not have the `project` scope required for Projects v2 creation. The
-backlog item for that work is:
+The active project is:
 
-- [Issue #6](https://github.com/ryo-hasegawa-35/ROSC/issues/6)
+- [ROSC Delivery Board](https://github.com/users/ryo-hasegawa-35/projects/3)
+
+Current project baseline:
+
+- the repository is linked to the project
+- all current backlog issues are added to the project
+- active pull requests can also be tracked in the same project
+- `Phase`, `Priority`, and `Area` fields are populated from the repository
+  taxonomy
+- the repository docs record the recommended roadmap, active-work, and
+  blocked-work filters for future maintainers
+
+Remaining nuance:
+
+- [Issue #6](https://github.com/ryo-hasegawa-35/ROSC/issues/6) remains open
+  while we decide whether documented filter-based views are sufficient or if
+  named saved views should also be created manually in the GitHub UI
 
 ## Milestone Map
 

@@ -33,12 +33,25 @@
 
 ## 現在の Project 状態
 
-Issue tracking はすでに使える状態です。
+Issue tracking と project tracking は、どちらもすでに使える状態です。
 
-一方で GitHub Project の作成はまだ完了していません。理由は、現在の CLI token
-に Projects v2 作成に必要な `project` scope がないためです。該当 backlog は:
+現在の active project は次です。
 
-- [Issue #6](https://github.com/ryo-hasegawa-35/ROSC/issues/6)
+- [ROSC Delivery Board](https://github.com/users/ryo-hasegawa-35/projects/3)
+
+現在の project baseline:
+
+- repository は project にリンク済み
+- 現在の backlog issue はすべて project に投入済み
+- active な pull request も同じ project で追跡できる
+- `Phase`、`Priority`、`Area` field は repository taxonomy に合わせて投入済み
+- repository 側の doc に roadmap、active work、blocked work の見方を残してある
+
+補足:
+
+- [Issue #6](https://github.com/ryo-hasegawa-35/ROSC/issues/6) は、
+  documented filter-based view で十分とするか、GitHub UI で named saved view
+  まで作るかを決めるまで open のままにしています
 
 ## Milestone 一覧
 
