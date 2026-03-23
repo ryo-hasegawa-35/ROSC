@@ -1,0 +1,59 @@
+{
+  "version": "0.1.0",
+  "workloads": [
+    {
+      "id": "control-burst",
+      "question": "How much bursty control traffic can the broker absorb without queue spikes?",
+      "class": "control_plane",
+      "rate_pps": 5000,
+      "destinations": 8,
+      "packet_size_bytes": 32,
+      "duration_seconds": 60
+    },
+    {
+      "id": "dense-sensor-stream",
+      "question": "How does the hot path behave under dense tracking and sensor traffic?",
+      "class": "sensor_stream",
+      "rate_pps": 100000,
+      "destinations": 4,
+      "packet_size_bytes": 96,
+      "duration_seconds": 120
+    },
+    {
+      "id": "mixed-installation",
+      "question": "Can mixed control, sensor, and UI traffic coexist without starvation?",
+      "class": "mixed",
+      "rate_pps": 40000,
+      "destinations": 12,
+      "packet_size_bytes": 64,
+      "duration_seconds": 120
+    },
+    {
+      "id": "malformed-pressure",
+      "question": "Does malformed traffic stay bounded without harming healthy flows?",
+      "class": "malformed",
+      "rate_pps": 20000,
+      "destinations": 6,
+      "packet_size_bytes": 48,
+      "duration_seconds": 60
+    },
+    {
+      "id": "late-joiner-rehydrate",
+      "question": "What is the recovery overhead when stateful destinations rejoin?",
+      "class": "recovery",
+      "rate_pps": 15000,
+      "destinations": 10,
+      "packet_size_bytes": 64,
+      "duration_seconds": 90
+    },
+    {
+      "id": "adapter-bridge",
+      "question": "What latency and isolation costs appear when adapters bridge protocols?",
+      "class": "adapter_bridge",
+      "rate_pps": 25000,
+      "destinations": 8,
+      "packet_size_bytes": 72,
+      "duration_seconds": 90
+    }
+  ]
+}

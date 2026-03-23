@@ -34,8 +34,10 @@ Related documents:
 ### Working Branches
 
 - use short-lived branches
-- prefer `codex/<topic>` for implementation or doc work so automated and human
-  work follow the same discoverable pattern
+- prefer descriptive names such as `feature/<topic>`, `docs/<topic>`, or
+  `fix/<topic>` so human contributors can understand intent immediately
+- if an automation tool uses its own branch prefix, treat that as a tool-level
+  exception rather than the project-wide naming rule
 
 ### Protected Branch Rules
 

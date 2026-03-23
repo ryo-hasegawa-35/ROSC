@@ -57,7 +57,10 @@ collaboration の準備方針をまとめています。
 - [圧倒的優位性要件](./advantage-requirements.md)
 - [工数とリスク](./effort-and-risks.md)
 - [詳細デリバリープラン](./detailed-delivery-plan.md)
+- [License And Contributor Policy](./license-and-contributor-policy.md)
+- [CI Expansion And Required-Check Roadmap](./ci-expansion-and-required-check-roadmap.md)
 - [GitHub Foundation And Collaboration Plan](./github-foundation-and-collaboration-plan.md)
+- [GitHub Backlog Map](./github-backlog-map.md)
 
 ## 関連する設計仕様
 
@@ -88,12 +91,16 @@ collaboration の準備方針をまとめています。
 - [C ABI Reference Header And Error-Code Catalog](../../design/ja/c-abi-reference-header-and-error-code-catalog.md)
 - [Deployment Topology And Release Profile Guide](../../design/ja/deployment-topology-and-release-profile-guide.md)
 - [Testing Strategy And Fuzz Corpus Plan](../../design/ja/testing-strategy-and-fuzz-corpus-plan.md)
+- [Rust Workspace And Crate Boundaries](../../design/ja/rust-workspace-and-crate-boundaries.md)
+- [OSC Conformance Corpus Plan](../../design/ja/osc-conformance-corpus-plan.md)
+- [Benchmark Fixture Inventory And Reproducibility Plan](../../design/ja/benchmark-fixture-inventory-and-reproducibility-plan.md)
 - [Adapter SDK API Reference](../../design/ja/adapter-sdk-api-reference.md)
 - [Conformance Vector And Interoperability Suite Guide](../../design/ja/conformance-vector-and-interoperability-suite-guide.md)
 - [Schema Evolution And Deprecation Policy](../../design/ja/schema-evolution-and-deprecation-policy.md)
 - [Dashboard Interaction Spec And Screen Inventory](../../design/ja/dashboard-interaction-spec-and-screen-inventory.md)
 - [Release Checklist And Operational Runbook](../../design/ja/release-checklist-and-operational-runbook.md)
 - [Architecture Decision Record Index](../../design/ja/architecture-decision-record-index.md)
+- [ADR Folder](../../design/adr/ja/README.md)
 
 ## 推奨する実装順
 

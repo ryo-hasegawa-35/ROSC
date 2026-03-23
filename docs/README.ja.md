@@ -39,9 +39,16 @@
 - GitHub や repository 準備から入る:
   - [GitHub Foundation And Collaboration Plan (English)](./concepts/en/github-foundation-and-collaboration-plan.md)
   - [GitHub Foundation And Collaboration Plan (Japanese)](./concepts/ja/github-foundation-and-collaboration-plan.md)
+  - [License And Contributor Policy (English)](./concepts/en/license-and-contributor-policy.md)
+  - [License And Contributor Policy (Japanese)](./concepts/ja/license-and-contributor-policy.md)
+  - [CI Expansion And Required-Check Roadmap (English)](./concepts/en/ci-expansion-and-required-check-roadmap.md)
+  - [CI Expansion And Required-Check Roadmap (Japanese)](./concepts/ja/ci-expansion-and-required-check-roadmap.md)
 - 技術設計から入る:
   - [Design Reading Order (English)](./design/en/reading-order.md)
   - [Design Reading Order (Japanese)](./design/ja/reading-order.md)
 - 用語の確認:
   - [Glossary (English)](./design/en/glossary.md)
   - [Glossary (Japanese)](./design/ja/glossary.md)
+- 実装前 fixture の確認:
+  - [Conformance Fixtures](../fixtures/conformance/README.md)
+  - [Benchmark Fixtures](../fixtures/benchmarks/README.md)

@@ -1,0 +1,12 @@
+{
+  "git_revision": "",
+  "build_profile": "",
+  "os": "",
+  "cpu": "",
+  "memory_gb": 0,
+  "workload_id": "",
+  "timing_source": "",
+  "duration_seconds": 0,
+  "destinations": 0,
+  "notes": ""
+}

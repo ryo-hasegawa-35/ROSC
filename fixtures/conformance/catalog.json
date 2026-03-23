@@ -1,0 +1,68 @@
+{
+  "version": "0.1.0",
+  "vectors": [
+    {
+      "id": "osc10-strict-basic-int",
+      "mode": "osc1_0_strict",
+      "category": "valid_message",
+      "expected": "accept",
+      "fixture_path": "vectors/osc10-strict-basic-int.hex.txt",
+      "source_ref": "osc-1.0-message-scalar",
+      "description": "Single OSC 1.0 message /foo with ,i 42."
+    },
+    {
+      "id": "osc10-strict-basic-string",
+      "mode": "osc1_0_strict",
+      "category": "valid_message",
+      "expected": "accept",
+      "fixture_path": "vectors/osc10-strict-basic-string.hex.txt",
+      "source_ref": "osc-1.0-message-string",
+      "description": "Single OSC 1.0 message /status with ,s \"ok\"."
+    },
+    {
+      "id": "osc10-strict-basic-bundle",
+      "mode": "osc1_0_strict",
+      "category": "valid_bundle",
+      "expected": "accept",
+      "fixture_path": "vectors/osc10-strict-basic-bundle.hex.txt",
+      "source_ref": "osc-1.0-bundle-basic",
+      "description": "Immediate bundle containing one /foo ,i 42 message."
+    },
+    {
+      "id": "osc10-legacy-missing-type-tag",
+      "mode": "osc1_0_legacy_tolerant",
+      "category": "legacy_missing_type_tag",
+      "expected": "tolerate",
+      "fixture_path": "vectors/osc10-legacy-missing-type-tag.hex.txt",
+      "source_ref": "legacy-osc-no-tag",
+      "description": "Legacy-style message without a type-tag string."
+    },
+    {
+      "id": "osc10-malformed-unaligned-address",
+      "mode": "osc1_0_strict",
+      "category": "malformed_alignment",
+      "expected": "reject",
+      "fixture_path": "vectors/osc10-malformed-unaligned-address.hex.txt",
+      "source_ref": "osc-1.0-padding-rule",
+      "description": "Malformed message with truncated address padding."
+    },
+    {
+      "id": "osc11-extended-boolean-true",
+      "mode": "osc1_1_extended",
+      "category": "extended_type",
+      "expected": "accept",
+      "fixture_path": "vectors/osc11-extended-boolean-true.hex.txt",
+      "source_ref": "nime-2009-osc-1.1-boolean",
+      "description": "OSC 1.1-style message using the T tag."
+    },
+    {
+      "id": "osc11-unknown-extension-tag",
+      "mode": "osc1_1_extended",
+      "category": "unknown_extension_tag",
+      "expected": "reject_or_opaque",
+      "fixture_path": "vectors/osc11-unknown-extension-tag.hex.txt",
+      "source_ref": "extension-defensive-handling",
+      "description": "Message with an unsupported extension type tag X."
+    }
+  ]
+}

@@ -15,6 +15,9 @@ What exists now:
 - a bilingual design specification set
 - repository governance and delivery planning documents
 - GitHub workflow and contribution rules for the next implementation phase
+- an initial ADR set in English and Japanese
+- pre-implementation conformance and benchmark fixture inventories
+- cross-platform repository-sanity CI scaffolding
 
 What does not exist yet:
 
@@ -27,6 +30,7 @@ What does not exist yet:
 
 - [Documentation Index](./docs/README.md)
 - [Documentation Index (Japanese)](./docs/README.ja.md)
+- [Repository README (Japanese)](./README.ja.md)
 - [Concepts / Planning (English)](./docs/concepts/en/README.md)
 - [Concepts / Planning (Japanese)](./docs/concepts/ja/README.md)
 - [Design Specs (English)](./docs/design/en/README.md)
@@ -59,7 +63,9 @@ Recommended reading order:
 See also:
 
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [CONTRIBUTING.ja.md](./CONTRIBUTING.ja.md)
 - [SECURITY.md](./SECURITY.md)
+- [SECURITY.ja.md](./SECURITY.ja.md)
 - [GitHub Foundation And Collaboration Plan](./docs/concepts/en/github-foundation-and-collaboration-plan.md)
 
 ## Source References
@@ -77,5 +83,7 @@ Additional online references:
 
 ## License
 
-License selection is not finalized yet. A dedicated repository issue should be
-used to decide the license before public code contributions begin.
+This repository is licensed under the [MIT License](./LICENSE).
+
+License rationale and contributor policy notes live in
+[License And Contributor Policy](./docs/concepts/en/license-and-contributor-policy.md).
