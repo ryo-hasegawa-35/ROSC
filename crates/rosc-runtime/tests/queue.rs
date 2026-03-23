@@ -7,7 +7,7 @@ use rosc_osc::{
     CompatibilityMode, OscArgument, OscMessage, ParsedOscPacket, TypeTagSource, encode_packet,
 };
 use rosc_packet::{IngressMetadata, PacketEnvelope, TransportKind};
-use rosc_route::{RouteCacheSpec, RouteRecoverySpec, TransformSpec};
+use rosc_route::{RouteCacheSpec, RouteObservabilitySpec, RouteRecoverySpec, TransformSpec};
 use rosc_runtime::{
     BreakerState, DestinationDispatchError, DestinationPolicy, DestinationRegistry,
     DestinationSendError, DestinationWorkerHandle, DropPolicy, EgressSink, IngressQueue,
@@ -168,6 +168,7 @@ async fn failing_destination_opens_breaker_without_blocking_healthy_peer() {
             transform: TransformSpec::default(),
             cache: RouteCacheSpec::default(),
             recovery: RouteRecoverySpec::default(),
+            observability: RouteObservabilitySpec::default(),
         })
         .await
         .unwrap_err();

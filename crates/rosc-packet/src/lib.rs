@@ -127,6 +127,16 @@ impl PacketEnvelope {
             capabilities: capabilities_for(&ParsedOscPacket::Message(derived_message)),
         })
     }
+
+    pub fn clone_with_metadata(&self, metadata: IngressMetadata) -> Self {
+        Self {
+            packet_id: PacketId(NEXT_PACKET_ID.fetch_add(1, Ordering::Relaxed)),
+            raw_bytes: Arc::clone(&self.raw_bytes),
+            metadata,
+            parsed: self.parsed.clone(),
+            capabilities: self.capabilities,
+        }
+    }
 }
 
 fn capabilities_for(parsed: &ParsedOscPacket) -> PacketCapabilities {

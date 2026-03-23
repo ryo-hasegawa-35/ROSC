@@ -123,6 +123,20 @@ pub struct RouteRecoverySpec {
     pub replay_allowed: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CapturePolicy {
+    #[default]
+    Off,
+    AlwaysBounded,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RouteObservabilitySpec {
+    #[serde(default)]
+    pub capture: CapturePolicy,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RouteSpec {
     pub id: String,
@@ -138,6 +152,8 @@ pub struct RouteSpec {
     pub cache: RouteCacheSpec,
     #[serde(default)]
     pub recovery: RouteRecoverySpec,
+    #[serde(default)]
+    pub observability: RouteObservabilitySpec,
     pub destinations: Vec<DestinationRef>,
 }
 
@@ -149,6 +165,7 @@ pub struct RouteDispatch {
     pub transform: TransformSpec,
     pub cache: RouteCacheSpec,
     pub recovery: RouteRecoverySpec,
+    pub observability: RouteObservabilitySpec,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -225,6 +242,7 @@ impl RoutingEngine {
                         transform: route.spec.transform.clone(),
                         cache: route.spec.cache.clone(),
                         recovery: route.spec.recovery.clone(),
+                        observability: route.spec.observability.clone(),
                     });
                 }
             }

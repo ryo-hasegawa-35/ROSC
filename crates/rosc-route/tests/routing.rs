@@ -5,8 +5,8 @@ use rosc_osc::{
 };
 use rosc_packet::{IngressMetadata, PacketEnvelope, TransportKind};
 use rosc_route::{
-    DestinationRef, RouteCacheSpec, RouteMatchSpec, RouteRecoverySpec, RouteSpec, RoutingEngine,
-    TrafficClass, TransformSpec, TransportSelector,
+    DestinationRef, RouteCacheSpec, RouteMatchSpec, RouteObservabilitySpec, RouteRecoverySpec,
+    RouteSpec, RoutingEngine, TrafficClass, TransformSpec, TransportSelector,
 };
 
 #[test]
@@ -27,6 +27,7 @@ fn routing_engine_matches_and_renames_exact_routes() {
         },
         cache: RouteCacheSpec::default(),
         recovery: RouteRecoverySpec::default(),
+        observability: RouteObservabilitySpec::default(),
         destinations: vec![DestinationRef {
             target: "udp_renderer".to_owned(),
             transport: TransportSelector::OscUdp,
@@ -78,6 +79,7 @@ fn traversal_wildcard_requires_extended_mode() {
         transform: TransformSpec::default(),
         cache: RouteCacheSpec::default(),
         recovery: RouteRecoverySpec::default(),
+        observability: RouteObservabilitySpec::default(),
         destinations: vec![DestinationRef {
             target: "tap".to_owned(),
             transport: TransportSelector::Internal,
@@ -104,6 +106,7 @@ fn traversal_wildcard_matches_in_extended_mode() {
         transform: TransformSpec::default(),
         cache: RouteCacheSpec::default(),
         recovery: RouteRecoverySpec::default(),
+        observability: RouteObservabilitySpec::default(),
         destinations: vec![DestinationRef {
             target: "tap".to_owned(),
             transport: TransportSelector::Internal,
@@ -157,6 +160,7 @@ fn transform_failure_is_isolated_to_the_failing_route() {
             },
             cache: RouteCacheSpec::default(),
             recovery: RouteRecoverySpec::default(),
+            observability: RouteObservabilitySpec::default(),
             destinations: vec![DestinationRef {
                 target: "renamed".to_owned(),
                 transport: TransportSelector::Internal,
@@ -177,6 +181,7 @@ fn transform_failure_is_isolated_to_the_failing_route() {
             transform: TransformSpec::default(),
             cache: RouteCacheSpec::default(),
             recovery: RouteRecoverySpec::default(),
+            observability: RouteObservabilitySpec::default(),
             destinations: vec![DestinationRef {
                 target: "tap".to_owned(),
                 transport: TransportSelector::Internal,

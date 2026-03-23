@@ -19,10 +19,22 @@ fn in_memory_telemetry_renders_prometheus_text() {
         route_id: "camera_fov".to_owned(),
         entries: 2,
     });
+    telemetry.emit(BrokerEvent::CaptureStored {
+        route_id: "camera_fov".to_owned(),
+    });
+    telemetry.emit(BrokerEvent::CaptureEntriesChanged {
+        route_id: "camera_fov".to_owned(),
+        entries: 4,
+    });
     telemetry.emit(BrokerEvent::RecoveryRehydrate {
         route_id: "camera_fov".to_owned(),
         destination_id: "udp_renderer".to_owned(),
         count: 2,
+    });
+    telemetry.emit(BrokerEvent::RecoveryReplay {
+        route_id: "camera_fov".to_owned(),
+        destination_id: "sandbox_tap".to_owned(),
+        count: 1,
     });
     telemetry.emit(BrokerEvent::QueueDepthChanged {
         queue_id: "udp_renderer".to_owned(),
@@ -49,8 +61,13 @@ fn in_memory_telemetry_renders_prometheus_text() {
     assert!(text.contains("rosc_route_transform_failures_total{route_id=\"camera_fov\"} 1"));
     assert!(text.contains("rosc_cache_entries{route_id=\"camera_fov\"} 2"));
     assert!(text.contains("rosc_cache_writes_total{route_id=\"camera_fov\"} 1"));
+    assert!(text.contains("rosc_capture_entries{route_id=\"camera_fov\"} 4"));
+    assert!(text.contains("rosc_capture_writes_total{route_id=\"camera_fov\"} 1"));
     assert!(text.contains(
         "rosc_recovery_rehydrate_total{route_id=\"camera_fov\",destination_id=\"udp_renderer\"} 2"
+    ));
+    assert!(text.contains(
+        "rosc_recovery_replay_total{route_id=\"camera_fov\",destination_id=\"sandbox_tap\"} 1"
     ));
     assert!(text.contains("rosc_queue_depth{queue_id=\"udp_renderer\"} 3"));
     assert!(text.contains("rosc_destination_send_total{destination_id=\"udp_renderer\"} 1"));

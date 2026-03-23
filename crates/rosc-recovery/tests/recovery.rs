@@ -2,10 +2,10 @@ use std::time::Duration;
 
 use rosc_osc::{CompatibilityMode, OscArgument, OscMessage, ParsedOscPacket, TypeTagSource};
 use rosc_packet::{IngressMetadata, PacketEnvelope, TransportKind};
-use rosc_recovery::{RecoveryEngine, RehydrateRequest};
+use rosc_recovery::{RecoveryAction, RecoveryEngine, RehydrateRequest, SandboxReplayRequest};
 use rosc_route::{
-    CachePolicy, DestinationRef, LateJoinerPolicy, PersistPolicy, RouteCacheSpec, RouteDispatch,
-    RouteRecoverySpec, TransformSpec, TransportSelector,
+    CachePolicy, CapturePolicy, DestinationRef, LateJoinerPolicy, PersistPolicy, RouteCacheSpec,
+    RouteDispatch, RouteObservabilitySpec, RouteRecoverySpec, TransformSpec, TransportSelector,
 };
 use rosc_telemetry::InMemoryTelemetry;
 
@@ -45,7 +45,10 @@ fn sample_dispatch(route_id: &str, destination_id: &str, address: &str) -> Route
             late_joiner: LateJoinerPolicy::Latest,
             rehydrate_on_connect: true,
             rehydrate_on_restart: false,
-            replay_allowed: false,
+            replay_allowed: true,
+        },
+        observability: RouteObservabilitySpec {
+            capture: CapturePolicy::AlwaysBounded,
         },
     }
 }
@@ -69,6 +72,12 @@ fn recovery_engine_rehydrates_latest_value_per_address() {
 
     assert_eq!(outcome.stale_evictions, 0);
     assert_eq!(outcome.dispatches.len(), 2);
+    assert!(
+        outcome
+            .dispatches
+            .iter()
+            .all(|dispatch| dispatch.packet.metadata.ingress_id == "rehydrate:camera")
+    );
 }
 
 #[test]
@@ -104,4 +113,42 @@ fn recovery_engine_requires_a_selector() {
         error.to_string(),
         "rehydrate requests must specify at least one selector"
     );
+}
+
+#[test]
+fn recovery_engine_replays_to_a_sandbox_destination_and_records_audit() {
+    let telemetry = InMemoryTelemetry::default();
+    let engine = RecoveryEngine::with_limits(telemetry.clone(), 8, 8);
+    engine.observe_dispatches(&[
+        sample_dispatch("camera", "udp_renderer", "/render/camera/fov"),
+        sample_dispatch("camera", "udp_renderer", "/render/camera/zoom"),
+    ]);
+
+    let outcome = engine
+        .sandbox_replay(SandboxReplayRequest {
+            route_id: "camera".to_owned(),
+            source_destination_id: Some("udp_renderer".to_owned()),
+            sandbox_destination_id: "sandbox_tap".to_owned(),
+            limit: 10,
+        })
+        .unwrap();
+
+    assert_eq!(outcome.dispatches.len(), 2);
+    assert!(outcome.dispatches.iter().all(|dispatch| {
+        dispatch.destination.destination_id() == "sandbox_tap"
+            && dispatch.packet.metadata.ingress_id == "replay:camera"
+            && dispatch.packet.metadata.transport == TransportKind::Internal
+    }));
+
+    let audit = engine.audit_records();
+    assert_eq!(audit.len(), 1);
+    assert_eq!(audit[0].action, RecoveryAction::SandboxReplay);
+    assert_eq!(audit[0].target_destination_id, "sandbox_tap");
+
+    let metrics = telemetry.render_prometheus();
+    assert!(metrics.contains("rosc_capture_entries{route_id=\"camera\"} 2"));
+    assert!(metrics.contains("rosc_capture_writes_total{route_id=\"camera\"} 2"));
+    assert!(metrics.contains(
+        "rosc_recovery_replay_total{route_id=\"camera\",destination_id=\"sandbox_tap\"} 2"
+    ));
 }

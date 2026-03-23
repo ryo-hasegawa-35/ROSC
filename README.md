@@ -63,6 +63,7 @@ Current Phase 01 runtime coverage:
 - safe config diffing and last-known-good config apply semantics
 - top-level UDP ingress / destination config with end-to-end localhost proxy relay coverage
 - first safe late-joiner recovery path with route-level cache policy and bounded rehydrate
+- bounded capture, sandbox replay, and recovery audit primitives kept distinct from live routing
 
 ## Documentation Entry Points
 

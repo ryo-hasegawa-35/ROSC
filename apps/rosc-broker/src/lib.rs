@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use rosc_config::BrokerConfig;
-use rosc_recovery::{RecoveryEngine, RehydrateRequest};
+use rosc_recovery::{RecoveryEngine, RehydrateRequest, SandboxReplayRequest};
 use rosc_runtime::{
     DestinationPolicy, DestinationRegistry, DestinationWorkerHandle, IngressQueue, QueuePolicy,
     Runtime, UdpEgressSink, UdpIngressBinding, UdpIngressConfig,
@@ -100,6 +100,29 @@ impl UdpProxyApp {
         let outcome = self.recovery.rehydrate(RehydrateRequest {
             route_id: None,
             destination_id: Some(destination_id.to_owned()),
+        })?;
+
+        let mut dispatched = 0usize;
+        for dispatch in outcome.dispatches {
+            if self.destinations.dispatch(dispatch).await.is_ok() {
+                dispatched += 1;
+            }
+        }
+
+        Ok(dispatched)
+    }
+
+    pub async fn replay_route_to_sandbox(
+        &self,
+        route_id: &str,
+        sandbox_destination_id: &str,
+        limit: usize,
+    ) -> Result<usize> {
+        let outcome = self.recovery.sandbox_replay(SandboxReplayRequest {
+            route_id: route_id.to_owned(),
+            source_destination_id: None,
+            sandbox_destination_id: sandbox_destination_id.to_owned(),
+            limit,
         })?;
 
         let mut dispatched = 0usize;

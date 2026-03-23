@@ -2,7 +2,8 @@ use rosc_config::{BrokerConfig, ConfigError, ConfigManager};
 use rosc_osc::CompatibilityMode;
 use rosc_route::{
     CachePolicy, DestinationRef, LateJoinerPolicy, PersistPolicy, RouteCacheSpec, RouteMatchSpec,
-    RouteRecoverySpec, RouteSpec, TrafficClass, TransformSpec, TransportSelector,
+    RouteObservabilitySpec, RouteRecoverySpec, RouteSpec, TrafficClass, TransformSpec,
+    TransportSelector,
 };
 
 #[test]
@@ -261,6 +262,7 @@ fn sample_route(id: &str, target: &str) -> RouteSpec {
             rehydrate_on_restart: false,
             replay_allowed: false,
         },
+        observability: RouteObservabilitySpec::default(),
         destinations: vec![DestinationRef {
             target: target.to_owned(),
             transport: TransportSelector::OscUdp,

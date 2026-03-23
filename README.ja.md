@@ -61,6 +61,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - config diff と last-known-good を持つ safe apply 基盤
 - top-level UDP ingress / destination config と end-to-end localhost proxy relay
 - route ごとの cache policy と bounded rehydrate を使う最初の late-joiner recovery
+- live routing と分離した bounded capture / sandbox replay / recovery audit の最小土台
 
 ## ドキュメント入口
 
