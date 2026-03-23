@@ -48,6 +48,12 @@ pub struct DestinationRef {
     pub enabled: bool,
 }
 
+impl DestinationRef {
+    pub fn destination_id(&self) -> &str {
+        &self.target
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RouteMatchSpec {
     #[serde(default)]

@@ -36,6 +36,7 @@ Run the current workspace locally:
 ```bash
 cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
+cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 ```
 
 Run the same workspace inside Docker:
@@ -48,6 +49,15 @@ Development container entry points:
 
 - [Docker Compose](./compose.yaml)
 - [Devcontainer](./.devcontainer/devcontainer.json)
+
+Current Phase 01 runtime coverage:
+
+- OSC parser/encoder for strict, legacy-tolerant, and extended modes
+- route matching with static address rename transforms
+- bounded ingress queue and UDP ingress binding
+- bounded per-destination egress workers with breaker-based isolation
+- in-memory health/metrics export rendered in Prometheus text format
+- safe config diffing and last-known-good config apply semantics
 
 ## Documentation Entry Points
 

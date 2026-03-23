@@ -1,41 +1,32 @@
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
+use async_trait::async_trait;
 use rosc_config::BrokerConfig;
 use rosc_osc::{
     CompatibilityMode, OscArgument, OscMessage, ParsedOscPacket, TypeTagSource, encode_packet,
 };
 use rosc_packet::{IngressMetadata, PacketEnvelope, TransportKind};
 use rosc_runtime::{
-    IngressQueue, QueueError, QueuePolicy, Runtime, UdpIngressBinding, UdpIngressConfig,
+    BreakerState, DestinationDispatchError, DestinationPolicy, DestinationRegistry,
+    DestinationSendError, DestinationWorkerHandle, DropPolicy, EgressSink, IngressQueue,
+    QueueError, QueuePolicy, Runtime, UdpIngressBinding, UdpIngressConfig,
 };
-use rosc_telemetry::{BrokerEvent, TelemetrySink};
+use rosc_telemetry::InMemoryTelemetry;
 use tokio::net::UdpSocket;
 
 #[test]
 fn ingress_queue_applies_bounded_capacity() {
     let (queue, _rx) = IngressQueue::new(QueuePolicy { max_depth: 1 });
-    let packet = PacketEnvelope::parse_osc(
-        vec![
-            0x2f, 0x66, 0x6f, 0x6f, 0, 0, 0, 0, 0x2c, 0x69, 0, 0, 0, 0, 0, 1,
-        ],
-        IngressMetadata {
-            ingress_id: "udp_in".to_owned(),
-            transport: TransportKind::OscUdp,
-            source_endpoint: None,
-            compatibility_mode: CompatibilityMode::Osc1_0Strict,
-            received_at: SystemTime::UNIX_EPOCH,
-        },
-    )
-    .unwrap();
+    let packet = sample_packet("/foo");
 
     queue.try_send(packet.clone()).unwrap();
     let error = queue.try_send(packet).unwrap_err();
     assert!(matches!(error, QueueError::QueueFull));
 }
 
-#[test]
-fn runtime_emits_route_match_events() {
+#[tokio::test]
+async fn runtime_dispatches_and_exports_health_snapshot() {
     let config = BrokerConfig::from_toml_str(
         r#"
         [[routes]]
@@ -54,31 +45,124 @@ fn runtime_emits_route_match_events() {
     .unwrap();
 
     let routing = rosc_route::RoutingEngine::new(config.routes).unwrap();
-    let sink = RecordingSink::default();
+    let telemetry = InMemoryTelemetry::default();
     let runtime = Runtime {
         routing,
-        telemetry: sink.clone(),
+        telemetry: telemetry.clone(),
     };
 
-    let packet = PacketEnvelope::parse_osc(
-        vec![
-            0x2f, 0x75, 0x65, 0x35, 0x2f, 0x63, 0x61, 0x6d, 0x65, 0x72, 0x61, 0x2f, 0x66, 0x6f,
-            0x76, 0x00, 0x2c, 0x66, 0x00, 0x00, 0x42, 0xb4, 0x00, 0x00,
-        ],
-        IngressMetadata {
-            ingress_id: "udp_in".to_owned(),
-            transport: TransportKind::OscUdp,
-            source_endpoint: None,
-            compatibility_mode: CompatibilityMode::Osc1_0Strict,
-            received_at: SystemTime::UNIX_EPOCH,
-        },
+    let recorder = Arc::new(RecordingSink::default());
+    let mut destinations = DestinationRegistry::default();
+    destinations.register(DestinationWorkerHandle::spawn(
+        "udp_renderer",
+        DestinationPolicy::default(),
+        recorder.clone(),
+        Arc::new(telemetry.clone()),
+    ));
+
+    let packet = sample_packet("/ue5/camera/fov");
+    assert_eq!(
+        runtime
+            .dispatch_packet(&packet, &destinations)
+            .await
+            .unwrap(),
+        1
+    );
+
+    tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    assert_eq!(recorder.sent.lock().unwrap().len(), 1);
+    assert_eq!(
+        destinations.status("udp_renderer").unwrap().breaker_state,
+        BreakerState::Closed
+    );
+
+    let health = telemetry.render_prometheus();
+    assert!(health.contains("rosc_route_matches_total{route_id=\"fov\"} 1"));
+    assert!(health.contains("rosc_destination_send_total{destination_id=\"udp_renderer\"} 1"));
+}
+
+#[tokio::test]
+async fn failing_destination_opens_breaker_without_blocking_healthy_peer() {
+    let config = BrokerConfig::from_toml_str(
+        r#"
+        [[routes]]
+        id = "fanout"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+        [routes.match]
+        address_patterns = ["/ue5/camera/fov"]
+        protocols = ["osc_udp"]
+        [[routes.destinations]]
+        target = "healthy"
+        transport = "osc_udp"
+        [[routes.destinations]]
+        target = "failing"
+        transport = "osc_udp"
+        "#,
     )
     .unwrap();
 
-    assert_eq!(runtime.route_packet(&packet).unwrap(), 1);
-    let events = sink.events.lock().unwrap();
-    assert_eq!(events.len(), 1);
-    assert!(matches!(&events[0], BrokerEvent::RouteMatched { route_id } if route_id == "fov"));
+    let routing = rosc_route::RoutingEngine::new(config.routes).unwrap();
+    let telemetry = InMemoryTelemetry::default();
+    let runtime = Runtime {
+        routing,
+        telemetry: telemetry.clone(),
+    };
+
+    let healthy = Arc::new(RecordingSink::default());
+    let failing = Arc::new(FailingSink);
+
+    let mut destinations = DestinationRegistry::default();
+    destinations.register(DestinationWorkerHandle::spawn(
+        "healthy",
+        DestinationPolicy::default(),
+        healthy.clone(),
+        Arc::new(telemetry.clone()),
+    ));
+    destinations.register(DestinationWorkerHandle::spawn(
+        "failing",
+        DestinationPolicy {
+            drop_policy: DropPolicy::DropNewest,
+            ..DestinationPolicy::default()
+        },
+        failing,
+        Arc::new(telemetry.clone()),
+    ));
+
+    for _ in 0..3 {
+        runtime
+            .dispatch_packet(&sample_packet("/ue5/camera/fov"), &destinations)
+            .await
+            .unwrap();
+    }
+
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    assert_eq!(healthy.sent.lock().unwrap().len(), 3);
+    assert_eq!(
+        destinations.status("failing").unwrap().breaker_state,
+        BreakerState::Open
+    );
+
+    let error = destinations
+        .dispatch(rosc_route::RouteDispatch {
+            route_id: "manual".to_owned(),
+            destination: rosc_route::DestinationRef {
+                target: "failing".to_owned(),
+                transport: rosc_route::TransportSelector::OscUdp,
+                enabled: true,
+            },
+            packet: sample_packet("/ue5/camera/fov"),
+        })
+        .await
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        rosc_runtime::RuntimeDispatchError::Destination(
+            DestinationDispatchError::BreakerOpen { .. }
+        )
+    ));
 }
 
 #[tokio::test]
@@ -110,13 +194,46 @@ async fn udp_ingress_binding_receives_and_parses_datagrams() {
     assert_eq!(packet.address(), Some("/ue5/camera/fov"));
 }
 
-#[derive(Clone, Default)]
-struct RecordingSink {
-    events: Arc<Mutex<Vec<BrokerEvent>>>,
+fn sample_packet(address: &str) -> PacketEnvelope {
+    PacketEnvelope::parse_osc(
+        encode_packet(&ParsedOscPacket::Message(OscMessage {
+            address: address.to_owned(),
+            type_tag_source: TypeTagSource::Explicit,
+            arguments: vec![OscArgument::Float32(90.0)],
+        }))
+        .unwrap(),
+        IngressMetadata {
+            ingress_id: "udp_in".to_owned(),
+            transport: TransportKind::OscUdp,
+            source_endpoint: None,
+            compatibility_mode: CompatibilityMode::Osc1_0Strict,
+            received_at: SystemTime::UNIX_EPOCH,
+        },
+    )
+    .unwrap()
 }
 
-impl TelemetrySink for RecordingSink {
-    fn emit(&self, event: BrokerEvent) {
-        self.events.lock().unwrap().push(event);
+#[derive(Default)]
+struct RecordingSink {
+    sent: Mutex<Vec<String>>,
+}
+
+#[async_trait]
+impl EgressSink for RecordingSink {
+    async fn send(&self, packet: &PacketEnvelope) -> Result<(), DestinationSendError> {
+        self.sent
+            .lock()
+            .unwrap()
+            .push(packet.address().unwrap_or("<bundle>").to_owned());
+        Ok(())
+    }
+}
+
+struct FailingSink;
+
+#[async_trait]
+impl EgressSink for FailingSink {
+    async fn send(&self, _packet: &PacketEnvelope) -> Result<(), DestinationSendError> {
+        Err(DestinationSendError::Custom("simulated failure".to_owned()))
     }
 }

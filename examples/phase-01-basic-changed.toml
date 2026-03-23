@@ -1,0 +1,31 @@
+[[routes]]
+id = "ue5_camera_fov"
+enabled = true
+mode = "osc1_0_strict"
+class = "StatefulControl"
+
+[routes.match]
+ingress_ids = ["udp_localhost_in"]
+address_patterns = ["/ue5/camera/fov"]
+protocols = ["osc_udp"]
+
+[routes.transform]
+rename_address = "/render/camera/fov"
+
+[[routes.destinations]]
+target = "udp_renderer"
+transport = "osc_udp"
+
+[[routes]]
+id = "td_tracking"
+enabled = true
+mode = "osc1_1_extended"
+class = "SensorStream"
+
+[routes.match]
+address_patterns = ["//tracking"]
+protocols = ["osc_udp"]
+
+[[routes.destinations]]
+target = "debug_tap"
+transport = "internal"

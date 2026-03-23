@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+async-trait.workspace = true
 rosc-packet = { path = "../rosc-packet" }
 rosc-route = { path = "../rosc-route" }
 rosc-telemetry = { path = "../rosc-telemetry" }

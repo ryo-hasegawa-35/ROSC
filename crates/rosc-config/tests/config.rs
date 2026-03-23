@@ -1,4 +1,4 @@
-use rosc_config::{BrokerConfig, ConfigError};
+use rosc_config::{BrokerConfig, ConfigError, ConfigManager};
 use rosc_osc::CompatibilityMode;
 use rosc_route::{
     DestinationRef, RouteMatchSpec, RouteSpec, TrafficClass, TransformSpec, TransportSelector,
@@ -29,6 +29,7 @@ fn config_loader_accepts_phase_01_style_routes() {
     )
     .expect("config should parse");
 
+    assert_eq!(config.schema_version, 1);
     assert_eq!(config.routes.len(), 1);
     assert_eq!(config.routes[0].id, "ue5_camera_fov");
 }
@@ -36,6 +37,7 @@ fn config_loader_accepts_phase_01_style_routes() {
 #[test]
 fn config_loader_rejects_duplicate_route_ids() {
     let config = BrokerConfig {
+        schema_version: 1,
         routes: vec![sample_route("dup", "a"), sample_route("dup", "b")],
     };
     let error = config
@@ -43,6 +45,107 @@ fn config_loader_rejects_duplicate_route_ids() {
         .expect_err("duplicate route ids must fail");
 
     assert!(matches!(error, ConfigError::DuplicateRouteId(id) if id == "dup"));
+}
+
+#[test]
+fn config_manager_preserves_last_known_good_on_invalid_candidate() {
+    let mut manager = ConfigManager::default();
+    let result = manager
+        .apply_toml_str(
+            r#"
+            [[routes]]
+            id = "camera"
+            enabled = true
+            mode = "osc1_0_strict"
+            class = "StatefulControl"
+            [routes.match]
+            [[routes.destinations]]
+            target = "udp_renderer"
+            transport = "osc_udp"
+            "#,
+        )
+        .expect("initial config should apply");
+
+    assert_eq!(result.revision, 1);
+    assert_eq!(
+        manager.current().expect("current config").config.routes[0].id,
+        "camera"
+    );
+
+    let error = manager.apply_toml_str(
+        r#"
+        schema_version = 99
+        [[routes]]
+        id = "broken"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+        [routes.match]
+        [[routes.destinations]]
+        target = "udp_renderer"
+        transport = "osc_udp"
+        "#,
+    );
+
+    assert!(matches!(
+        error,
+        Err(ConfigError::UnsupportedSchemaVersion(99))
+    ));
+    let current = manager.current().expect("last known good should remain");
+    assert_eq!(current.revision, 1);
+    assert_eq!(current.config.routes[0].id, "camera");
+}
+
+#[test]
+fn config_manager_reports_route_diff() {
+    let mut manager = ConfigManager::default();
+    manager
+        .apply_toml_str(
+            r#"
+            [[routes]]
+            id = "camera"
+            enabled = true
+            mode = "osc1_0_strict"
+            class = "StatefulControl"
+            [routes.match]
+            [[routes.destinations]]
+            target = "udp_renderer"
+            transport = "osc_udp"
+            "#,
+        )
+        .unwrap();
+
+    let diff = manager
+        .preview_toml_diff(
+            r#"
+            [[routes]]
+            id = "camera"
+            enabled = true
+            mode = "osc1_0_strict"
+            class = "StatefulControl"
+            [routes.match]
+            [routes.transform]
+            rename_address = "/render/camera/fov"
+            [[routes.destinations]]
+            target = "udp_renderer"
+            transport = "osc_udp"
+
+            [[routes]]
+            id = "tracking"
+            enabled = true
+            mode = "osc1_1_extended"
+            class = "SensorStream"
+            [routes.match]
+            [[routes.destinations]]
+            target = "tap"
+            transport = "internal"
+            "#,
+        )
+        .unwrap();
+
+    assert_eq!(diff.added_routes, vec!["tracking"]);
+    assert_eq!(diff.changed_routes, vec!["camera"]);
+    assert!(diff.removed_routes.is_empty());
 }
 
 fn sample_route(id: &str, target: &str) -> RouteSpec {

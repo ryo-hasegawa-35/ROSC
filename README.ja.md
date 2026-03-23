@@ -34,6 +34,7 @@ repository は現在、最初の実装フェーズに入りました。
 ```bash
 cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
+cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 ```
 
 Docker 経由で同じ確認を行う場合:
@@ -46,6 +47,15 @@ docker compose run --rm rosc-dev cargo test --workspace
 
 - [Docker Compose](./compose.yaml)
 - [Devcontainer](./.devcontainer/devcontainer.json)
+
+現在の Phase 01 実装範囲:
+
+- strict / legacy-tolerant / extended を扱う OSC parser / encoder
+- static address rename を含む route matching
+- bounded ingress queue と UDP ingress binding
+- breaker 付き per-destination egress worker と isolation
+- Prometheus text に落とせる in-memory health / metrics export
+- config diff と last-known-good を持つ safe apply 基盤
 
 ## ドキュメント入口
 
