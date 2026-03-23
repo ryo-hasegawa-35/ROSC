@@ -7,17 +7,20 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use rosc_config::{BrokerConfig, ConfigApplyResult, ConfigError, ConfigManager, DropPolicyConfig};
 use rosc_recovery::{RecoveryEngine, RehydrateRequest, SandboxReplayRequest};
+use rosc_route::{CachePolicy, CapturePolicy, TrafficClass, TransportSelector};
 use rosc_runtime::{
     BreakerPolicy, DestinationPolicy, DestinationRegistry, DestinationWorkerHandle, DropPolicy,
     IngressQueue, QueuePolicy, Runtime, UdpEgressSink, UdpIngressBinding, UdpIngressConfig,
 };
 use rosc_telemetry::{BrokerEvent, InMemoryTelemetry, TelemetrySink};
+use serde::Serialize;
 
 pub struct UdpProxyApp {
     runtime: Arc<Runtime<InMemoryTelemetry>>,
     recovery: Arc<RecoveryEngine<InMemoryTelemetry>>,
     destinations: Arc<DestinationRegistry>,
     ingresses: BTreeMap<String, UdpIngressBinding>,
+    status: UdpProxyStatusSnapshot,
 }
 
 #[derive(Debug)]
@@ -31,6 +34,62 @@ pub struct ConfigFileSupervisor<TTelemetry> {
     path: PathBuf,
     manager: ConfigManager,
     telemetry: TTelemetry,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct UdpProxyStatusSnapshot {
+    pub ingresses: Vec<UdpProxyIngressStatus>,
+    pub destinations: Vec<UdpProxyDestinationStatus>,
+    pub routes: Vec<UdpProxyRouteStatus>,
+    pub fallback_routes: Vec<UdpProxyFallbackStatus>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct UdpProxyIngressStatus {
+    pub id: String,
+    pub configured_bind: String,
+    pub bound_local_addr: Option<String>,
+    pub route_ids: Vec<String>,
+    pub max_packet_size: usize,
+    pub mode: rosc_osc::CompatibilityMode,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct UdpProxyDestinationStatus {
+    pub id: String,
+    pub bind: String,
+    pub target: String,
+    pub route_ids: Vec<String>,
+    pub queue_depth: usize,
+    pub drop_policy: DropPolicyConfig,
+    pub breaker_open_after_consecutive_failures: u32,
+    pub breaker_open_after_consecutive_queue_overflows: u32,
+    pub breaker_cooldown_ms: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct UdpProxyRouteStatus {
+    pub id: String,
+    pub enabled: bool,
+    pub mode: rosc_osc::CompatibilityMode,
+    pub traffic_class: TrafficClass,
+    pub ingress_ids: Vec<String>,
+    pub address_patterns: Vec<String>,
+    pub destination_ids: Vec<String>,
+    pub rename_address: Option<String>,
+    pub cache_policy: CachePolicy,
+    pub capture_policy: CapturePolicy,
+    pub rehydrate_on_connect: bool,
+    pub replay_allowed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct UdpProxyFallbackStatus {
+    pub route_id: String,
+    pub direct_udp_targets: Vec<String>,
+    pub available: bool,
+    pub note: String,
 }
 
 impl UdpProxyApp {
@@ -69,6 +128,10 @@ impl UdpProxyApp {
                     })
             })
             .collect::<Result<BTreeMap<_, _>>>()?;
+        let mut status = proxy_status_from_config(config)?;
+        for ingress in &mut status.ingresses {
+            ingress.bound_local_addr = ingress_addrs.get(&ingress.id).map(ToString::to_string);
+        }
 
         let mut destinations = DestinationRegistry::default();
         for destination in &config.udp_destinations {
@@ -121,7 +184,12 @@ impl UdpProxyApp {
             recovery,
             destinations: Arc::new(destinations),
             ingresses,
+            status,
         })
+    }
+
+    pub fn status_snapshot(&self) -> UdpProxyStatusSnapshot {
+        self.status.clone()
     }
 
     pub fn ingress_local_addr(&self, ingress_id: &str) -> Option<SocketAddr> {
@@ -309,6 +377,171 @@ where
             changed_routes: applied.diff.changed_routes.len(),
         });
     }
+}
+
+pub fn proxy_status_from_config(config: &BrokerConfig) -> Result<UdpProxyStatusSnapshot> {
+    config.validate_runtime_references()?;
+
+    let route_ids_by_ingress = config
+        .udp_ingresses
+        .iter()
+        .map(|ingress| {
+            let route_ids = config
+                .routes
+                .iter()
+                .filter(|route| {
+                    route.match_spec.ingress_ids.is_empty()
+                        || route
+                            .match_spec
+                            .ingress_ids
+                            .iter()
+                            .any(|id| id == &ingress.id)
+                })
+                .map(|route| route.id.clone())
+                .collect::<Vec<_>>();
+            (ingress.id.clone(), route_ids)
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    let route_ids_by_destination = config
+        .udp_destinations
+        .iter()
+        .map(|destination| {
+            let route_ids = config
+                .routes
+                .iter()
+                .filter(|route| {
+                    route.destinations.iter().any(|route_destination| {
+                        route_destination.transport == TransportSelector::OscUdp
+                            && route_destination.target == destination.id
+                    })
+                })
+                .map(|route| route.id.clone())
+                .collect::<Vec<_>>();
+            (destination.id.clone(), route_ids)
+        })
+        .collect::<BTreeMap<_, _>>();
+
+    let ingresses = config
+        .udp_ingresses
+        .iter()
+        .map(|ingress| UdpProxyIngressStatus {
+            id: ingress.id.clone(),
+            configured_bind: ingress.bind.clone(),
+            bound_local_addr: None,
+            route_ids: route_ids_by_ingress
+                .get(&ingress.id)
+                .cloned()
+                .unwrap_or_default(),
+            max_packet_size: ingress.max_packet_size,
+            mode: ingress.mode,
+        })
+        .collect::<Vec<_>>();
+
+    let destinations = config
+        .udp_destinations
+        .iter()
+        .map(|destination| UdpProxyDestinationStatus {
+            id: destination.id.clone(),
+            bind: destination.bind.clone(),
+            target: destination.target.clone(),
+            route_ids: route_ids_by_destination
+                .get(&destination.id)
+                .cloned()
+                .unwrap_or_default(),
+            queue_depth: destination.policy.queue_depth,
+            drop_policy: destination.policy.drop_policy,
+            breaker_open_after_consecutive_failures: destination
+                .policy
+                .breaker
+                .open_after_consecutive_failures,
+            breaker_open_after_consecutive_queue_overflows: destination
+                .policy
+                .breaker
+                .open_after_consecutive_queue_overflows,
+            breaker_cooldown_ms: destination.policy.breaker.cooldown_ms,
+        })
+        .collect::<Vec<_>>();
+
+    let destination_targets = config
+        .udp_destinations
+        .iter()
+        .map(|destination| (destination.id.as_str(), destination.target.as_str()))
+        .collect::<BTreeMap<_, _>>();
+
+    let routes = config
+        .routes
+        .iter()
+        .map(|route| UdpProxyRouteStatus {
+            id: route.id.clone(),
+            enabled: route.enabled,
+            mode: route.mode,
+            traffic_class: route.class.clone(),
+            ingress_ids: route.match_spec.ingress_ids.clone(),
+            address_patterns: route.match_spec.address_patterns.clone(),
+            destination_ids: route
+                .destinations
+                .iter()
+                .map(|destination| destination.target.clone())
+                .collect(),
+            rename_address: route.transform.rename_address.clone(),
+            cache_policy: route.cache.policy,
+            capture_policy: route.observability.capture,
+            rehydrate_on_connect: route.recovery.rehydrate_on_connect,
+            replay_allowed: route.recovery.replay_allowed,
+        })
+        .collect::<Vec<_>>();
+
+    let fallback_routes = config
+        .routes
+        .iter()
+        .map(|route| {
+            let direct_udp_targets = route
+                .destinations
+                .iter()
+                .filter(|destination| destination.transport == TransportSelector::OscUdp)
+                .filter_map(|destination| destination_targets.get(destination.target.as_str()))
+                .map(|target| (*target).to_owned())
+                .collect::<Vec<_>>();
+            let available = !direct_udp_targets.is_empty();
+            let note = if available {
+                "If ROSC sidecar mode is unavailable, point the sender directly at these UDP targets.".to_owned()
+            } else {
+                "No direct UDP fallback target is available for this route yet.".to_owned()
+            };
+
+            UdpProxyFallbackStatus {
+                route_id: route.id.clone(),
+                direct_udp_targets,
+                available,
+                note,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let mut warnings = Vec::new();
+    for route in &config.routes {
+        if route.match_spec.ingress_ids.is_empty() {
+            warnings.push(format!(
+                "route `{}` matches all ingresses; proxy sidecar scope is broad",
+                route.id
+            ));
+        }
+        if route.match_spec.address_patterns.is_empty() {
+            warnings.push(format!(
+                "route `{}` matches all addresses; fallback analysis is broad",
+                route.id
+            ));
+        }
+    }
+
+    Ok(UdpProxyStatusSnapshot {
+        ingresses,
+        destinations,
+        routes,
+        fallback_routes,
+        warnings,
+    })
 }
 
 fn ingress_receives_target(ingress_addr: SocketAddr, target: SocketAddr) -> bool {

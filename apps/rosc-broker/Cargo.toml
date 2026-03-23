@@ -14,4 +14,6 @@ rosc-recovery = { path = "../../crates/rosc-recovery" }
 rosc-route = { path = "../../crates/rosc-route" }
 rosc-runtime = { path = "../../crates/rosc-runtime" }
 rosc-telemetry = { path = "../../crates/rosc-telemetry" }
+serde.workspace = true
+serde_json.workspace = true
 tokio.workspace = true

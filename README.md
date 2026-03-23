@@ -36,6 +36,7 @@ Run the current workspace locally:
 ```bash
 cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
+cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
@@ -68,6 +69,7 @@ Current Phase 01 runtime coverage:
 - configurable per-destination queue, drop, and breaker policy from TOML
 - polling-based safe config watch flow that preserves the last-known-good revision
 - startup-time proxy loop prevention for UDP destinations that point back into a bound ingress
+- JSON proxy-status output that summarizes ingresses, destinations, routes, and direct UDP fallback hints
 
 ## Documentation Entry Points
 

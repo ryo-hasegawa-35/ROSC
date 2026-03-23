@@ -34,6 +34,7 @@ repository は現在、最初の実装フェーズに入りました。
 ```bash
 cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
+cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
@@ -66,6 +67,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - TOML から調整できる per-destination queue / drop / breaker policy
 - last-known-good を維持する polling-based safe config watch flow
 - bound 済み ingress へ戻る UDP destination を startup 時点で弾く proxy loop prevention
+- ingress / destination / route と direct UDP fallback hint を JSON で確認できる `proxy-status`
 
 ## ドキュメント入口
 
