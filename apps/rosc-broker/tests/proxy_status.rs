@@ -51,6 +51,13 @@ fn proxy_status_summarizes_sidecar_routes_and_fallback_targets() {
 
     let status = proxy_status_from_config(&config).unwrap();
 
+    assert_eq!(status.summary.total_routes, 1);
+    assert_eq!(status.summary.active_routes, 1);
+    assert_eq!(status.summary.disabled_routes, 0);
+    assert_eq!(status.summary.active_ingresses, 1);
+    assert_eq!(status.summary.active_destinations, 1);
+    assert_eq!(status.summary.fallback_ready_routes, 1);
+    assert_eq!(status.summary.fallback_missing_routes, 0);
     assert_eq!(status.ingresses.len(), 1);
     assert_eq!(status.ingresses[0].route_ids, vec!["camera"]);
     assert_eq!(status.destinations.len(), 1);
@@ -64,6 +71,10 @@ fn proxy_status_summarizes_sidecar_routes_and_fallback_targets() {
         status.fallback_routes[0].direct_udp_targets,
         vec!["127.0.0.1:9001"]
     );
+    assert_eq!(status.route_assessments.len(), 1);
+    assert!(status.route_assessments[0].active);
+    assert!(status.route_assessments[0].direct_udp_fallback_available);
+    assert_eq!(status.route_assessments[0].warning_count, 0);
     assert!(status.warnings.is_empty());
 }
 
@@ -149,10 +160,67 @@ fn proxy_status_excludes_disabled_routes_from_active_usage_summary() {
 
     let status = proxy_status_from_config(&config).unwrap();
 
+    assert_eq!(status.summary.total_routes, 1);
+    assert_eq!(status.summary.active_routes, 0);
+    assert_eq!(status.summary.disabled_routes, 1);
+    assert_eq!(status.summary.active_ingresses, 0);
+    assert_eq!(status.summary.active_destinations, 0);
     assert_eq!(status.routes.len(), 1);
     assert!(!status.routes[0].enabled);
     assert!(status.ingresses[0].route_ids.is_empty());
     assert!(status.destinations[0].route_ids.is_empty());
     assert!(status.fallback_routes.is_empty());
+    assert_eq!(status.route_assessments.len(), 1);
+    assert!(!status.route_assessments[0].active);
+    assert!(!status.route_assessments[0].direct_udp_fallback_available);
     assert!(status.warnings.is_empty());
+}
+
+#[test]
+fn proxy_status_reports_missing_fallback_and_broad_scope_warnings() {
+    let config = BrokerConfig::from_toml_str(
+        r#"
+        [[udp_ingresses]]
+        id = "udp_localhost_in"
+        bind = "127.0.0.1:9000"
+        mode = "osc1_0_strict"
+
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+
+        [routes.match]
+
+        [[routes.destinations]]
+        target = "tap"
+        transport = "internal"
+        "#,
+    )
+    .unwrap();
+
+    let status = proxy_status_from_config(&config).unwrap();
+
+    assert_eq!(status.summary.active_routes, 1);
+    assert_eq!(status.summary.fallback_ready_routes, 0);
+    assert_eq!(status.summary.fallback_missing_routes, 1);
+    assert_eq!(status.route_assessments.len(), 1);
+    assert_eq!(status.route_assessments[0].warning_count, 3);
+    assert!(
+        status.route_assessments[0]
+            .warnings
+            .contains(&"matches all ingresses".to_owned())
+    );
+    assert!(
+        status.route_assessments[0]
+            .warnings
+            .contains(&"matches all addresses".to_owned())
+    );
+    assert!(
+        status.route_assessments[0]
+            .warnings
+            .contains(&"no direct udp fallback target".to_owned())
+    );
+    assert_eq!(status.warnings.len(), 2);
 }

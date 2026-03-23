@@ -7,11 +7,25 @@ use serde::Serialize;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct UdpProxyStatusSnapshot {
+    pub summary: UdpProxySummary,
     pub ingresses: Vec<UdpProxyIngressStatus>,
     pub destinations: Vec<UdpProxyDestinationStatus>,
     pub routes: Vec<UdpProxyRouteStatus>,
     pub fallback_routes: Vec<UdpProxyFallbackStatus>,
+    pub route_assessments: Vec<UdpProxyRouteAssessment>,
     pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct UdpProxySummary {
+    pub total_routes: usize,
+    pub active_routes: usize,
+    pub disabled_routes: usize,
+    pub active_ingresses: usize,
+    pub active_destinations: usize,
+    pub fallback_ready_routes: usize,
+    pub fallback_missing_routes: usize,
+    pub warning_count: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -59,6 +73,15 @@ pub struct UdpProxyFallbackStatus {
     pub direct_udp_targets: Vec<String>,
     pub available: bool,
     pub note: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct UdpProxyRouteAssessment {
+    pub route_id: String,
+    pub active: bool,
+    pub direct_udp_fallback_available: bool,
+    pub warning_count: usize,
+    pub warnings: Vec<String>,
 }
 
 pub fn proxy_status_from_config(config: &BrokerConfig) -> Result<UdpProxyStatusSnapshot> {
@@ -161,26 +184,32 @@ pub fn proxy_status_from_config(config: &BrokerConfig) -> Result<UdpProxyStatusS
         .map(|destination| (destination.id.as_str(), destination.target.as_str()))
         .collect::<BTreeMap<_, _>>();
 
+    let mut route_assessments = Vec::new();
     let routes = config
         .routes
         .iter()
-        .map(|route| UdpProxyRouteStatus {
-            id: route.id.clone(),
-            enabled: route.enabled,
-            mode: route.mode,
-            traffic_class: route.class.clone(),
-            ingress_ids: route.match_spec.ingress_ids.clone(),
-            address_patterns: route.match_spec.address_patterns.clone(),
-            destination_ids: route
-                .destinations
-                .iter()
-                .map(|destination| destination.target.clone())
-                .collect(),
-            rename_address: route.transform.rename_address.clone(),
-            cache_policy: route.cache.policy,
-            capture_policy: route.observability.capture,
-            rehydrate_on_connect: route.recovery.rehydrate_on_connect,
-            replay_allowed: route.recovery.replay_allowed,
+        .map(|route| {
+            let assessment = assess_route(route, &destination_targets);
+            route_assessments.push(assessment);
+
+            UdpProxyRouteStatus {
+                id: route.id.clone(),
+                enabled: route.enabled,
+                mode: route.mode,
+                traffic_class: route.class.clone(),
+                ingress_ids: route.match_spec.ingress_ids.clone(),
+                address_patterns: route.match_spec.address_patterns.clone(),
+                destination_ids: route
+                    .destinations
+                    .iter()
+                    .map(|destination| destination.target.clone())
+                    .collect(),
+                rename_address: route.transform.rename_address.clone(),
+                cache_policy: route.cache.policy,
+                capture_policy: route.observability.capture,
+                rehydrate_on_connect: route.recovery.rehydrate_on_connect,
+                replay_allowed: route.recovery.replay_allowed,
+            }
         })
         .collect::<Vec<_>>();
 
@@ -212,11 +241,83 @@ pub fn proxy_status_from_config(config: &BrokerConfig) -> Result<UdpProxyStatusS
         })
         .collect::<Vec<_>>();
 
+    let summary = UdpProxySummary {
+        total_routes: routes.len(),
+        active_routes: route_assessments
+            .iter()
+            .filter(|route| route.active)
+            .count(),
+        disabled_routes: route_assessments
+            .iter()
+            .filter(|route| !route.active)
+            .count(),
+        active_ingresses: ingresses
+            .iter()
+            .filter(|ingress| !ingress.route_ids.is_empty())
+            .count(),
+        active_destinations: destinations
+            .iter()
+            .filter(|destination| !destination.route_ids.is_empty())
+            .count(),
+        fallback_ready_routes: route_assessments
+            .iter()
+            .filter(|route| route.active && route.direct_udp_fallback_available)
+            .count(),
+        fallback_missing_routes: route_assessments
+            .iter()
+            .filter(|route| route.active && !route.direct_udp_fallback_available)
+            .count(),
+        warning_count: warnings.len()
+            + route_assessments
+                .iter()
+                .map(|route| route.warning_count)
+                .sum::<usize>(),
+    };
+
     Ok(UdpProxyStatusSnapshot {
+        summary,
         ingresses,
         destinations,
         routes,
         fallback_routes,
+        route_assessments,
         warnings,
     })
+}
+
+fn assess_route(
+    route: &rosc_route::RouteSpec,
+    destination_targets: &BTreeMap<&str, &str>,
+) -> UdpProxyRouteAssessment {
+    let direct_udp_targets = route
+        .destinations
+        .iter()
+        .filter(|destination| destination.transport == TransportSelector::OscUdp)
+        .filter_map(|destination| destination_targets.get(destination.target.as_str()))
+        .collect::<Vec<_>>();
+
+    let mut warnings = Vec::new();
+    if route.enabled && route.match_spec.ingress_ids.is_empty() {
+        warnings.push("matches all ingresses".to_owned());
+    }
+    if route.enabled && route.match_spec.address_patterns.is_empty() {
+        warnings.push("matches all addresses".to_owned());
+    }
+    if route.enabled && direct_udp_targets.is_empty() {
+        warnings.push("no direct udp fallback target".to_owned());
+    }
+    if route.enabled
+        && route.recovery.replay_allowed
+        && route.observability.capture == CapturePolicy::Off
+    {
+        warnings.push("replay configured without capture visibility".to_owned());
+    }
+
+    UdpProxyRouteAssessment {
+        route_id: route.id.clone(),
+        active: route.enabled,
+        direct_udp_fallback_available: route.enabled && !direct_udp_targets.is_empty(),
+        warning_count: warnings.len(),
+        warnings,
+    }
 }
