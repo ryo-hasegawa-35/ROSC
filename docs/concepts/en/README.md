@@ -58,6 +58,8 @@ Important interpretation notes:
 - [Advantage Requirements](./advantage-requirements.md)
 - [Effort And Risks](./effort-and-risks.md)
 - [Detailed Delivery Plan](./detailed-delivery-plan.md)
+- [License And Contributor Policy](./license-and-contributor-policy.md)
+- [CI Expansion And Required-Check Roadmap](./ci-expansion-and-required-check-roadmap.md)
 - [GitHub Foundation And Collaboration Plan](./github-foundation-and-collaboration-plan.md)
 - [GitHub Backlog Map](./github-backlog-map.md)
 
@@ -90,12 +92,16 @@ Important interpretation notes:
 - [C ABI Reference Header And Error-Code Catalog](../../design/en/c-abi-reference-header-and-error-code-catalog.md)
 - [Deployment Topology And Release Profile Guide](../../design/en/deployment-topology-and-release-profile-guide.md)
 - [Testing Strategy And Fuzz Corpus Plan](../../design/en/testing-strategy-and-fuzz-corpus-plan.md)
+- [Rust Workspace And Crate Boundaries](../../design/en/rust-workspace-and-crate-boundaries.md)
+- [OSC Conformance Corpus Plan](../../design/en/osc-conformance-corpus-plan.md)
+- [Benchmark Fixture Inventory And Reproducibility Plan](../../design/en/benchmark-fixture-inventory-and-reproducibility-plan.md)
 - [Adapter SDK API Reference](../../design/en/adapter-sdk-api-reference.md)
 - [Conformance Vector And Interoperability Suite Guide](../../design/en/conformance-vector-and-interoperability-suite-guide.md)
 - [Schema Evolution And Deprecation Policy](../../design/en/schema-evolution-and-deprecation-policy.md)
 - [Dashboard Interaction Spec And Screen Inventory](../../design/en/dashboard-interaction-spec-and-screen-inventory.md)
 - [Release Checklist And Operational Runbook](../../design/en/release-checklist-and-operational-runbook.md)
 - [Architecture Decision Record Index](../../design/en/architecture-decision-record-index.md)
+- [ADR Folder](../../design/adr/en/README.md)
 
 Japanese versions:
 

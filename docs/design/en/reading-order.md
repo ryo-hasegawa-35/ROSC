@@ -37,7 +37,9 @@ Read these if you are about to work on the broker core:
 3. [Route Configuration Grammar](./route-configuration-grammar.md)
 4. [Route Rule Cookbook And Worked Examples](./route-rule-cookbook-and-worked-examples.md)
 5. [Fault Model And Overload Behavior](./fault-model-and-overload-behavior.md)
-6. [Benchmark Workload Definition](./benchmark-workload-definition.md)
+6. [Rust Workspace And Crate Boundaries](./rust-workspace-and-crate-boundaries.md)
+7. [OSC Conformance Corpus Plan](./osc-conformance-corpus-plan.md)
+8. [Benchmark Workload Definition](./benchmark-workload-definition.md)
 
 This path answers:
 
@@ -94,8 +96,10 @@ quality:
 2. [Schema Definition Format](./schema-definition-format.md)
 3. [Deployment Topology And Release Profile Guide](./deployment-topology-and-release-profile-guide.md)
 4. [Testing Strategy And Fuzz Corpus Plan](./testing-strategy-and-fuzz-corpus-plan.md)
-5. [Benchmark Result Interpretation Guide](./benchmark-result-interpretation-guide.md)
-6. [Config Validation And Migration Note](./config-validation-and-migration-note.md)
+5. [OSC Conformance Corpus Plan](./osc-conformance-corpus-plan.md)
+6. [Benchmark Fixture Inventory And Reproducibility Plan](./benchmark-fixture-inventory-and-reproducibility-plan.md)
+7. [Benchmark Result Interpretation Guide](./benchmark-result-interpretation-guide.md)
+8. [Config Validation And Migration Note](./config-validation-and-migration-note.md)
 
 This path answers:
 
@@ -130,9 +134,11 @@ production readiness:
 
 1. [Metrics And Telemetry Schema](./metrics-and-telemetry-schema.md)
 2. [Benchmark Workload Definition](./benchmark-workload-definition.md)
-3. [Benchmark Result Interpretation Guide](./benchmark-result-interpretation-guide.md)
-4. [Architecture Decision Record Index](./architecture-decision-record-index.md)
-5. [Release Checklist And Operational Runbook](./release-checklist-and-operational-runbook.md)
+3. [Benchmark Fixture Inventory And Reproducibility Plan](./benchmark-fixture-inventory-and-reproducibility-plan.md)
+4. [Benchmark Result Interpretation Guide](./benchmark-result-interpretation-guide.md)
+5. [Architecture Decision Record Index](./architecture-decision-record-index.md)
+6. [ADR Folder](../adr/en/README.md)
+7. [Release Checklist And Operational Runbook](./release-checklist-and-operational-runbook.md)
 
 This path answers:
 

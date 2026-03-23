@@ -55,9 +55,13 @@ jobs:
                       )
 
           required_files = [
+              root / "LICENSE",
               root / "README.md",
+              root / "README.ja.md",
               root / "CONTRIBUTING.md",
+              root / "CONTRIBUTING.ja.md",
               root / "SECURITY.md",
+              root / "SECURITY.ja.md",
               root / "CODEOWNERS",
               root / "docs" / "README.md",
               root / "docs" / "README.ja.md",

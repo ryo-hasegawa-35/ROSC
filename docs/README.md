@@ -40,9 +40,16 @@ All new project documents should have:
 - For GitHub and repository preparation before coding:
   - [GitHub Foundation And Collaboration Plan (English)](./concepts/en/github-foundation-and-collaboration-plan.md)
   - [GitHub Foundation And Collaboration Plan (Japanese)](./concepts/ja/github-foundation-and-collaboration-plan.md)
+  - [License And Contributor Policy (English)](./concepts/en/license-and-contributor-policy.md)
+  - [License And Contributor Policy (Japanese)](./concepts/ja/license-and-contributor-policy.md)
+  - [CI Expansion And Required-Check Roadmap (English)](./concepts/en/ci-expansion-and-required-check-roadmap.md)
+  - [CI Expansion And Required-Check Roadmap (Japanese)](./concepts/ja/ci-expansion-and-required-check-roadmap.md)
 - For technical architecture:
   - [Design Reading Order (English)](./design/en/reading-order.md)
   - [Design Reading Order (Japanese)](./design/ja/reading-order.md)
 - For terminology:
   - [Glossary (English)](./design/en/glossary.md)
   - [Glossary (Japanese)](./design/ja/glossary.md)
+- For pre-implementation fixtures:
+  - [Conformance Fixtures](../fixtures/conformance/README.md)
+  - [Benchmark Fixtures](../fixtures/benchmarks/README.md)

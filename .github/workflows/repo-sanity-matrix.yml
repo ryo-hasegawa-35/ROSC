@@ -1,0 +1,84 @@
+name: Repository Sanity Matrix
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  repo-sanity:
+    name: repo-sanity (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate repository readiness artifacts
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import json
+          import sys
+
+          root = Path(".").resolve()
+          required = [
+              "LICENSE",
+              "README.md",
+              "README.ja.md",
+              "CONTRIBUTING.md",
+              "CONTRIBUTING.ja.md",
+              "SECURITY.md",
+              "SECURITY.ja.md",
+              "docs/concepts/en/license-and-contributor-policy.md",
+              "docs/concepts/ja/license-and-contributor-policy.md",
+              "docs/concepts/en/ci-expansion-and-required-check-roadmap.md",
+              "docs/concepts/ja/ci-expansion-and-required-check-roadmap.md",
+              "docs/design/en/rust-workspace-and-crate-boundaries.md",
+              "docs/design/ja/rust-workspace-and-crate-boundaries.md",
+              "docs/design/en/osc-conformance-corpus-plan.md",
+              "docs/design/ja/osc-conformance-corpus-plan.md",
+              "docs/design/en/benchmark-fixture-inventory-and-reproducibility-plan.md",
+              "docs/design/ja/benchmark-fixture-inventory-and-reproducibility-plan.md",
+              "docs/design/adr/en/README.md",
+              "docs/design/adr/ja/README.md",
+              "fixtures/conformance/catalog.json",
+              "fixtures/benchmarks/workload-catalog.json",
+              "fixtures/benchmarks/context-template.json",
+          ]
+
+          missing = [path for path in required if not (root / path).exists()]
+          if missing:
+              print("Missing required repository readiness artifacts:", file=sys.stderr)
+              for path in missing:
+                  print(f"- {path}", file=sys.stderr)
+              sys.exit(1)
+
+          for rel in [
+              "fixtures/conformance/catalog.json",
+              "fixtures/benchmarks/workload-catalog.json",
+              "fixtures/benchmarks/context-template.json",
+          ]:
+              json.loads((root / rel).read_text(encoding="utf-8"))
+
+          en_adrs = sorted((root / "docs/design/adr/en").glob("adr-*.md"))
+          ja_adrs = sorted((root / "docs/design/adr/ja").glob("adr-*.md"))
+          if len(en_adrs) != len(ja_adrs):
+              print("ADR trees are not mirrored between English and Japanese.", file=sys.stderr)
+              sys.exit(1)
+
+          print("Repository readiness artifacts look good.")
+          PY

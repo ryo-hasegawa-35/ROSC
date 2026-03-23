@@ -49,115 +49,26 @@ Every ADR should include:
 
 ## Storage Convention
 
-When ADR files are added, store them in mirrored language trees:
+ADR files live in mirrored language trees:
 
 - `docs/design/adr/en/`
 - `docs/design/adr/ja/`
 
-The index may exist before the individual ADR files do.
+## Current Accepted ADR Set
 
-## Initial ADR Backlog
-
-These are the first decisions that should become formal ADRs before or during
-initial implementation.
-
-### ADR-0001: Compatibility Mode Contract
-
-Scope:
-
-- `osc1_0_strict`
-- `osc1_0_legacy_tolerant`
-- `osc1_1_extended`
-- legacy missing-type-tag policy
-
-### ADR-0002: Dual Packet Representation
-
-Scope:
-
-- raw byte retention
-- normalized internal view
-- parse failure and unknown-tag behavior
-
-### ADR-0003: Route Semantic Model Before File Format
-
-Scope:
-
-- semantic route fields
-- TOML as first external format
-- validation before apply
-
-### ADR-0004: Traffic Classes And Isolation Rules
-
-Scope:
-
-- traffic class vocabulary
-- per-destination isolation
-- breaker and quarantine expectations
-
-### ADR-0005: Recovery Contract
-
-Scope:
-
-- rehydrate versus replay
-- cache classes
-- automatic versus manual recovery boundaries
-
-### ADR-0006: Telemetry Levels And Cardinality Budget
-
-Scope:
-
-- `metrics_level` semantics
-- canonical metric names
-- bounded-label policy
-
-### ADR-0007: Plugin Boundary And Trust Tiers
-
-Scope:
-
-- plugin trust tiers
-- Wasm versus external process boundaries
-- broker-owned safety semantics
-
-### ADR-0008: Security Overlay Is Additive
-
-Scope:
-
-- source verification at the broker edge
-- legacy bridge treatment
-- raw OSC backward compatibility
-
-### ADR-0009: Native IPC ABI Stability And Fallback
-
-Scope:
-
-- IPC acceleration remains optional
-- UDP fallback remains first-class
-- ABI versioning expectations
-
-### ADR-0010: Broker Identity, Federation, And Failover
-
-Scope:
-
-- broker identity
-- replication scope
-- split-brain prevention
-- failover authority
-
-### ADR-0011: Benchmark Gate And Release Evidence
-
-Scope:
-
-- mandatory benchmark context
-- interpretation classes
-- release evidence requirements
-
-### ADR-0012: GitHub Protection And Docs-First Collaboration
-
-Scope:
-
-- protected branch baseline
-- review expectations
-- documentation gate before risky code
+- [ADR-0001 Compatibility Mode Contract](../adr/en/adr-0001-compatibility-mode-contract.md)
+- [ADR-0002 Dual Packet Representation](../adr/en/adr-0002-dual-packet-representation.md)
+- [ADR-0003 Route Semantic Model Before File Format](../adr/en/adr-0003-route-semantic-model-before-file-format.md)
+- [ADR-0004 Traffic Classes And Isolation Rules](../adr/en/adr-0004-traffic-classes-and-isolation-rules.md)
+- [ADR-0005 Recovery Contract](../adr/en/adr-0005-recovery-contract.md)
+- [ADR-0006 Telemetry Levels And Cardinality Budget](../adr/en/adr-0006-telemetry-levels-and-cardinality-budget.md)
+- [ADR-0007 Plugin Boundary And Trust Tiers](../adr/en/adr-0007-plugin-boundary-and-trust-tiers.md)
+- [ADR-0008 Security Overlay Is Additive](../adr/en/adr-0008-security-overlay-is-additive.md)
+- [ADR-0009 Native IPC ABI Stability And Fallback](../adr/en/adr-0009-native-ipc-abi-stability-and-fallback.md)
+- [ADR-0010 Broker Identity, Federation, And Failover](../adr/en/adr-0010-broker-identity-federation-and-failover.md)
+- [ADR-0011 Benchmark Gate And Release Evidence](../adr/en/adr-0011-benchmark-gate-and-release-evidence.md)
+- [ADR-0012 GitHub Protection And Docs-First Collaboration](../adr/en/adr-0012-github-protection-and-docs-first-collaboration.md)
+- [ADR-0013 Phase 00 Foundation Completion Gate](../adr/en/adr-0013-phase-00-foundation-completion.md)
 
 ## When To Create A New ADR
 

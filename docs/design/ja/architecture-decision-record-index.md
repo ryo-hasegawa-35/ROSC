@@ -49,114 +49,26 @@ decision trail を残します。
 
 ## Storage Convention
 
-ADR file を追加する場合は、言語ごとに mirrored tree へ置きます。
+ADR file は、言語ごとの mirrored tree に保存します。
 
 - `docs/design/adr/en/`
 - `docs/design/adr/ja/`
 
-index は individual ADR file より先に存在していて構いません。
+## 現在の Accepted ADR Set
 
-## 初期 ADR Backlog
-
-初期実装の前後で、まず formal ADR にすべき decision は次です。
-
-### ADR-0001: Compatibility Mode Contract
-
-Scope:
-
-- `osc1_0_strict`
-- `osc1_0_legacy_tolerant`
-- `osc1_1_extended`
-- legacy missing-type-tag policy
-
-### ADR-0002: Dual Packet Representation
-
-Scope:
-
-- raw byte retention
-- normalized internal view
-- parse failure と unknown-tag behavior
-
-### ADR-0003: Route Semantic Model Before File Format
-
-Scope:
-
-- semantic route field
-- first external format としての TOML
-- apply 前 validation
-
-### ADR-0004: Traffic Classes And Isolation Rules
-
-Scope:
-
-- traffic class vocabulary
-- per-destination isolation
-- breaker と quarantine expectation
-
-### ADR-0005: Recovery Contract
-
-Scope:
-
-- rehydrate と replay の分離
-- cache class
-- automatic / manual recovery boundary
-
-### ADR-0006: Telemetry Levels And Cardinality Budget
-
-Scope:
-
-- `metrics_level` semantics
-- canonical metric name
-- bounded-label policy
-
-### ADR-0007: Plugin Boundary And Trust Tiers
-
-Scope:
-
-- plugin trust tier
-- Wasm と external process の boundary
-- broker-owned safety semantics
-
-### ADR-0008: Security Overlay Is Additive
-
-Scope:
-
-- broker edge での source verification
-- legacy bridge の扱い
-- raw OSC backward compatibility
-
-### ADR-0009: Native IPC ABI Stability And Fallback
-
-Scope:
-
-- IPC acceleration は optional のまま
-- UDP fallback を first-class に保つ
-- ABI versioning expectation
-
-### ADR-0010: Broker Identity, Federation, And Failover
-
-Scope:
-
-- broker identity
-- replication scope
-- split-brain prevention
-- failover authority
-
-### ADR-0011: Benchmark Gate And Release Evidence
-
-Scope:
-
-- mandatory benchmark context
-- interpretation class
-- release evidence requirement
-
-### ADR-0012: GitHub Protection And Docs-First Collaboration
-
-Scope:
-
-- protected branch baseline
-- review expectation
-- risky code 前の documentation gate
+- [ADR-0001 Compatibility Mode Contract](../adr/ja/adr-0001-compatibility-mode-contract.md)
+- [ADR-0002 Dual Packet Representation](../adr/ja/adr-0002-dual-packet-representation.md)
+- [ADR-0003 Route Semantic Model Before File Format](../adr/ja/adr-0003-route-semantic-model-before-file-format.md)
+- [ADR-0004 Traffic Classes And Isolation Rules](../adr/ja/adr-0004-traffic-classes-and-isolation-rules.md)
+- [ADR-0005 Recovery Contract](../adr/ja/adr-0005-recovery-contract.md)
+- [ADR-0006 Telemetry Levels And Cardinality Budget](../adr/ja/adr-0006-telemetry-levels-and-cardinality-budget.md)
+- [ADR-0007 Plugin Boundary And Trust Tiers](../adr/ja/adr-0007-plugin-boundary-and-trust-tiers.md)
+- [ADR-0008 Security Overlay Is Additive](../adr/ja/adr-0008-security-overlay-is-additive.md)
+- [ADR-0009 Native IPC ABI Stability And Fallback](../adr/ja/adr-0009-native-ipc-abi-stability-and-fallback.md)
+- [ADR-0010 Broker Identity, Federation, And Failover](../adr/ja/adr-0010-broker-identity-federation-and-failover.md)
+- [ADR-0011 Benchmark Gate And Release Evidence](../adr/ja/adr-0011-benchmark-gate-and-release-evidence.md)
+- [ADR-0012 GitHub Protection And Docs-First Collaboration](../adr/ja/adr-0012-github-protection-and-docs-first-collaboration.md)
+- [ADR-0013 Phase 00 Foundation Completion Gate](../adr/ja/adr-0013-phase-00-foundation-completion.md)
 
 ## 新しい ADR を作るタイミング
 

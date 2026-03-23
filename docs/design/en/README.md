@@ -27,6 +27,7 @@ Concept, roadmap, and GitHub planning material lives in
 - [Route Rule Cookbook And Worked Examples](./route-rule-cookbook-and-worked-examples.md)
 - [Metrics And Telemetry Schema](./metrics-and-telemetry-schema.md)
 - [Benchmark Workload Definition](./benchmark-workload-definition.md)
+- [Benchmark Fixture Inventory And Reproducibility Plan](./benchmark-fixture-inventory-and-reproducibility-plan.md)
 - [Benchmark Result Interpretation Guide](./benchmark-result-interpretation-guide.md)
 - [Dashboard Information Architecture](./dashboard-information-architecture.md)
 - [Dashboard Interaction Spec And Screen Inventory](./dashboard-interaction-spec-and-screen-inventory.md)
@@ -52,13 +53,17 @@ Concept, roadmap, and GitHub planning material lives in
 - [Federation And High-Availability Model](./federation-and-high-availability-model.md)
 - [Deployment Topology And Release Profile Guide](./deployment-topology-and-release-profile-guide.md)
 - [Testing Strategy And Fuzz Corpus Plan](./testing-strategy-and-fuzz-corpus-plan.md)
+- [Rust Workspace And Crate Boundaries](./rust-workspace-and-crate-boundaries.md)
+- [OSC Conformance Corpus Plan](./osc-conformance-corpus-plan.md)
 - [Conformance Vector And Interoperability Suite Guide](./conformance-vector-and-interoperability-suite-guide.md)
 - [Architecture Decision Record Index](./architecture-decision-record-index.md)
+- [ADR Folder](../adr/en/README.md)
 
 ## Related Planning Documents
 
 - [Detailed Delivery Plan](../../concepts/en/detailed-delivery-plan.md)
 - [GitHub Foundation And Collaboration Plan](../../concepts/en/github-foundation-and-collaboration-plan.md)
+- [CI Expansion And Required-Check Roadmap](../../concepts/en/ci-expansion-and-required-check-roadmap.md)
 
 ## Language And References
 
