@@ -36,6 +36,7 @@ cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
+cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml
 ```
 
 Docker 経由で同じ確認を行う場合:
@@ -58,6 +59,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - Prometheus text に落とせる in-memory health / metrics export
 - 初期ローカルトラブルシュート向けの HTTP `/healthz` と `/metrics` endpoint
 - config diff と last-known-good を持つ safe apply 基盤
+- top-level UDP ingress / destination config と end-to-end localhost proxy relay
 
 ## ドキュメント入口
 

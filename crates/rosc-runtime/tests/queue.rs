@@ -29,6 +29,11 @@ fn ingress_queue_applies_bounded_capacity() {
 async fn runtime_dispatches_and_exports_health_snapshot() {
     let config = BrokerConfig::from_toml_str(
         r#"
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "0.0.0.0:0"
+        target = "127.0.0.1:9001"
+
         [[routes]]
         id = "fov"
         enabled = true
@@ -61,13 +66,9 @@ async fn runtime_dispatches_and_exports_health_snapshot() {
     ));
 
     let packet = sample_packet("/ue5/camera/fov");
-    assert_eq!(
-        runtime
-            .dispatch_packet(&packet, &destinations)
-            .await
-            .unwrap(),
-        1
-    );
+    let outcome = runtime.dispatch_packet(&packet, &destinations).await;
+    assert!(outcome.failures.is_empty());
+    assert_eq!(outcome.dispatched, 1);
 
     tokio::time::sleep(std::time::Duration::from_millis(25)).await;
     assert_eq!(recorder.sent.lock().unwrap().len(), 1);
@@ -85,6 +86,16 @@ async fn runtime_dispatches_and_exports_health_snapshot() {
 async fn failing_destination_opens_breaker_without_blocking_healthy_peer() {
     let config = BrokerConfig::from_toml_str(
         r#"
+        [[udp_destinations]]
+        id = "healthy"
+        bind = "0.0.0.0:0"
+        target = "127.0.0.1:9001"
+
+        [[udp_destinations]]
+        id = "failing"
+        bind = "0.0.0.0:0"
+        target = "127.0.0.1:9002"
+
         [[routes]]
         id = "fanout"
         enabled = true
@@ -131,10 +142,10 @@ async fn failing_destination_opens_breaker_without_blocking_healthy_peer() {
     ));
 
     for _ in 0..3 {
-        runtime
+        let outcome = runtime
             .dispatch_packet(&sample_packet("/ue5/camera/fov"), &destinations)
-            .await
-            .unwrap();
+            .await;
+        assert!(outcome.failures.is_empty());
     }
 
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
@@ -239,13 +250,9 @@ async fn route_transform_failure_does_not_block_other_matching_routes() {
     )
     .unwrap();
 
-    assert_eq!(
-        runtime
-            .dispatch_packet(&packet, &destinations)
-            .await
-            .unwrap(),
-        1
-    );
+    let outcome = runtime.dispatch_packet(&packet, &destinations).await;
+    assert_eq!(outcome.dispatched, 1);
+    assert_eq!(outcome.failures.len(), 1);
     tokio::time::sleep(std::time::Duration::from_millis(25)).await;
 
     assert_eq!(healthy.sent.lock().unwrap().len(), 1);

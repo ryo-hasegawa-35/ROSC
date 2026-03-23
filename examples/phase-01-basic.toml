@@ -1,3 +1,13 @@
+[[udp_ingresses]]
+id = "udp_localhost_in"
+bind = "127.0.0.1:9000"
+mode = "osc1_0_strict"
+
+[[udp_destinations]]
+id = "udp_renderer"
+bind = "0.0.0.0:0"
+target = "127.0.0.1:9001"
+
 [[routes]]
 id = "ue5_camera_fov"
 enabled = true

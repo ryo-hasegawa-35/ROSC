@@ -14,6 +14,16 @@ fn config_loader_accepts_phase_01_style_routes() {
         mode = "osc1_0_strict"
         class = "StatefulControl"
 
+        [[udp_ingresses]]
+        id = "udp_localhost_in"
+        bind = "127.0.0.1:9000"
+        mode = "osc1_0_strict"
+
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "0.0.0.0:0"
+        target = "127.0.0.1:9001"
+
         [routes.match]
         ingress_ids = ["udp_localhost_in"]
         address_patterns = ["/ue5/camera/fov"]
@@ -30,6 +40,8 @@ fn config_loader_accepts_phase_01_style_routes() {
     .expect("config should parse");
 
     assert_eq!(config.schema_version, 1);
+    assert_eq!(config.udp_ingresses.len(), 1);
+    assert_eq!(config.udp_destinations.len(), 1);
     assert_eq!(config.routes.len(), 1);
     assert_eq!(config.routes[0].id, "ue5_camera_fov");
 }
@@ -39,6 +51,8 @@ fn config_loader_rejects_duplicate_route_ids() {
     let config = BrokerConfig {
         schema_version: 1,
         routes: vec![sample_route("dup", "a"), sample_route("dup", "b")],
+        udp_ingresses: Vec::new(),
+        udp_destinations: Vec::new(),
     };
     let error = config
         .validate()
@@ -58,6 +72,10 @@ fn config_manager_preserves_last_known_good_on_invalid_candidate() {
             enabled = true
             mode = "osc1_0_strict"
             class = "StatefulControl"
+            [[udp_destinations]]
+            id = "udp_renderer"
+            bind = "0.0.0.0:0"
+            target = "127.0.0.1:9001"
             [routes.match]
             [[routes.destinations]]
             target = "udp_renderer"
@@ -80,6 +98,10 @@ fn config_manager_preserves_last_known_good_on_invalid_candidate() {
         enabled = true
         mode = "osc1_0_strict"
         class = "StatefulControl"
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "0.0.0.0:0"
+        target = "127.0.0.1:9001"
         [routes.match]
         [[routes.destinations]]
         target = "udp_renderer"
@@ -107,6 +129,10 @@ fn config_manager_reports_route_diff() {
             enabled = true
             mode = "osc1_0_strict"
             class = "StatefulControl"
+            [[udp_destinations]]
+            id = "udp_renderer"
+            bind = "0.0.0.0:0"
+            target = "127.0.0.1:9001"
             [routes.match]
             [[routes.destinations]]
             target = "udp_renderer"
@@ -123,6 +149,14 @@ fn config_manager_reports_route_diff() {
             enabled = true
             mode = "osc1_0_strict"
             class = "StatefulControl"
+            [[udp_destinations]]
+            id = "udp_renderer"
+            bind = "0.0.0.0:0"
+            target = "127.0.0.1:9001"
+            [[udp_destinations]]
+            id = "tap"
+            bind = "0.0.0.0:0"
+            target = "127.0.0.1:9002"
             [routes.match]
             [routes.transform]
             rename_address = "/render/camera/fov"
@@ -146,6 +180,30 @@ fn config_manager_reports_route_diff() {
     assert_eq!(diff.added_routes, vec!["tracking"]);
     assert_eq!(diff.changed_routes, vec!["camera"]);
     assert!(diff.removed_routes.is_empty());
+}
+
+#[test]
+fn config_loader_rejects_unknown_udp_destination_reference() {
+    let error = BrokerConfig::from_toml_str(
+        r#"
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+        [routes.match]
+        [[routes.destinations]]
+        target = "missing_udp_target"
+        transport = "osc_udp"
+        "#,
+    )
+    .expect_err("unknown udp target should fail validation");
+
+    assert!(matches!(
+        error,
+        ConfigError::UnknownUdpDestinationReference { route_id, destination_id }
+        if route_id == "camera" && destination_id == "missing_udp_target"
+    ));
 }
 
 fn sample_route(id: &str, target: &str) -> RouteSpec {

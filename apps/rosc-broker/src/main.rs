@@ -27,6 +27,11 @@ enum Command {
         #[arg(long)]
         config: Option<PathBuf>,
     },
+    RunUdpProxy {
+        config: PathBuf,
+        #[arg(long, default_value_t = 1024)]
+        ingress_queue_depth: usize,
+    },
 }
 
 #[tokio::main]
@@ -92,6 +97,22 @@ async fn main() -> Result<()> {
                 }
             }
             println!("health endpoint stopped");
+        }
+        Command::RunUdpProxy {
+            config,
+            ingress_queue_depth,
+        } => {
+            let content = fs::read_to_string(&config)
+                .with_context(|| format!("failed to read config file {}", config.display()))?;
+            let config = rosc_config::BrokerConfig::from_toml_str(&content)?;
+            let telemetry = InMemoryTelemetry::default();
+            let mut app = rosc_broker::UdpProxyApp::from_config(&config, telemetry).await?;
+            app.spawn_ingress_tasks(ingress_queue_depth).await;
+            println!("udp proxy running; press Ctrl-C to stop");
+            tokio::signal::ctrl_c()
+                .await
+                .context("failed to listen for ctrl-c")?;
+            println!("udp proxy stopped");
         }
     }
     Ok(())

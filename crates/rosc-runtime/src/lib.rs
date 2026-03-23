@@ -130,6 +130,20 @@ pub enum RuntimeDispatchError {
     Destination(#[from] DestinationDispatchError),
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DispatchFailure {
+    pub route_id: String,
+    pub destination_id: String,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DispatchOutcome {
+    pub dispatched: usize,
+    pub failures: Vec<DispatchFailure>,
+}
+
+#[derive(Clone)]
 pub struct IngressQueue {
     tx: mpsc::Sender<PacketEnvelope>,
 }
@@ -210,14 +224,36 @@ where
         &self,
         packet: &PacketEnvelope,
         destinations: &DestinationRegistry,
-    ) -> Result<usize, RuntimeDispatchError> {
+    ) -> DispatchOutcome {
         let outcome = self.routing.route(packet);
         self.emit_routing_events(&outcome);
 
+        let mut dispatch_outcome = DispatchOutcome {
+            dispatched: 0,
+            failures: outcome
+                .failures
+                .into_iter()
+                .map(|failure| DispatchFailure {
+                    route_id: failure.route_id,
+                    destination_id: "<route>".to_owned(),
+                    reason: failure.error.to_string(),
+                })
+                .collect(),
+        };
+
         for dispatch in &outcome.dispatches {
-            destinations.dispatch(dispatch.clone()).await?;
+            match destinations.dispatch(dispatch.clone()).await {
+                Ok(_enqueue_outcome) => {
+                    dispatch_outcome.dispatched += 1;
+                }
+                Err(error) => dispatch_outcome.failures.push(DispatchFailure {
+                    route_id: dispatch.route_id.clone(),
+                    destination_id: dispatch.destination.destination_id().to_owned(),
+                    reason: error.to_string(),
+                }),
+            }
         }
-        Ok(outcome.dispatches.len())
+        dispatch_outcome
     }
 
     fn emit_routing_events(&self, outcome: &RoutingOutcome) {

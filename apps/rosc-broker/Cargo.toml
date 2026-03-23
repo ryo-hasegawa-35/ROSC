@@ -9,6 +9,8 @@ rust-version.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 rosc-config = { path = "../../crates/rosc-config" }
+rosc-osc = { path = "../../crates/rosc-osc" }
+rosc-route = { path = "../../crates/rosc-route" }
 rosc-runtime = { path = "../../crates/rosc-runtime" }
 rosc-telemetry = { path = "../../crates/rosc-telemetry" }
 tokio.workspace = true

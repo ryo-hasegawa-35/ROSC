@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use rosc_route::{RouteBuildError, RouteSpec, RoutingEngine};
+use rosc_route::{RouteBuildError, RouteSpec, RoutingEngine, TransportSelector};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -11,6 +11,10 @@ pub struct BrokerConfig {
     #[serde(default = "default_schema_version")]
     pub schema_version: u32,
     #[serde(default)]
+    pub udp_ingresses: Vec<UdpIngressConfig>,
+    #[serde(default)]
+    pub udp_destinations: Vec<UdpDestinationConfig>,
+    #[serde(default)]
     pub routes: Vec<RouteSpec>,
 }
 
@@ -18,9 +22,28 @@ impl Default for BrokerConfig {
     fn default() -> Self {
         Self {
             schema_version: default_schema_version(),
+            udp_ingresses: Vec::new(),
+            udp_destinations: Vec::new(),
             routes: Vec::new(),
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct UdpIngressConfig {
+    pub id: String,
+    pub bind: String,
+    pub mode: rosc_osc::CompatibilityMode,
+    #[serde(default = "default_udp_packet_size")]
+    pub max_packet_size: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct UdpDestinationConfig {
+    pub id: String,
+    #[serde(default = "default_udp_bind_address")]
+    pub bind: String,
+    pub target: String,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -65,6 +88,20 @@ pub enum ConfigError {
     UnsupportedSchemaVersion(u32),
     #[error("route ids must be unique; duplicate `{0}` was found")]
     DuplicateRouteId(String),
+    #[error("udp ingress ids must be unique; duplicate `{0}` was found")]
+    DuplicateUdpIngressId(String),
+    #[error("udp destination ids must be unique; duplicate `{0}` was found")]
+    DuplicateUdpDestinationId(String),
+    #[error("route `{route_id}` references unknown ingress `{ingress_id}`")]
+    UnknownIngressReference {
+        route_id: String,
+        ingress_id: String,
+    },
+    #[error("route `{route_id}` references unknown udp destination `{destination_id}`")]
+    UnknownUdpDestinationReference {
+        route_id: String,
+        destination_id: String,
+    },
     #[error(transparent)]
     RouteBuild(#[from] RouteBuildError),
 }
@@ -88,7 +125,61 @@ impl BrokerConfig {
             }
         }
 
+        let mut ingress_ids = BTreeSet::new();
+        for ingress in &self.udp_ingresses {
+            if !ingress_ids.insert(ingress.id.clone()) {
+                return Err(ConfigError::DuplicateUdpIngressId(ingress.id.clone()));
+            }
+        }
+
+        let mut destination_ids = BTreeSet::new();
+        for destination in &self.udp_destinations {
+            if !destination_ids.insert(destination.id.clone()) {
+                return Err(ConfigError::DuplicateUdpDestinationId(
+                    destination.id.clone(),
+                ));
+            }
+        }
+
         let _engine = RoutingEngine::new(self.routes.clone())?;
+        self.validate_runtime_references()?;
+        Ok(())
+    }
+
+    pub fn validate_runtime_references(&self) -> Result<(), ConfigError> {
+        let ingress_ids: BTreeSet<&str> = self
+            .udp_ingresses
+            .iter()
+            .map(|ingress| ingress.id.as_str())
+            .collect();
+        let destination_ids: BTreeSet<&str> = self
+            .udp_destinations
+            .iter()
+            .map(|destination| destination.id.as_str())
+            .collect();
+
+        for route in &self.routes {
+            for ingress_id in &route.match_spec.ingress_ids {
+                if !ingress_ids.contains(ingress_id.as_str()) {
+                    return Err(ConfigError::UnknownIngressReference {
+                        route_id: route.id.clone(),
+                        ingress_id: ingress_id.clone(),
+                    });
+                }
+            }
+
+            for destination in &route.destinations {
+                if destination.transport == TransportSelector::OscUdp
+                    && !destination_ids.contains(destination.target.as_str())
+                {
+                    return Err(ConfigError::UnknownUdpDestinationReference {
+                        route_id: route.id.clone(),
+                        destination_id: destination.target.clone(),
+                    });
+                }
+            }
+        }
+
         Ok(())
     }
 }
@@ -182,4 +273,12 @@ fn diff_configs(current: &BrokerConfig, candidate: &BrokerConfig) -> ConfigDiff 
 
 const fn default_schema_version() -> u32 {
     SUPPORTED_SCHEMA_VERSION
+}
+
+const fn default_udp_packet_size() -> usize {
+    65_536
+}
+
+fn default_udp_bind_address() -> String {
+    "0.0.0.0:0".to_owned()
 }
