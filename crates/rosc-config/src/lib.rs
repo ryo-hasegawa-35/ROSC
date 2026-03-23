@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use rosc_route::{CachePolicy, RouteBuildError, RouteSpec, RoutingEngine, TransportSelector};
+use rosc_route::{
+    CachePolicy, CapturePolicy, RouteBuildError, RouteSpec, RoutingEngine, TransportSelector,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -44,6 +46,56 @@ pub struct UdpDestinationConfig {
     #[serde(default = "default_udp_bind_address")]
     pub bind: String,
     pub target: String,
+    #[serde(default)]
+    pub policy: UdpDestinationPolicyConfig,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DropPolicyConfig {
+    DropNewest,
+    #[default]
+    DropOldest,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BreakerPolicyConfig {
+    #[serde(default = "default_breaker_failure_threshold")]
+    pub open_after_consecutive_failures: u32,
+    #[serde(default = "default_breaker_overflow_threshold")]
+    pub open_after_consecutive_queue_overflows: u32,
+    #[serde(default = "default_breaker_cooldown_ms")]
+    pub cooldown_ms: u64,
+}
+
+impl Default for BreakerPolicyConfig {
+    fn default() -> Self {
+        Self {
+            open_after_consecutive_failures: default_breaker_failure_threshold(),
+            open_after_consecutive_queue_overflows: default_breaker_overflow_threshold(),
+            cooldown_ms: default_breaker_cooldown_ms(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct UdpDestinationPolicyConfig {
+    #[serde(default = "default_destination_queue_depth")]
+    pub queue_depth: usize,
+    #[serde(default)]
+    pub drop_policy: DropPolicyConfig,
+    #[serde(default)]
+    pub breaker: BreakerPolicyConfig,
+}
+
+impl Default for UdpDestinationPolicyConfig {
+    fn default() -> Self {
+        Self {
+            queue_depth: default_destination_queue_depth(),
+            drop_policy: DropPolicyConfig::default(),
+            breaker: BreakerPolicyConfig::default(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -92,6 +144,8 @@ pub enum ConfigError {
     DuplicateUdpIngressId(String),
     #[error("udp destination ids must be unique; duplicate `{0}` was found")]
     DuplicateUdpDestinationId(String),
+    #[error("udp destination `{destination_id}` must have queue_depth >= 1")]
+    InvalidUdpDestinationQueueDepth { destination_id: String },
     #[error("route `{route_id}` references unknown ingress `{ingress_id}`")]
     UnknownIngressReference {
         route_id: String,
@@ -104,6 +158,8 @@ pub enum ConfigError {
     },
     #[error("route `{route_id}` enables rehydrate without a cache policy")]
     RecoveryWithoutCache { route_id: String },
+    #[error("route `{route_id}` enables replay without bounded capture")]
+    ReplayWithoutCapture { route_id: String },
     #[error(transparent)]
     RouteBuild(#[from] RouteBuildError),
 }
@@ -141,6 +197,11 @@ impl BrokerConfig {
                     destination.id.clone(),
                 ));
             }
+            if destination.policy.queue_depth == 0 {
+                return Err(ConfigError::InvalidUdpDestinationQueueDepth {
+                    destination_id: destination.id.clone(),
+                });
+            }
         }
 
         let _engine = RoutingEngine::new(self.routes.clone())?;
@@ -167,6 +228,11 @@ impl BrokerConfig {
                     || route.recovery.late_joiner.is_enabled())
             {
                 return Err(ConfigError::RecoveryWithoutCache {
+                    route_id: route.id.clone(),
+                });
+            }
+            if route.recovery.replay_allowed && route.observability.capture == CapturePolicy::Off {
+                return Err(ConfigError::ReplayWithoutCapture {
                     route_id: route.id.clone(),
                 });
             }
@@ -293,4 +359,20 @@ const fn default_udp_packet_size() -> usize {
 
 fn default_udp_bind_address() -> String {
     "0.0.0.0:0".to_owned()
+}
+
+const fn default_destination_queue_depth() -> usize {
+    16
+}
+
+const fn default_breaker_failure_threshold() -> u32 {
+    3
+}
+
+const fn default_breaker_overflow_threshold() -> u32 {
+    3
+}
+
+const fn default_breaker_cooldown_ms() -> u64 {
+    250
 }

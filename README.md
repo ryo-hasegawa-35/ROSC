@@ -64,6 +64,7 @@ Current Phase 01 runtime coverage:
 - top-level UDP ingress / destination config with end-to-end localhost proxy relay coverage
 - first safe late-joiner recovery path with route-level cache policy and bounded rehydrate
 - bounded capture, sandbox replay, and recovery audit primitives kept distinct from live routing
+- configurable per-destination queue, drop, and breaker policy from TOML
 
 ## Documentation Entry Points
 

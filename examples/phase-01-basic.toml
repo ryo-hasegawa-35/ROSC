@@ -8,6 +8,15 @@ id = "udp_renderer"
 bind = "0.0.0.0:0"
 target = "127.0.0.1:9001"
 
+[udp_destinations.policy]
+queue_depth = 16
+drop_policy = "drop_oldest"
+
+[udp_destinations.policy.breaker]
+open_after_consecutive_failures = 3
+open_after_consecutive_queue_overflows = 3
+cooldown_ms = 250
+
 [[routes]]
 id = "ue5_camera_fov"
 enabled = true

@@ -62,6 +62,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - top-level UDP ingress / destination config と end-to-end localhost proxy relay
 - route ごとの cache policy と bounded rehydrate を使う最初の late-joiner recovery
 - live routing と分離した bounded capture / sandbox replay / recovery audit の最小土台
+- TOML から調整できる per-destination queue / drop / breaker policy
 
 ## ドキュメント入口
 

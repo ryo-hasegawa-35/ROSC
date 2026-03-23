@@ -25,6 +25,13 @@ fn config_loader_accepts_phase_01_style_routes() {
         id = "udp_renderer"
         bind = "0.0.0.0:0"
         target = "127.0.0.1:9001"
+        [udp_destinations.policy]
+        queue_depth = 32
+        drop_policy = "drop_oldest"
+        [udp_destinations.policy.breaker]
+        open_after_consecutive_failures = 5
+        open_after_consecutive_queue_overflows = 7
+        cooldown_ms = 1000
 
         [routes.match]
         ingress_ids = ["udp_localhost_in"]
@@ -53,6 +60,7 @@ fn config_loader_accepts_phase_01_style_routes() {
     assert_eq!(config.schema_version, 1);
     assert_eq!(config.udp_ingresses.len(), 1);
     assert_eq!(config.udp_destinations.len(), 1);
+    assert_eq!(config.udp_destinations[0].policy.queue_depth, 32);
     assert_eq!(config.routes.len(), 1);
     assert_eq!(config.routes[0].id, "ue5_camera_fov");
 }
@@ -240,6 +248,54 @@ fn config_loader_rejects_rehydrate_without_cache() {
     assert!(matches!(
         error,
         ConfigError::RecoveryWithoutCache { route_id } if route_id == "camera"
+    ));
+}
+
+#[test]
+fn config_loader_rejects_replay_without_capture() {
+    let error = BrokerConfig::from_toml_str(
+        r#"
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+        [routes.match]
+        [routes.cache]
+        policy = "last_value_per_address"
+        [routes.recovery]
+        replay_allowed = true
+        [[routes.destinations]]
+        target = "loopback"
+        transport = "internal"
+        "#,
+    )
+    .expect_err("replay should require capture");
+
+    assert!(matches!(
+        error,
+        ConfigError::ReplayWithoutCapture { route_id } if route_id == "camera"
+    ));
+}
+
+#[test]
+fn config_loader_rejects_zero_queue_depth_on_udp_destination() {
+    let error = BrokerConfig::from_toml_str(
+        r#"
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "0.0.0.0:0"
+        target = "127.0.0.1:9001"
+        [udp_destinations.policy]
+        queue_depth = 0
+        "#,
+    )
+    .expect_err("queue depth must be positive");
+
+    assert!(matches!(
+        error,
+        ConfigError::InvalidUdpDestinationQueueDepth { destination_id }
+        if destination_id == "udp_renderer"
     ));
 }
 

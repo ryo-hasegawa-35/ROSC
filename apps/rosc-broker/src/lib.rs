@@ -3,11 +3,11 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use rosc_config::BrokerConfig;
+use rosc_config::{BrokerConfig, DropPolicyConfig};
 use rosc_recovery::{RecoveryEngine, RehydrateRequest, SandboxReplayRequest};
 use rosc_runtime::{
-    DestinationPolicy, DestinationRegistry, DestinationWorkerHandle, IngressQueue, QueuePolicy,
-    Runtime, UdpEgressSink, UdpIngressBinding, UdpIngressConfig,
+    BreakerPolicy, DestinationPolicy, DestinationRegistry, DestinationWorkerHandle, DropPolicy,
+    IngressQueue, QueuePolicy, Runtime, UdpEgressSink, UdpIngressBinding, UdpIngressConfig,
 };
 use rosc_telemetry::{BrokerEvent, InMemoryTelemetry, TelemetrySink};
 
@@ -38,7 +38,26 @@ impl UdpProxyApp {
             let sink = Arc::new(UdpEgressSink::bind(&destination.bind, target).await?);
             destinations.register(DestinationWorkerHandle::spawn(
                 destination.id.clone(),
-                DestinationPolicy::default(),
+                DestinationPolicy {
+                    queue_depth: destination.policy.queue_depth,
+                    drop_policy: match destination.policy.drop_policy {
+                        DropPolicyConfig::DropNewest => DropPolicy::DropNewest,
+                        DropPolicyConfig::DropOldest => DropPolicy::DropOldest,
+                    },
+                    breaker: BreakerPolicy {
+                        open_after_consecutive_failures: destination
+                            .policy
+                            .breaker
+                            .open_after_consecutive_failures,
+                        open_after_consecutive_queue_overflows: destination
+                            .policy
+                            .breaker
+                            .open_after_consecutive_queue_overflows,
+                        cooldown: std::time::Duration::from_millis(
+                            destination.policy.breaker.cooldown_ms,
+                        ),
+                    },
+                },
                 sink,
                 Arc::new(telemetry.clone()),
             ));

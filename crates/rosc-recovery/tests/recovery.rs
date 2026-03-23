@@ -153,3 +153,26 @@ fn recovery_engine_replays_to_a_sandbox_destination_and_records_audit() {
         "rosc_recovery_replay_total{route_id=\"camera\",destination_id=\"sandbox_tap\"} 2"
     ));
 }
+
+#[test]
+fn recovery_engine_skips_routes_that_do_not_allow_replay() {
+    let telemetry = InMemoryTelemetry::default();
+    let engine = RecoveryEngine::with_limits(telemetry.clone(), 8, 8);
+    let mut dispatch = sample_dispatch("camera", "udp_renderer", "/render/camera/fov");
+    dispatch.recovery.replay_allowed = false;
+    engine.observe_dispatches(&[dispatch]);
+
+    let outcome = engine
+        .sandbox_replay(SandboxReplayRequest {
+            route_id: "camera".to_owned(),
+            source_destination_id: Some("udp_renderer".to_owned()),
+            sandbox_destination_id: "sandbox_tap".to_owned(),
+            limit: 10,
+        })
+        .unwrap();
+
+    assert!(outcome.dispatches.is_empty());
+    assert!(engine.audit_records().is_empty());
+    let metrics = telemetry.render_prometheus();
+    assert!(!metrics.contains("rosc_recovery_replay_total"));
+}
