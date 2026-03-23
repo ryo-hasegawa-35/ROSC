@@ -1,0 +1,47 @@
+# ROSC ドキュメント
+
+このディレクトリは、次の 2 系統に分けて整理しています。
+
+- [構想 / 計画 (English)](./concepts/en/README.md)
+- [構想 / 計画 (Japanese)](./concepts/ja/README.md)
+- [設計仕様 (English)](./design/en/README.md)
+- [設計仕様 (Japanese)](./design/ja/README.md)
+
+参考資料:
+
+- [OSC 1.0 Specification PDF](./references/osc-1.0-specification.pdf)
+- [OSC 1.1 NIME 2009 PDF](./references/osc-1.1-nime-2009.pdf)
+- [OpenSoundControl.org](https://opensoundcontrol.stanford.edu/)
+- [OSC 1.0 Spec Page](https://opensoundcontrol.stanford.edu/spec-1_0.html)
+- [OSC 1.1 Spec Page](https://opensoundcontrol.stanford.edu/spec-1_1.html)
+
+## フォルダ方針
+
+- `docs/concepts/`
+  - ビジョン、ロードマップ、計画、優先順位、フェーズ整理
+- `docs/design/`
+  - 技術仕様、挙動モデル、設定文法、運用設計
+- `docs/references/`
+  - 一次資料のローカルコピー
+
+## 作業ルール
+
+今後追加するプロジェクト文書はすべて:
+
+- 英語版を作る
+- 日本語版を作る
+- `concepts` か `design` のどちらかに明確に置く
+
+## 最初に見るとよい入口
+
+- ビジョンやフェーズ計画から入る:
+  - [Concepts / Planning (Japanese)](./concepts/ja/README.md)
+- GitHub や repository 準備から入る:
+  - [GitHub Foundation And Collaboration Plan (English)](./concepts/en/github-foundation-and-collaboration-plan.md)
+  - [GitHub Foundation And Collaboration Plan (Japanese)](./concepts/ja/github-foundation-and-collaboration-plan.md)
+- 技術設計から入る:
+  - [Design Reading Order (English)](./design/en/reading-order.md)
+  - [Design Reading Order (Japanese)](./design/ja/reading-order.md)
+- 用語の確認:
+  - [Glossary (English)](./design/en/glossary.md)
+  - [Glossary (Japanese)](./design/ja/glossary.md)

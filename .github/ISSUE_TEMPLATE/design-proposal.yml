@@ -1,0 +1,54 @@
+name: Design Proposal
+description: A design change, ADR-worthy proposal, or semantics discussion that needs explicit review.
+title: "[Design] "
+labels:
+  - type:design
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem or ambiguity is this proposal trying to solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Change
+      description: Describe the proposed decision or adjustment.
+    validations:
+      required: true
+  - type: textarea
+    id: affected_docs
+    attributes:
+      label: Affected Documents
+      description: List all design or planning docs that would need updates.
+      placeholder: |
+        - docs/design/...
+        - docs/concepts/...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Rejected Alternatives
+      description: What alternatives were considered and why were they rejected?
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks And Compatibility Impact
+      description: Explain risk, compatibility impact, and any rollback concerns.
+    validations:
+      required: true
+  - type: textarea
+    id: adr
+    attributes:
+      label: ADR Need
+      description: State whether this should become a new ADR or update an existing ADR.
+      placeholder: |
+        - New ADR needed? yes/no
+        - Existing ADR: ADR-....
+    validations:
+      required: true

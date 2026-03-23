@@ -1,0 +1,76 @@
+name: Delivery Task
+description: A concrete implementation, design-sync, or infrastructure task that someone can execute.
+title: "[Task] "
+labels:
+  - type:task
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the task in one short paragraph.
+      placeholder: What needs to be done, and why does it matter?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: In Scope
+      description: List what this issue should include.
+      placeholder: |
+        - ...
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out Of Scope
+      description: List what should explicitly not be done in this issue.
+      placeholder: |
+        - ...
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Deliverables
+      description: State the concrete outputs expected from this issue.
+      placeholder: |
+        - documents
+        - code
+        - tests
+        - CI updates
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Write the conditions that make this task done.
+      placeholder: |
+        - ...
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Link blocking issues, decisions, or docs.
+      placeholder: |
+        - blocked by #
+        - depends on docs/...
+    validations:
+      required: false
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Link the relevant repository documents or external references.
+      placeholder: |
+        - docs/design/...
+        - docs/concepts/...
+    validations:
+      required: true

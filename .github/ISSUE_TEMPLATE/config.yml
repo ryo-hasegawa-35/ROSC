@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation Index
+    url: https://github.com/ryo-hasegawa-35/ROSC/tree/main/docs
+    about: Start here for the current planning and design baseline.
+  - name: Security Reporting Guidance
+    url: https://github.com/ryo-hasegawa-35/ROSC/blob/main/SECURITY.md
+    about: Please use the private reporting path for security-sensitive issues.

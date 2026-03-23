@@ -1,0 +1,82 @@
+name: Docs Quality
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  docs-consistency:
+    name: docs-consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate documentation integrity
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          root = Path(".").resolve()
+          errors = []
+
+          def ensure_pair_tree(base: Path):
+              en = base / "en"
+              ja = base / "ja"
+              en_files = {p.relative_to(en).as_posix() for p in en.rglob("*.md")}
+              ja_files = {p.relative_to(ja).as_posix() for p in ja.rglob("*.md")}
+              missing_in_ja = sorted(en_files - ja_files)
+              missing_in_en = sorted(ja_files - en_files)
+              for rel in missing_in_ja:
+                  errors.append(f"Missing Japanese pair for {base/'en'/rel}")
+              for rel in missing_in_en:
+                  errors.append(f"Missing English pair for {base/'ja'/rel}")
+
+          def check_links(md_path: Path):
+              text = md_path.read_text(encoding="utf-8")
+              for match in re.finditer(r"\[[^\]]+\]\(([^)]+)\)", text):
+                  target = match.group(1)
+                  if target.startswith(("http://", "https://", "#", "mailto:")):
+                      continue
+                  resolved = (md_path.parent / target).resolve()
+                  if not resolved.exists():
+                      errors.append(
+                          f"Broken relative link in {md_path.relative_to(root)} -> {target}"
+                      )
+
+          required_files = [
+              root / "README.md",
+              root / "CONTRIBUTING.md",
+              root / "SECURITY.md",
+              root / "CODEOWNERS",
+              root / "docs" / "README.md",
+              root / "docs" / "README.ja.md",
+          ]
+          for req in required_files:
+              if not req.exists():
+                  errors.append(f"Missing required file: {req.relative_to(root)}")
+
+          ensure_pair_tree(root / "docs" / "concepts")
+          ensure_pair_tree(root / "docs" / "design")
+
+          for md in root.rglob("*.md"):
+              check_links(md)
+
+          if errors:
+              print("Documentation integrity check failed:", file=sys.stderr)
+              for err in errors:
+                  print(f"- {err}", file=sys.stderr)
+              sys.exit(1)
+
+          print("Documentation integrity check passed.")
+          PY
