@@ -10,7 +10,7 @@ use rosc_packet::{IngressMetadata, PacketEnvelope, TransportKind};
 use rosc_runtime::{
     BreakerState, DestinationDispatchError, DestinationPolicy, DestinationRegistry,
     DestinationSendError, DestinationWorkerHandle, DropPolicy, EgressSink, IngressQueue,
-    QueueError, QueuePolicy, Runtime, UdpIngressBinding, UdpIngressConfig,
+    QueueError, QueuePolicy, Runtime, UdpEgressSink, UdpIngressBinding, UdpIngressConfig,
 };
 use rosc_telemetry::InMemoryTelemetry;
 use tokio::net::UdpSocket;
@@ -194,6 +194,59 @@ async fn udp_ingress_binding_receives_and_parses_datagrams() {
     assert_eq!(packet.address(), Some("/ue5/camera/fov"));
 }
 
+#[tokio::test]
+async fn udp_egress_sink_writes_raw_datagrams() {
+    let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let target = listener.local_addr().unwrap();
+    let sink = UdpEgressSink::bind("127.0.0.1:0", target).await.unwrap();
+    let packet = sample_packet("/ue5/camera/fov");
+
+    sink.send(&packet).await.unwrap();
+
+    let mut buf = vec![0u8; 2048];
+    let (size, _) = listener.recv_from(&mut buf).await.unwrap();
+    assert_eq!(&buf[..size], packet.raw_bytes.as_ref());
+}
+
+#[tokio::test]
+async fn destination_breaker_recovers_after_cooldown_and_successful_probe() {
+    let telemetry = InMemoryTelemetry::default();
+    let worker = DestinationWorkerHandle::spawn(
+        "flaky",
+        DestinationPolicy {
+            breaker: rosc_runtime::BreakerPolicy {
+                open_after_consecutive_failures: 1,
+                open_after_consecutive_queue_overflows: 3,
+                cooldown: std::time::Duration::from_millis(30),
+            },
+            ..DestinationPolicy::default()
+        },
+        Arc::new(FlakySink {
+            remaining_failures: Mutex::new(1),
+            sent: Mutex::new(Vec::new()),
+        }),
+        Arc::new(telemetry),
+    );
+
+    worker
+        .enqueue(sample_packet("/ue5/camera/fov"))
+        .await
+        .unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    assert_eq!(worker.status().breaker_state, BreakerState::Open);
+
+    tokio::time::sleep(std::time::Duration::from_millis(35)).await;
+    worker
+        .enqueue(sample_packet("/ue5/camera/fov"))
+        .await
+        .unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(35)).await;
+
+    let status = worker.status();
+    assert_eq!(status.breaker_state, BreakerState::Closed);
+    assert_eq!(status.sent_total, 1);
+}
+
 fn sample_packet(address: &str) -> PacketEnvelope {
     PacketEnvelope::parse_osc(
         encode_packet(&ParsedOscPacket::Message(OscMessage {
@@ -235,5 +288,26 @@ struct FailingSink;
 impl EgressSink for FailingSink {
     async fn send(&self, _packet: &PacketEnvelope) -> Result<(), DestinationSendError> {
         Err(DestinationSendError::Custom("simulated failure".to_owned()))
+    }
+}
+
+struct FlakySink {
+    remaining_failures: Mutex<usize>,
+    sent: Mutex<Vec<String>>,
+}
+
+#[async_trait]
+impl EgressSink for FlakySink {
+    async fn send(&self, packet: &PacketEnvelope) -> Result<(), DestinationSendError> {
+        let mut remaining = self.remaining_failures.lock().unwrap();
+        if *remaining > 0 {
+            *remaining -= 1;
+            return Err(DestinationSendError::Custom("temporary failure".to_owned()));
+        }
+        self.sent
+            .lock()
+            .unwrap()
+            .push(packet.address().unwrap_or("<bundle>").to_owned());
+        Ok(())
     }
 }
