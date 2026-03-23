@@ -63,6 +63,8 @@ Important interpretation notes:
 - [GitHub Foundation And Collaboration Plan](./github-foundation-and-collaboration-plan.md)
 - [GitHub Backlog Map](./github-backlog-map.md)
 - [AI Collaboration And Agent Interop Plan](./ai-collaboration-and-agent-interop-plan.md)
+- [Maintainer Approval And Merge Behavior](./maintainer-approval-and-merge-behavior.md)
+- [Release Note And Changelog Policy](./release-note-and-changelog-policy.md)
 
 ## Related Design Specs
 

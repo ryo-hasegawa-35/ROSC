@@ -3,6 +3,10 @@
 このフォルダには、ROSC の accepted / future architecture decision record
 を保存します。
 
+Template:
+
+- [ADR Template](./adr-template.md)
+
 初期 accepted ADR:
 
 - [ADR-0001 Compatibility Mode Contract](./adr-0001-compatibility-mode-contract.md)

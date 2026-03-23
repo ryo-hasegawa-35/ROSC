@@ -81,6 +81,8 @@ jobs:
               root / "LICENSE",
               root / "README.md",
               root / "README.ja.md",
+              root / "CHANGELOG.md",
+              root / "CHANGELOG.ja.md",
               root / "CONTRIBUTING.md",
               root / "CONTRIBUTING.ja.md",
               root / "SECURITY.md",
@@ -96,6 +98,10 @@ jobs:
               root / ".skill" / "SKILLS.md",
               root / ".skills" / "SKILL.md",
               root / ".skills" / "SKILLS.md",
+              root / "docs" / "concepts" / "en" / "maintainer-approval-and-merge-behavior.md",
+              root / "docs" / "concepts" / "ja" / "maintainer-approval-and-merge-behavior.md",
+              root / "docs" / "concepts" / "en" / "release-note-and-changelog-policy.md",
+              root / "docs" / "concepts" / "ja" / "release-note-and-changelog-policy.md",
           ]
           for req in required_files:
               if not req.exists():

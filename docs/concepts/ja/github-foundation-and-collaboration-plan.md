@@ -14,6 +14,8 @@ cross-platform infrastructure product を目指しています。なので GitHu
 
 - [Detailed Delivery Plan](./detailed-delivery-plan.md)
 - [Effort And Risks](./effort-and-risks.md)
+- [Maintainer Approval And Merge Behavior](./maintainer-approval-and-merge-behavior.md)
+- [Release Note And Changelog Policy](./release-note-and-changelog-policy.md)
 - [Implementation Readiness Checklist](../../design/ja/implementation-readiness-checklist.md)
 - [Architecture Decision Record Index](../../design/ja/architecture-decision-record-index.md)
 
@@ -180,6 +182,21 @@ code-heavy な CI がまだなくても、repository は少なくとも次を検
 - tag は意味のある release / preview state に対応させる
 - release note は summary だけでなく evidence へリンクする
 - compatibility-sensitive change は明示的に強調する
+
+関連:
+
+- [Release Note と Changelog の方針](./release-note-and-changelog-policy.md)
+
+## Maintainer Approval Behavior
+
+単一 owner の repository では、同じ GitHub account が自分で作った PR に
+独立 reviewer として approval を付けることはできません。さらに admin
+enforcement が無効なら、review rule があっても GitHub は admin bypass を
+提示することがあります。
+
+詳しくは次を参照してください。
+
+- [Maintainer Approval と Merge Behavior](./maintainer-approval-and-merge-behavior.md)
 
 ## Security And Disclosure Baseline
 

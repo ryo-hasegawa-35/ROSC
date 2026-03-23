@@ -1,0 +1,41 @@
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - invalid
+      - question
+      - wontfix
+  categories:
+    - title: Breaking Or Compatibility-Sensitive Changes
+      labels:
+        - risk:compatibility
+    - title: Routing Core And Performance
+      labels:
+        - area:routing-core
+        - risk:performance
+    - title: Observability And Recovery
+      labels:
+        - area:observability
+        - area:recovery
+    - title: Adapters And Native Integration
+      labels:
+        - area:adapters
+        - area:native-ipc
+    - title: Plugins, Schema, And Extensibility
+      labels:
+        - area:plugins
+        - area:schema
+    - title: Security, Federation, And Trust
+      labels:
+        - area:security
+        - area:federation
+        - risk:security
+    - title: Release Engineering And Repository Governance
+      labels:
+        - area:release
+        - area:repo-governance
+        - type:ci
+        - type:docs
+    - title: Other Changes
+      labels:
+        - enhancement
