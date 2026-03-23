@@ -1,0 +1,41 @@
+use std::path::PathBuf;
+
+use clap::{Parser, Subcommand};
+
+#[derive(Debug, Parser)]
+#[command(author, version, about = "ROSC broker bootstrap CLI")]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    CheckConfig {
+        path: PathBuf,
+    },
+    ProxyStatus {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+    },
+    WatchConfig {
+        path: PathBuf,
+        #[arg(long, default_value_t = 1000)]
+        poll_ms: u64,
+    },
+    DiffConfig {
+        current: PathBuf,
+        candidate: PathBuf,
+    },
+    ServeHealth {
+        listen: String,
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
+    RunUdpProxy {
+        config: PathBuf,
+        #[arg(long, default_value_t = 1024)]
+        ingress_queue_depth: usize,
+    },
+}
