@@ -65,6 +65,9 @@ The repository should also keep mirrored AI entry trees in `.agent/`,
 `.agents/`, `.skill/`, and `.skills/` so different tools discover the same
 working rules.
 
+Review-assist automation should also follow minimal-permission rules and must
+never take merge actions silently.
+
 ## Required GitHub Baseline Files
 
 Before major coding begins, plan to add:

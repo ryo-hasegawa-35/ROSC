@@ -62,6 +62,9 @@ cross-platform infrastructure product を目指しています。なので GitHu
 加えて、異なるツールが同じ前提を読めるように、`.agent/`、`.agents/`、
 `.skill/`、`.skills/` の mirror も維持します。
 
+review 補助 automation も最小権限を守り、勝手に merge しないことを前提に
+します。
+
 ## 先に揃えたい GitHub Baseline File
 
 本格的な coding 前に、少なくとも次を計画します。

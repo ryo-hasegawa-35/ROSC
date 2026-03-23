@@ -62,6 +62,7 @@ collaboration の準備方針をまとめています。
 - [GitHub Foundation And Collaboration Plan](./github-foundation-and-collaboration-plan.md)
 - [GitHub Backlog Map](./github-backlog-map.md)
 - [AI 協業と Agent Interop 方針](./ai-collaboration-and-agent-interop-plan.md)
+- [Gemini PR Review Assistant](./gemini-pr-review-assistant.md)
 
 ## 関連する設計仕様
 

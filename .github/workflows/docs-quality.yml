@@ -96,6 +96,9 @@ jobs:
               root / ".skill" / "SKILLS.md",
               root / ".skills" / "SKILL.md",
               root / ".skills" / "SKILLS.md",
+              root / ".github" / "workflows" / "gemini-pr-review.yml",
+              root / "docs" / "concepts" / "en" / "gemini-pr-review-assistant.md",
+              root / "docs" / "concepts" / "ja" / "gemini-pr-review-assistant.md",
           ]
           for req in required_files:
               if not req.exists():

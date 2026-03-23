@@ -41,6 +41,7 @@ repository は現在、実装前の準備フェーズにあります。
 - [Skill Catalog (Plural Alias)](./.skills/SKILLS.md)
 - [AI Collaboration And Agent Interop Plan](./docs/concepts/en/ai-collaboration-and-agent-interop-plan.md)
 - [AI Collaboration And Agent Interop Plan (Japanese)](./docs/concepts/ja/ai-collaboration-and-agent-interop-plan.md)
+- [Gemini PR Review Assistant](./docs/concepts/ja/gemini-pr-review-assistant.md)
 
 おすすめの読み順:
 

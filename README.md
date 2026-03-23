@@ -44,6 +44,7 @@ What does not exist yet:
 - [Skill Catalog (Plural Alias)](./.skills/SKILLS.md)
 - [AI Collaboration And Agent Interop Plan](./docs/concepts/en/ai-collaboration-and-agent-interop-plan.md)
 - [AI Collaboration And Agent Interop Plan (Japanese)](./docs/concepts/ja/ai-collaboration-and-agent-interop-plan.md)
+- [Gemini PR Review Assistant](./docs/concepts/en/gemini-pr-review-assistant.md)
 
 Recommended reading order:
 
