@@ -35,6 +35,8 @@ What does not exist yet:
 - [Concepts / Planning (Japanese)](./docs/concepts/ja/README.md)
 - [Design Specs (English)](./docs/design/en/README.md)
 - [Design Specs (Japanese)](./docs/design/ja/README.md)
+- [Changelog](./CHANGELOG.md)
+- [Changelog (Japanese)](./CHANGELOG.ja.md)
 
 ## AI Collaboration Entry Points
 
@@ -45,6 +47,8 @@ What does not exist yet:
 - [AI Collaboration And Agent Interop Plan](./docs/concepts/en/ai-collaboration-and-agent-interop-plan.md)
 - [AI Collaboration And Agent Interop Plan (Japanese)](./docs/concepts/ja/ai-collaboration-and-agent-interop-plan.md)
 - [Gemini PR Review Assistant](./docs/concepts/en/gemini-pr-review-assistant.md)
+- [Maintainer Approval And Merge Behavior](./docs/concepts/en/maintainer-approval-and-merge-behavior.md)
+- [Release Note And Changelog Policy](./docs/concepts/en/release-note-and-changelog-policy.md)
 
 Recommended reading order:
 

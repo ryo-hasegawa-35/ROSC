@@ -3,6 +3,10 @@
 This folder contains the accepted and future architecture decision records for
 ROSC.
 
+Templates:
+
+- [ADR Template](./adr-template.md)
+
 Initial accepted ADRs:
 
 - [ADR-0001 Compatibility Mode Contract](./adr-0001-compatibility-mode-contract.md)
@@ -17,3 +21,4 @@ Initial accepted ADRs:
 - [ADR-0010 Broker Identity, Federation, And Failover](./adr-0010-broker-identity-federation-and-failover.md)
 - [ADR-0011 Benchmark Gate And Release Evidence](./adr-0011-benchmark-gate-and-release-evidence.md)
 - [ADR-0012 GitHub Protection And Docs-First Collaboration](./adr-0012-github-protection-and-docs-first-collaboration.md)
+- [ADR-0013 Phase 00 Foundation Completion Gate](./adr-0013-phase-00-foundation-completion.md)

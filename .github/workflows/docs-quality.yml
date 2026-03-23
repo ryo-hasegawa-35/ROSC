@@ -81,6 +81,8 @@ jobs:
               root / "LICENSE",
               root / "README.md",
               root / "README.ja.md",
+              root / "CHANGELOG.md",
+              root / "CHANGELOG.ja.md",
               root / "CONTRIBUTING.md",
               root / "CONTRIBUTING.ja.md",
               root / "SECURITY.md",
@@ -99,6 +101,10 @@ jobs:
               root / ".github" / "workflows" / "gemini-pr-review.yml",
               root / "docs" / "concepts" / "en" / "gemini-pr-review-assistant.md",
               root / "docs" / "concepts" / "ja" / "gemini-pr-review-assistant.md",
+              root / "docs" / "concepts" / "en" / "maintainer-approval-and-merge-behavior.md",
+              root / "docs" / "concepts" / "ja" / "maintainer-approval-and-merge-behavior.md",
+              root / "docs" / "concepts" / "en" / "release-note-and-changelog-policy.md",
+              root / "docs" / "concepts" / "ja" / "release-note-and-changelog-policy.md",
           ]
           for req in required_files:
               if not req.exists():

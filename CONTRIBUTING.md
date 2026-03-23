@@ -15,6 +15,7 @@ Before opening a substantial pull request, read:
 3. [Design Reading Order](./docs/design/en/reading-order.md)
 4. [Implementation Readiness Checklist](./docs/design/en/implementation-readiness-checklist.md)
 5. [GitHub Foundation And Collaboration Plan](./docs/concepts/en/github-foundation-and-collaboration-plan.md)
+6. [Maintainer Approval And Merge Behavior](./docs/concepts/en/maintainer-approval-and-merge-behavior.md)
 
 ## Contribution Workflow
 
@@ -54,6 +55,7 @@ Relevant examples:
 - security overlay behavior
 - benchmark interpretation
 - GitHub governance policy
+- release-note and changelog policy
 
 ## Bilingual Documentation Rule
 
