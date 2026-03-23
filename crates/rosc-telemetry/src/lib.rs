@@ -86,6 +86,7 @@ pub enum BrokerEvent {
         removed_routes: usize,
         changed_routes: usize,
     },
+    ConfigRejected,
 }
 
 pub trait TelemetrySink: Send + Sync {
@@ -124,6 +125,7 @@ pub struct HealthSnapshot {
     pub config_added_routes_total: u64,
     pub config_removed_routes_total: u64,
     pub config_changed_routes_total: u64,
+    pub config_rejections_total: u64,
 }
 
 #[derive(Clone, Default)]
@@ -262,6 +264,11 @@ impl InMemoryTelemetry {
             "rosc_config_changed_routes_total {}",
             snapshot.config_changed_routes_total
         );
+        let _ = writeln!(
+            output,
+            "rosc_config_rejections_total {}",
+            snapshot.config_rejections_total
+        );
 
         output
     }
@@ -373,6 +380,9 @@ impl TelemetrySink for InMemoryTelemetry {
                 snapshot.config_added_routes_total += added_routes as u64;
                 snapshot.config_removed_routes_total += removed_routes as u64;
                 snapshot.config_changed_routes_total += changed_routes as u64;
+            }
+            BrokerEvent::ConfigRejected => {
+                snapshot.config_rejections_total += 1;
             }
         }
     }

@@ -18,6 +18,11 @@ enum Command {
     CheckConfig {
         path: PathBuf,
     },
+    WatchConfig {
+        path: PathBuf,
+        #[arg(long, default_value_t = 1000)]
+        poll_ms: u64,
+    },
     DiffConfig {
         current: PathBuf,
         candidate: PathBuf,
@@ -47,6 +52,49 @@ async fn main() -> Result<()> {
                 config.schema_version,
                 config.routes.len()
             );
+        }
+        Command::WatchConfig { path, poll_ms } => {
+            let telemetry = InMemoryTelemetry::default();
+            let mut supervisor = rosc_broker::ConfigFileSupervisor::new(&path, telemetry);
+            let applied = supervisor.load_initial()?;
+            println!(
+                "loaded initial config: revision={} added_routes={}",
+                applied.revision,
+                applied.diff.added_routes.join(",")
+            );
+
+            let mut interval = tokio::time::interval(std::time::Duration::from_millis(poll_ms));
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        match supervisor.poll_once()? {
+                            rosc_broker::ConfigReloadOutcome::Unchanged => {}
+                            rosc_broker::ConfigReloadOutcome::Applied(applied) => {
+                                println!(
+                                    "applied config revision={} added_routes={} removed_routes={} changed_routes={}",
+                                    applied.revision,
+                                    applied.diff.added_routes.join(","),
+                                    applied.diff.removed_routes.join(","),
+                                    applied.diff.changed_routes.join(","),
+                                );
+                            }
+                            rosc_broker::ConfigReloadOutcome::Rejected(error) => {
+                                let revision = supervisor.current_revision().unwrap_or_default();
+                                println!(
+                                    "rejected config change; keeping revision={} reason={}",
+                                    revision,
+                                    error
+                                );
+                            }
+                        }
+                    }
+                    result = tokio::signal::ctrl_c() => {
+                        result.context("failed to listen for ctrl-c")?;
+                        break;
+                    }
+                }
+            }
+            println!("config watcher stopped");
         }
         Command::DiffConfig { current, candidate } => {
             let current_content = fs::read_to_string(&current)

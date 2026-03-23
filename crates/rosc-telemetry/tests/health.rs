@@ -54,6 +54,7 @@ fn in_memory_telemetry_renders_prometheus_text() {
         removed_routes: 0,
         changed_routes: 2,
     });
+    telemetry.emit(BrokerEvent::ConfigRejected);
 
     let text = telemetry.render_prometheus();
     assert!(text.contains("rosc_ingress_packets_total{ingress_id=\"udp_localhost_in\"} 1"));
@@ -73,4 +74,5 @@ fn in_memory_telemetry_renders_prometheus_text() {
     assert!(text.contains("rosc_destination_send_total{destination_id=\"udp_renderer\"} 1"));
     assert!(text.contains("rosc_destination_breaker_state{destination_id=\"udp_renderer\"} 2"));
     assert!(text.contains("rosc_config_revision 4"));
+    assert!(text.contains("rosc_config_rejections_total 1"));
 }

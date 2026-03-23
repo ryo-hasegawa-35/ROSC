@@ -34,6 +34,7 @@ repository は現在、最初の実装フェーズに入りました。
 ```bash
 cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
+cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml
@@ -63,6 +64,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - route ごとの cache policy と bounded rehydrate を使う最初の late-joiner recovery
 - live routing と分離した bounded capture / sandbox replay / recovery audit の最小土台
 - TOML から調整できる per-destination queue / drop / breaker policy
+- last-known-good を維持する polling-based safe config watch flow
 
 ## ドキュメント入口
 
