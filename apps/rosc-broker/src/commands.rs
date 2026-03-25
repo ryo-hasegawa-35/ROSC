@@ -161,15 +161,14 @@ async fn watch_udp_proxy(
         require_fallback_ready,
     };
     let telemetry = InMemoryTelemetry::default();
-    let mut health_service =
-        spawn_optional_health_service(health_listen, telemetry.clone()).await?;
     let mut supervisor = rosc_broker::ManagedProxyFileSupervisor::start(
         path,
-        telemetry,
+        telemetry.clone(),
         ingress_queue_depth,
         safety_policy,
     )
     .await?;
+    let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
     print_proxy_report(&supervisor.status_snapshot());
     println!(
         "managed udp proxy loaded revision={}",
@@ -304,11 +303,14 @@ async fn run_udp_proxy(
         require_fallback_ready,
     };
     let telemetry = InMemoryTelemetry::default();
-    let mut health_service =
-        spawn_optional_health_service(health_listen, telemetry.clone()).await?;
-    let mut proxy =
-        rosc_broker::ManagedUdpProxy::start(config, telemetry, ingress_queue_depth, safety_policy)
-            .await?;
+    let mut proxy = rosc_broker::ManagedUdpProxy::start(
+        config,
+        telemetry.clone(),
+        ingress_queue_depth,
+        safety_policy,
+    )
+    .await?;
+    let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
     println!("udp proxy running; press Ctrl-C to stop");
     tokio::signal::ctrl_c()
         .await
