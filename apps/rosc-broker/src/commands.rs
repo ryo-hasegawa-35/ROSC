@@ -245,11 +245,12 @@ async fn run_udp_proxy(
         );
     }
 
-    app.spawn_ingress_tasks(ingress_queue_depth).await;
+    app.spawn_ingress_tasks(ingress_queue_depth).await?;
     println!("udp proxy running; press Ctrl-C to stop");
     tokio::signal::ctrl_c()
         .await
         .context("failed to listen for ctrl-c")?;
+    app.shutdown().await;
     println!("udp proxy stopped");
     Ok(())
 }

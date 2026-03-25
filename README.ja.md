@@ -69,6 +69,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - bound 済み ingress へ戻る UDP destination を startup 時点で弾く proxy loop prevention
 - ingress / destination / route と direct UDP fallback hint、runtime queue health を JSON で確認できる `proxy-status`
 - operator warning や fallback 不足があると起動 / reload を止められる safety gate
+- controlled restart と将来の hot reload に向けて ingress port をきれいに返す clean shutdown
 
 ## ドキュメント入口
 

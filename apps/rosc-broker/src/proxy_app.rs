@@ -10,6 +10,8 @@ use rosc_runtime::{
     IngressQueue, QueuePolicy, Runtime, UdpEgressSink, UdpIngressBinding, UdpIngressConfig,
 };
 use rosc_telemetry::{BrokerEvent, HealthSnapshot, InMemoryTelemetry, TelemetrySink};
+use tokio::sync::watch;
+use tokio::task::JoinHandle;
 
 use crate::proxy_status::{
     UdpProxyStatusSnapshot, attach_runtime_status, proxy_status_from_config,
@@ -19,8 +21,45 @@ pub struct UdpProxyApp {
     runtime: Arc<Runtime<InMemoryTelemetry>>,
     recovery: Arc<RecoveryEngine<InMemoryTelemetry>>,
     destinations: Arc<DestinationRegistry>,
+    ingress_addrs: BTreeMap<String, SocketAddr>,
     ingresses: BTreeMap<String, UdpIngressBinding>,
     status: UdpProxyStatusSnapshot,
+    tasks: ProxyRuntimeTasks,
+}
+
+#[derive(Default)]
+struct ProxyRuntimeTasks {
+    shutdown: Option<watch::Sender<bool>>,
+    dispatcher: Option<JoinHandle<()>>,
+    ingresses: Vec<JoinHandle<()>>,
+}
+
+impl ProxyRuntimeTasks {
+    fn is_running(&self) -> bool {
+        self.shutdown.is_some() || self.dispatcher.is_some() || !self.ingresses.is_empty()
+    }
+
+    async fn shutdown(&mut self) {
+        if let Some(shutdown) = self.shutdown.take() {
+            let _ = shutdown.send(true);
+        }
+
+        if let Some(dispatcher) = self.dispatcher.take() {
+            let _ = dispatcher.await;
+        }
+
+        for handle in self.ingresses.drain(..) {
+            let _ = handle.await;
+        }
+    }
+}
+
+impl Drop for ProxyRuntimeTasks {
+    fn drop(&mut self) {
+        if let Some(shutdown) = self.shutdown.take() {
+            let _ = shutdown.send(true);
+        }
+    }
 }
 
 impl UdpProxyApp {
@@ -47,8 +86,10 @@ impl UdpProxyApp {
             runtime,
             recovery,
             destinations: Arc::new(destinations),
+            ingress_addrs,
             ingresses,
             status,
+            tasks: ProxyRuntimeTasks::default(),
         })
     }
 
@@ -61,9 +102,7 @@ impl UdpProxyApp {
     }
 
     pub fn ingress_local_addr(&self, ingress_id: &str) -> Option<SocketAddr> {
-        self.ingresses
-            .get(ingress_id)
-            .and_then(|binding| binding.local_addr().ok())
+        self.ingress_addrs.get(ingress_id).copied()
     }
 
     pub async fn relay_once(&self, ingress_id: &str) -> Result<usize> {
@@ -130,56 +169,89 @@ impl UdpProxyApp {
         Ok(dispatched)
     }
 
-    pub async fn spawn_ingress_tasks(&mut self, ingress_queue_depth: usize) {
+    pub async fn spawn_ingress_tasks(&mut self, ingress_queue_depth: usize) -> Result<()> {
+        if self.tasks.is_running() {
+            anyhow::bail!("udp proxy ingress tasks are already running");
+        }
+
         let (queue, mut rx) = IngressQueue::new(QueuePolicy {
             max_depth: ingress_queue_depth,
         });
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
         let runtime = Arc::clone(&self.runtime);
         let recovery = Arc::clone(&self.recovery);
         let destinations = Arc::clone(&self.destinations);
-        tokio::spawn(async move {
-            while let Some(packet) = rx.recv().await {
-                let outcome = runtime.dispatch_packet(&packet, &destinations).await;
-                recovery.observe_dispatches(&outcome.successful_dispatches);
-                for failure in outcome.failures {
-                    runtime.telemetry.emit(BrokerEvent::DispatchFailed {
-                        route_id: failure.route_id,
-                        destination_id: failure.destination_id,
-                        reason: failure.reason,
-                    });
-                }
-            }
-        });
-
-        for (ingress_id, binding) in std::mem::take(&mut self.ingresses) {
-            let queue = queue.clone();
-            let telemetry = self.runtime.telemetry.clone();
-            tokio::spawn(async move {
-                loop {
-                    match binding.recv_next().await {
-                        Ok(packet) => {
-                            telemetry.emit(BrokerEvent::PacketAccepted {
-                                ingress_id: packet.metadata.ingress_id.clone(),
-                            });
-                            match queue.try_send(packet) {
-                                Ok(()) => {}
-                                Err(error) => telemetry.emit(BrokerEvent::PacketDropped {
-                                    ingress_id: ingress_id.clone(),
-                                    reason: error.to_string(),
-                                }),
-                            }
-                        }
-                        Err(error) => {
-                            telemetry.emit(BrokerEvent::PacketDropped {
-                                ingress_id: ingress_id.clone(),
-                                reason: error.to_string(),
+        let mut dispatcher_shutdown = shutdown_rx.clone();
+        self.tasks.dispatcher = Some(tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = dispatcher_shutdown.changed() => {
+                        break;
+                    }
+                    packet = rx.recv() => {
+                        let Some(packet) = packet else {
+                            break;
+                        };
+                        let outcome = runtime.dispatch_packet(&packet, &destinations).await;
+                        recovery.observe_dispatches(&outcome.successful_dispatches);
+                        for failure in outcome.failures {
+                            runtime.telemetry.emit(BrokerEvent::DispatchFailed {
+                                route_id: failure.route_id,
+                                destination_id: failure.destination_id,
+                                reason: failure.reason,
                             });
                         }
                     }
                 }
-            });
+            }
+        }));
+
+        for (ingress_id, binding) in std::mem::take(&mut self.ingresses) {
+            let queue = queue.clone();
+            let telemetry = self.runtime.telemetry.clone();
+            let mut ingress_shutdown = shutdown_rx.clone();
+            self.tasks.ingresses.push(tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        biased;
+                        _ = ingress_shutdown.changed() => {
+                            break;
+                        }
+                        packet = binding.recv_next() => {
+                            match packet {
+                                Ok(packet) => {
+                                    telemetry.emit(BrokerEvent::PacketAccepted {
+                                        ingress_id: packet.metadata.ingress_id.clone(),
+                                    });
+                                    match queue.try_send(packet) {
+                                        Ok(()) => {}
+                                        Err(error) => telemetry.emit(BrokerEvent::PacketDropped {
+                                            ingress_id: ingress_id.clone(),
+                                            reason: error.to_string(),
+                                        }),
+                                    }
+                                }
+                                Err(error) => {
+                                    telemetry.emit(BrokerEvent::PacketDropped {
+                                        ingress_id: ingress_id.clone(),
+                                        reason: error.to_string(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }));
         }
+
+        self.tasks.shutdown = Some(shutdown_tx);
+        Ok(())
+    }
+
+    pub async fn shutdown(&mut self) {
+        self.tasks.shutdown().await;
     }
 }
 

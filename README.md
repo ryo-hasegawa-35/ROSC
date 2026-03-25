@@ -71,6 +71,7 @@ Current Phase 01 runtime coverage:
 - startup-time proxy loop prevention for UDP destinations that point back into a bound ingress
 - JSON proxy-status output that summarizes ingresses, destinations, routes, direct UDP fallback hints, and runtime queue health
 - startup and reload safety gates that can block proxy activation when operator warnings or fallback gaps are present
+- clean proxy shutdown that releases ingress ports for controlled restart and future hot reload work
 
 ## Documentation Entry Points
 
