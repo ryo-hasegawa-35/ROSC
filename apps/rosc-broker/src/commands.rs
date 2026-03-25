@@ -191,6 +191,7 @@ async fn watch_udp_proxy(
                             supervisor.current_revision().unwrap_or_default(),
                             reasons.join(" | ")
                         );
+                        print_proxy_report(&supervisor.status_snapshot());
                     }
                     rosc_broker::ProxyReloadOutcome::Rejected(error) => {
                         println!(
@@ -198,6 +199,7 @@ async fn watch_udp_proxy(
                             supervisor.current_revision().unwrap_or_default(),
                             error
                         );
+                        print_proxy_report(&supervisor.status_snapshot());
                     }
                     rosc_broker::ProxyReloadOutcome::ReloadFailed(error) => {
                         println!(
@@ -205,6 +207,7 @@ async fn watch_udp_proxy(
                             supervisor.current_revision().unwrap_or_default(),
                             error
                         );
+                        print_proxy_report(&supervisor.status_snapshot());
                     }
                 }
             }
