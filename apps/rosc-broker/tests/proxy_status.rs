@@ -160,6 +160,8 @@ async fn live_proxy_status_exposes_bound_local_addr_when_requested() {
     let runtime = status
         .runtime
         .expect("live status should include runtime snapshot");
+    assert_eq!(runtime.config_revision, 0);
+    assert_eq!(runtime.config_rejections_total, 0);
     assert_eq!(
         runtime.ingress_packets_total.get("udp_localhost_in"),
         Some(&1)

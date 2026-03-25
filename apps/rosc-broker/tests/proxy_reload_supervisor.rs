@@ -132,6 +132,12 @@ async fn proxy_reload_supervisor_blocks_unsafe_candidate_and_keeps_last_known_go
         other => panic!("expected blocked config, got {other:?}"),
     }
     assert_eq!(supervisor.current_revision(), Some(1));
+    let runtime = supervisor
+        .status_snapshot()
+        .runtime
+        .expect("managed proxy status should expose runtime");
+    assert_eq!(runtime.config_revision, 1);
+    assert_eq!(runtime.config_rejections_total, 1);
 
     send_test_packet(
         supervisor
@@ -194,6 +200,12 @@ async fn proxy_reload_supervisor_rolls_back_after_runtime_reload_failure() {
         other => panic!("expected runtime reload failure, got {other:?}"),
     }
     assert_eq!(supervisor.current_revision(), Some(1));
+    let runtime = supervisor
+        .status_snapshot()
+        .runtime
+        .expect("managed proxy status should expose runtime");
+    assert_eq!(runtime.config_revision, 1);
+    assert_eq!(runtime.config_rejections_total, 1);
 
     send_test_packet(
         supervisor

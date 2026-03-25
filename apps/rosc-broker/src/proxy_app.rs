@@ -21,10 +21,17 @@ pub struct UdpProxyApp {
     runtime: Arc<Runtime<InMemoryTelemetry>>,
     recovery: Arc<RecoveryEngine<InMemoryTelemetry>>,
     destinations: Arc<DestinationRegistry>,
+    ingress_specs: BTreeMap<String, IngressBindingSpec>,
     ingress_addrs: BTreeMap<String, SocketAddr>,
     ingresses: BTreeMap<String, UdpIngressBinding>,
     status: UdpProxyStatusSnapshot,
     tasks: ProxyRuntimeTasks,
+}
+
+#[derive(Clone)]
+struct IngressBindingSpec {
+    bind_address: String,
+    config: UdpIngressConfig,
 }
 
 #[derive(Default)]
@@ -75,6 +82,7 @@ impl UdpProxyApp {
 
         let ingresses = bind_ingresses(config).await?;
         let ingress_addrs = ingress_addresses(&ingresses)?;
+        let ingress_specs = ingress_specs(&config.udp_ingresses, &ingress_addrs);
         let mut status = proxy_status_from_config(config)?;
         for ingress in &mut status.ingresses {
             ingress.bound_local_addr = ingress_addrs.get(&ingress.id).map(ToString::to_string);
@@ -86,6 +94,7 @@ impl UdpProxyApp {
             runtime,
             recovery,
             destinations: Arc::new(destinations),
+            ingress_specs,
             ingress_addrs,
             ingresses,
             status,
@@ -173,6 +182,7 @@ impl UdpProxyApp {
         if self.tasks.is_running() {
             anyhow::bail!("udp proxy ingress tasks are already running");
         }
+        self.ensure_ingresses_bound().await?;
 
         let (queue, mut rx) = IngressQueue::new(QueuePolicy {
             max_depth: ingress_queue_depth,
@@ -253,6 +263,17 @@ impl UdpProxyApp {
     pub async fn shutdown(&mut self) {
         self.tasks.shutdown().await;
     }
+
+    async fn ensure_ingresses_bound(&mut self) -> Result<()> {
+        if !self.ingresses.is_empty() {
+            return Ok(());
+        }
+
+        self.ingresses = bind_ingresses_from_specs(&self.ingress_specs).await?;
+        self.ingress_addrs = ingress_addresses(&self.ingresses)?;
+        refresh_ingress_status(&mut self.status, &self.ingress_addrs);
+        Ok(())
+    }
 }
 
 async fn bind_ingresses(config: &BrokerConfig) -> Result<BTreeMap<String, UdpIngressBinding>> {
@@ -272,6 +293,43 @@ async fn bind_ingresses(config: &BrokerConfig) -> Result<BTreeMap<String, UdpIng
     Ok(ingresses)
 }
 
+async fn bind_ingresses_from_specs(
+    specs: &BTreeMap<String, IngressBindingSpec>,
+) -> Result<BTreeMap<String, UdpIngressBinding>> {
+    let mut ingresses = BTreeMap::new();
+    for (ingress_id, spec) in specs {
+        let binding = UdpIngressBinding::bind(&spec.bind_address, spec.config.clone()).await?;
+        ingresses.insert(ingress_id.clone(), binding);
+    }
+    Ok(ingresses)
+}
+
+fn ingress_specs(
+    ingresses: &[rosc_config::UdpIngressConfig],
+    ingress_addrs: &BTreeMap<String, SocketAddr>,
+) -> BTreeMap<String, IngressBindingSpec> {
+    ingresses
+        .iter()
+        .map(|ingress| {
+            let bind_address = ingress_addrs
+                .get(&ingress.id)
+                .map(ToString::to_string)
+                .unwrap_or_else(|| ingress.bind.clone());
+            (
+                ingress.id.clone(),
+                IngressBindingSpec {
+                    bind_address,
+                    config: UdpIngressConfig {
+                        ingress_id: ingress.id.clone(),
+                        compatibility_mode: ingress.mode,
+                        max_packet_size: ingress.max_packet_size,
+                    },
+                },
+            )
+        })
+        .collect()
+}
+
 fn ingress_addresses(
     ingresses: &BTreeMap<String, UdpIngressBinding>,
 ) -> Result<BTreeMap<String, SocketAddr>> {
@@ -286,6 +344,15 @@ fn ingress_addresses(
                 })
         })
         .collect()
+}
+
+fn refresh_ingress_status(
+    status: &mut UdpProxyStatusSnapshot,
+    ingress_addrs: &BTreeMap<String, SocketAddr>,
+) {
+    for ingress in &mut status.ingresses {
+        ingress.bound_local_addr = ingress_addrs.get(&ingress.id).map(ToString::to_string);
+    }
 }
 
 async fn build_destinations(
