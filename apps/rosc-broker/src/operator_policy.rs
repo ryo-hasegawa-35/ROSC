@@ -45,6 +45,13 @@ pub fn proxy_startup_report_lines(status: &UdpProxyStatusSnapshot) -> Vec<String
         status.summary.warning_count
     )];
 
+    if let Some(runtime) = &status.runtime {
+        lines.push(format!(
+            "proxy runtime: config_revision={} config_rejections_total={}",
+            runtime.config_revision, runtime.config_rejections_total
+        ));
+    }
+
     lines.extend(
         operator_warnings(status)
             .into_iter()

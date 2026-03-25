@@ -1,8 +1,9 @@
 use rosc_broker::{
-    ProxyRuntimeSafetyPolicy, evaluate_proxy_runtime_policy, proxy_startup_report_lines,
-    proxy_status_from_config,
+    ProxyRuntimeSafetyPolicy, attach_runtime_status, evaluate_proxy_runtime_policy,
+    proxy_startup_report_lines, proxy_status_from_config,
 };
 use rosc_config::BrokerConfig;
+use rosc_telemetry::HealthSnapshot;
 
 fn broad_scope_config() -> BrokerConfig {
     BrokerConfig::from_toml_str(
@@ -69,4 +70,25 @@ fn startup_report_lines_include_summary_and_warning_lines() {
 
     assert!(report.iter().any(|line| line.starts_with("proxy summary:")));
     assert!(report.iter().any(|line| line.starts_with("proxy warning:")));
+}
+
+#[test]
+fn startup_report_lines_include_runtime_config_state_when_available() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            config_revision: 7,
+            config_rejections_total: 2,
+            ..HealthSnapshot::default()
+        },
+    );
+    let report = proxy_startup_report_lines(&status);
+
+    assert!(report.iter().any(|line| line.contains("config_revision=7")));
+    assert!(
+        report
+            .iter()
+            .any(|line| line.contains("config_rejections_total=2"))
+    );
 }
