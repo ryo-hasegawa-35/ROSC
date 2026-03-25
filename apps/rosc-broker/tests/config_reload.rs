@@ -1,16 +1,16 @@
 use std::fs;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use rosc_broker::{ConfigFileSupervisor, ConfigReloadOutcome};
 use rosc_telemetry::InMemoryTelemetry;
 
+static UNIQUE_CONFIG_COUNTER: AtomicU64 = AtomicU64::new(0);
+
 fn unique_config_path() -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    std::env::temp_dir().join(format!("rosc-config-reload-{nonce}.toml"))
+    let nonce = UNIQUE_CONFIG_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let pid = std::process::id();
+    std::env::temp_dir().join(format!("rosc-config-reload-{pid}-{nonce}.toml"))
 }
 
 fn base_config() -> &'static str {

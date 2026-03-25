@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 use rosc_broker::{
     ManagedProxyFileSupervisor, ProxyLaunchProfileMode, ProxyReloadOutcome,
@@ -12,12 +13,12 @@ use rosc_osc::{
 use rosc_telemetry::InMemoryTelemetry;
 use tokio::net::UdpSocket;
 
+static UNIQUE_CONFIG_COUNTER: AtomicU64 = AtomicU64::new(0);
+
 fn unique_config_path() -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    std::env::temp_dir().join(format!("rosc-managed-proxy-{nonce}.toml"))
+    let nonce = UNIQUE_CONFIG_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let pid = std::process::id();
+    std::env::temp_dir().join(format!("rosc-managed-proxy-{pid}-{nonce}.toml"))
 }
 
 fn proxy_config(ingress_bind: &str, destination_addr: &str, rename_address: &str) -> String {
