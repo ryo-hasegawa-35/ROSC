@@ -138,6 +138,12 @@ pub struct ConfigApplyResult {
     pub diff: ConfigDiff,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConfigPreview {
+    pub config: BrokerConfig,
+    pub diff: ConfigDiff,
+}
+
 #[derive(Default)]
 pub struct ConfigManager {
     next_revision: u64,
@@ -279,74 +285,56 @@ impl ConfigManager {
         self.current.as_ref()
     }
 
-    pub fn preview_toml_diff(&self, input: &str) -> Result<ConfigDiff, ConfigError> {
-        let candidate = BrokerConfig::from_toml_str(input)?;
-        Ok(match &self.current {
-            Some(current) => diff_configs(&current.config, &candidate),
-            None => ConfigDiff {
-                added_ingresses: candidate
-                    .udp_ingresses
-                    .iter()
-                    .map(|ingress| ingress.id.clone())
-                    .collect(),
-                removed_ingresses: Vec::new(),
-                changed_ingresses: Vec::new(),
-                added_destinations: candidate
-                    .udp_destinations
-                    .iter()
-                    .map(|destination| destination.id.clone())
-                    .collect(),
-                removed_destinations: Vec::new(),
-                changed_destinations: Vec::new(),
-                added_routes: candidate
-                    .routes
-                    .iter()
-                    .map(|route| route.id.clone())
-                    .collect(),
-                removed_routes: Vec::new(),
-                changed_routes: Vec::new(),
-            },
-        })
-    }
-
-    pub fn apply_toml_str(&mut self, input: &str) -> Result<ConfigApplyResult, ConfigError> {
-        let candidate = BrokerConfig::from_toml_str(input)?;
+    pub fn preview_toml_str(&self, input: &str) -> Result<ConfigPreview, ConfigError> {
+        let config = BrokerConfig::from_toml_str(input)?;
         let diff = match &self.current {
-            Some(current) => diff_configs(&current.config, &candidate),
+            Some(current) => diff_configs(&current.config, &config),
             None => ConfigDiff {
-                added_ingresses: candidate
+                added_ingresses: config
                     .udp_ingresses
                     .iter()
                     .map(|ingress| ingress.id.clone())
                     .collect(),
                 removed_ingresses: Vec::new(),
                 changed_ingresses: Vec::new(),
-                added_destinations: candidate
+                added_destinations: config
                     .udp_destinations
                     .iter()
                     .map(|destination| destination.id.clone())
                     .collect(),
                 removed_destinations: Vec::new(),
                 changed_destinations: Vec::new(),
-                added_routes: candidate
-                    .routes
-                    .iter()
-                    .map(|route| route.id.clone())
-                    .collect(),
+                added_routes: config.routes.iter().map(|route| route.id.clone()).collect(),
                 removed_routes: Vec::new(),
                 changed_routes: Vec::new(),
             },
         };
 
+        Ok(ConfigPreview { config, diff })
+    }
+
+    pub fn preview_toml_diff(&self, input: &str) -> Result<ConfigDiff, ConfigError> {
+        self.preview_toml_str(input).map(|preview| preview.diff)
+    }
+
+    pub fn apply_preview(&mut self, input: &str, preview: ConfigPreview) -> ConfigApplyResult {
         let revision = self.next_revision + 1;
         self.next_revision = revision;
         self.current = Some(AppliedConfig {
             revision,
             raw_toml: input.to_owned(),
-            config: candidate,
+            config: preview.config,
         });
 
-        Ok(ConfigApplyResult { revision, diff })
+        ConfigApplyResult {
+            revision,
+            diff: preview.diff,
+        }
+    }
+
+    pub fn apply_toml_str(&mut self, input: &str) -> Result<ConfigApplyResult, ConfigError> {
+        let preview = self.preview_toml_str(input)?;
+        Ok(self.apply_preview(input, preview))
     }
 }
 

@@ -37,10 +37,10 @@ Run the current workspace locally:
 cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
-cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000
+cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
-cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml
+cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
 ```
 
 Run the same workspace inside Docker:
@@ -69,7 +69,8 @@ Current Phase 01 runtime coverage:
 - configurable per-destination queue, drop, and breaker policy from TOML
 - polling-based safe config watch flow that preserves the last-known-good revision
 - startup-time proxy loop prevention for UDP destinations that point back into a bound ingress
-- JSON proxy-status output that summarizes ingresses, destinations, routes, and direct UDP fallback hints
+- JSON proxy-status output that summarizes ingresses, destinations, routes, direct UDP fallback hints, and runtime queue health
+- startup and reload safety gates that can block proxy activation when operator warnings or fallback gaps are present
 
 ## Documentation Entry Points
 

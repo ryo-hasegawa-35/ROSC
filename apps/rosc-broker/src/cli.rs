@@ -23,6 +23,10 @@ pub enum Command {
         path: PathBuf,
         #[arg(long, default_value_t = 1000)]
         poll_ms: u64,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
     },
     DiffConfig {
         current: PathBuf,
@@ -37,5 +41,9 @@ pub enum Command {
         config: PathBuf,
         #[arg(long, default_value_t = 1024)]
         ingress_queue_depth: usize,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
     },
 }

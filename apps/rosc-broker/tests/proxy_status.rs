@@ -1,4 +1,4 @@
-use rosc_broker::{UdpProxyApp, proxy_status_from_config};
+use rosc_broker::{UdpProxyApp, operator_warnings, proxy_status_from_config, startup_blockers};
 use rosc_config::BrokerConfig;
 use rosc_osc::{OscArgument, OscMessage, ParsedOscPacket, TypeTagSource, encode_packet};
 use rosc_telemetry::InMemoryTelemetry;
@@ -267,4 +267,13 @@ fn proxy_status_reports_missing_fallback_and_broad_scope_warnings() {
             .contains(&"no direct udp fallback target".to_owned())
     );
     assert_eq!(status.warnings.len(), 2);
+    let warnings = operator_warnings(&status);
+    assert_eq!(warnings.len(), 5);
+    let blockers = startup_blockers(&status, true, true);
+    assert_eq!(blockers.len(), 6);
+    assert!(
+        blockers
+            .iter()
+            .any(|entry| entry.contains("direct UDP fallback"))
+    );
 }

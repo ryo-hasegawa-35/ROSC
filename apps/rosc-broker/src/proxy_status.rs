@@ -324,6 +324,41 @@ pub fn attach_runtime_status(
     status
 }
 
+pub fn operator_warnings(status: &UdpProxyStatusSnapshot) -> Vec<String> {
+    let mut warnings = status.warnings.clone();
+    for route in &status.route_assessments {
+        if !route.active {
+            continue;
+        }
+        for warning in &route.warnings {
+            warnings.push(format!("route `{}`: {}", route.route_id, warning));
+        }
+    }
+    warnings
+}
+
+pub fn startup_blockers(
+    status: &UdpProxyStatusSnapshot,
+    fail_on_warnings: bool,
+    require_fallback_ready: bool,
+) -> Vec<String> {
+    let mut blockers = Vec::new();
+    if require_fallback_ready {
+        for route in &status.route_assessments {
+            if route.active && !route.direct_udp_fallback_available {
+                blockers.push(format!(
+                    "route `{}` does not have a direct UDP fallback target",
+                    route.route_id
+                ));
+            }
+        }
+    }
+    if fail_on_warnings {
+        blockers.extend(operator_warnings(status));
+    }
+    blockers
+}
+
 fn assess_route(
     route: &rosc_route::RouteSpec,
     destination_targets: &BTreeMap<&str, &str>,

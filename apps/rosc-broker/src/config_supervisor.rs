@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use rosc_config::{ConfigApplyResult, ConfigError, ConfigManager};
+use rosc_config::{BrokerConfig, ConfigApplyResult, ConfigError, ConfigManager};
 use rosc_telemetry::{BrokerEvent, TelemetrySink};
 
 #[derive(Debug)]
@@ -10,6 +10,7 @@ pub enum ConfigReloadOutcome {
     Unchanged,
     Applied(ConfigApplyResult),
     Rejected(ConfigError),
+    Blocked(Vec<String>),
 }
 
 pub struct ConfigFileSupervisor<TTelemetry> {
@@ -39,13 +40,35 @@ where
     }
 
     pub fn load_initial(&mut self) -> Result<ConfigApplyResult> {
+        self.load_initial_with_guard(|_| Ok(()))
+    }
+
+    pub fn load_initial_with_guard<F>(&mut self, guard: F) -> Result<ConfigApplyResult>
+    where
+        F: FnOnce(&BrokerConfig) -> Result<(), Vec<String>>,
+    {
         let content = read_config_file(&self.path)?;
-        let applied = self.manager.apply_toml_str(&content)?;
+        let preview = self.manager.preview_toml_str(&content)?;
+        if let Err(reasons) = guard(&preview.config) {
+            self.telemetry.emit(BrokerEvent::ConfigRejected);
+            anyhow::bail!(format_blocked_reasons(
+                "initial config blocked by runtime safety policy",
+                reasons
+            ));
+        }
+        let applied = self.manager.apply_preview(&content, preview);
         self.emit_config_applied(&applied);
         Ok(applied)
     }
 
     pub fn poll_once(&mut self) -> Result<ConfigReloadOutcome> {
+        self.poll_once_with_guard(|_| Ok(()))
+    }
+
+    pub fn poll_once_with_guard<F>(&mut self, guard: F) -> Result<ConfigReloadOutcome>
+    where
+        F: FnOnce(&BrokerConfig) -> Result<(), Vec<String>>,
+    {
         let content = read_config_file(&self.path)?;
         if self
             .manager
@@ -56,8 +79,13 @@ where
             return Ok(ConfigReloadOutcome::Unchanged);
         }
 
-        match self.manager.apply_toml_str(&content) {
-            Ok(applied) => {
+        match self.manager.preview_toml_str(&content) {
+            Ok(preview) => {
+                if let Err(reasons) = guard(&preview.config) {
+                    self.telemetry.emit(BrokerEvent::ConfigRejected);
+                    return Ok(ConfigReloadOutcome::Blocked(reasons));
+                }
+                let applied = self.manager.apply_preview(&content, preview);
                 self.emit_config_applied(&applied);
                 Ok(ConfigReloadOutcome::Applied(applied))
             }
@@ -88,4 +116,19 @@ fn read_config_file(path: &Path) -> Result<String> {
     fs::read_to_string(path)
         .map_err(anyhow::Error::from)
         .with_context(|| format!("failed to read config file {}", path.display()))
+}
+
+fn format_blocked_reasons(header: &str, reasons: Vec<String>) -> String {
+    if reasons.is_empty() {
+        return header.to_owned();
+    }
+
+    format!(
+        "{header}:\n{}",
+        reasons
+            .into_iter()
+            .map(|reason| format!("- {reason}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    )
 }

@@ -163,3 +163,69 @@ fn config_supervisor_reports_destination_policy_only_changes() {
 
     let _ = fs::remove_file(path);
 }
+
+#[test]
+fn config_supervisor_blocks_candidate_when_guard_rejects_it() {
+    let path = unique_config_path();
+    fs::write(&path, base_config()).unwrap();
+
+    let telemetry = InMemoryTelemetry::default();
+    let mut supervisor = ConfigFileSupervisor::new(&path, telemetry.clone());
+    let applied = supervisor
+        .load_initial_with_guard(|_| Ok(()))
+        .expect("initial config should load");
+    assert_eq!(applied.revision, 1);
+
+    fs::write(
+        &path,
+        r#"
+        [[routes]]
+        id = "unsafe"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+        [routes.match]
+        address_patterns = ["/unsafe"]
+        protocols = ["osc_udp"]
+        [[routes.destinations]]
+        target = "shadow"
+        transport = "internal"
+        "#,
+    )
+    .unwrap();
+
+    let outcome = supervisor
+        .poll_once_with_guard(|config| {
+            let status = rosc_broker::proxy_status_from_config(config)
+                .map_err(|error| vec![error.to_string()])?;
+            let blockers = rosc_broker::startup_blockers(&status, true, true);
+            if blockers.is_empty() {
+                Ok(())
+            } else {
+                Err(blockers)
+            }
+        })
+        .unwrap();
+
+    match outcome {
+        ConfigReloadOutcome::Blocked(reasons) => {
+            assert!(
+                reasons
+                    .iter()
+                    .any(|reason| reason.contains("direct UDP fallback"))
+            );
+            assert!(
+                reasons
+                    .iter()
+                    .any(|reason| reason.contains("matches all ingresses"))
+            );
+        }
+        other => panic!("expected blocked config, got {other:?}"),
+    }
+
+    assert_eq!(supervisor.current_revision(), Some(1));
+    let metrics = telemetry.render_prometheus();
+    assert!(metrics.contains("rosc_config_rejections_total 1"));
+
+    let _ = fs::remove_file(path);
+}

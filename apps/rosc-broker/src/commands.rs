@@ -15,13 +15,28 @@ pub async fn run(command: Command) -> Result<()> {
             config,
             resolve_bindings,
         } => proxy_status(&config, resolve_bindings).await,
-        Command::WatchConfig { path, poll_ms } => watch_config(&path, poll_ms).await,
+        Command::WatchConfig {
+            path,
+            poll_ms,
+            fail_on_warnings,
+            require_fallback_ready,
+        } => watch_config(&path, poll_ms, fail_on_warnings, require_fallback_ready).await,
         Command::DiffConfig { current, candidate } => diff_config(&current, &candidate).await,
         Command::ServeHealth { listen, config } => serve_health(&listen, config.as_deref()).await,
         Command::RunUdpProxy {
             config,
             ingress_queue_depth,
-        } => run_udp_proxy(&config, ingress_queue_depth).await,
+            fail_on_warnings,
+            require_fallback_ready,
+        } => {
+            run_udp_proxy(
+                &config,
+                ingress_queue_depth,
+                fail_on_warnings,
+                require_fallback_ready,
+            )
+            .await
+        }
     }
 }
 
@@ -52,10 +67,21 @@ async fn proxy_status(path: &Path, resolve_bindings: bool) -> Result<()> {
     Ok(())
 }
 
-async fn watch_config(path: &Path, poll_ms: u64) -> Result<()> {
+async fn watch_config(
+    path: &Path,
+    poll_ms: u64,
+    fail_on_warnings: bool,
+    require_fallback_ready: bool,
+) -> Result<()> {
     let telemetry = InMemoryTelemetry::default();
     let mut supervisor = rosc_broker::ConfigFileSupervisor::new(path, telemetry);
-    let applied = supervisor.load_initial()?;
+    let safety_policy = rosc_broker::ProxyRuntimeSafetyPolicy {
+        fail_on_warnings,
+        require_fallback_ready,
+    };
+    let applied = supervisor.load_initial_with_guard(|config| {
+        rosc_broker::evaluate_proxy_runtime_policy(config, safety_policy)
+    })?;
     println!(
         "loaded initial config: revision={} added_ingresses={} added_destinations={} added_routes={}",
         applied.revision,
@@ -68,7 +94,9 @@ async fn watch_config(path: &Path, poll_ms: u64) -> Result<()> {
     loop {
         tokio::select! {
             _ = interval.tick() => {
-                match supervisor.poll_once()? {
+                match supervisor.poll_once_with_guard(|config| {
+                    rosc_broker::evaluate_proxy_runtime_policy(config, safety_policy)
+                })? {
                     rosc_broker::ConfigReloadOutcome::Unchanged => {}
                     rosc_broker::ConfigReloadOutcome::Applied(applied) => {
                         println!(
@@ -91,6 +119,14 @@ async fn watch_config(path: &Path, poll_ms: u64) -> Result<()> {
                             "rejected config change; keeping revision={} reason={}",
                             revision,
                             error
+                        );
+                    }
+                    rosc_broker::ConfigReloadOutcome::Blocked(reasons) => {
+                        let revision = supervisor.current_revision().unwrap_or_default();
+                        println!(
+                            "blocked config change; keeping revision={} reasons={}",
+                            revision,
+                            reasons.join(" | ")
                         );
                     }
                 }
@@ -177,12 +213,38 @@ async fn serve_health(listen: &str, config: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
-async fn run_udp_proxy(path: &Path, ingress_queue_depth: usize) -> Result<()> {
+async fn run_udp_proxy(
+    path: &Path,
+    ingress_queue_depth: usize,
+    fail_on_warnings: bool,
+    require_fallback_ready: bool,
+) -> Result<()> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("failed to read config file {}", path.display()))?;
     let config = rosc_config::BrokerConfig::from_toml_str(&content)?;
     let telemetry = InMemoryTelemetry::default();
     let mut app = rosc_broker::UdpProxyApp::from_config(&config, telemetry).await?;
+    let status = app.status_snapshot();
+    for line in rosc_broker::proxy_startup_report_lines(&status) {
+        println!("{line}");
+    }
+
+    let blockers = rosc_broker::ProxyRuntimeSafetyPolicy {
+        fail_on_warnings,
+        require_fallback_ready,
+    }
+    .blockers(&status);
+    if !blockers.is_empty() {
+        anyhow::bail!(
+            "udp proxy startup blocked:\n{}",
+            blockers
+                .into_iter()
+                .map(|blocker| format!("- {blocker}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+    }
+
     app.spawn_ingress_tasks(ingress_queue_depth).await;
     println!("udp proxy running; press Ctrl-C to stop");
     tokio::signal::ctrl_c()
