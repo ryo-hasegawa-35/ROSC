@@ -74,6 +74,12 @@ fn in_memory_telemetry_renders_prometheus_text() {
         changed_routes: 2,
     });
     telemetry.emit(BrokerEvent::ConfigRejected);
+    telemetry.emit(BrokerEvent::LaunchProfileChanged {
+        mode: "safe_mode".to_owned(),
+        disabled_capture_routes: 1,
+        disabled_replay_routes: 2,
+        disabled_restart_rehydrate_routes: 3,
+    });
 
     let text = telemetry.render_prometheus();
     assert!(text.contains("rosc_ingress_packets_total{ingress_id=\"udp_localhost_in\"} 1"));
@@ -107,4 +113,8 @@ fn in_memory_telemetry_renders_prometheus_text() {
     assert!(text.contains("rosc_config_added_destinations_total 3"));
     assert!(text.contains("rosc_config_changed_destinations_total 4"));
     assert!(text.contains("rosc_config_rejections_total 1"));
+    assert!(text.contains("rosc_launch_profile_mode{mode=\"safe_mode\"} 1"));
+    assert!(text.contains("rosc_launch_profile_disabled_capture_routes 1"));
+    assert!(text.contains("rosc_launch_profile_disabled_replay_routes 2"));
+    assert!(text.contains("rosc_launch_profile_disabled_restart_rehydrate_routes 3"));
 }

@@ -11,6 +11,12 @@ async fn health_endpoint_serves_healthz_and_metrics() {
     telemetry.emit(BrokerEvent::RouteMatched {
         route_id: "camera_fov".to_owned(),
     });
+    telemetry.emit(BrokerEvent::LaunchProfileChanged {
+        mode: "safe_mode".to_owned(),
+        disabled_capture_routes: 1,
+        disabled_replay_routes: 0,
+        disabled_restart_rehydrate_routes: 1,
+    });
     let reporter = Arc::new(telemetry.clone());
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -32,6 +38,7 @@ async fn health_endpoint_serves_healthz_and_metrics() {
 
     assert!(response.contains("HTTP/1.1 200 OK"));
     assert!(response.contains("rosc_route_matches_total{route_id=\"camera_fov\"} 1"));
+    assert!(response.contains("rosc_launch_profile_mode{mode=\"safe_mode\"} 1"));
     server.await.unwrap();
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

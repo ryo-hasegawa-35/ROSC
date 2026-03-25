@@ -101,6 +101,12 @@ pub enum BrokerEvent {
         removed_routes: usize,
         changed_routes: usize,
     },
+    LaunchProfileChanged {
+        mode: String,
+        disabled_capture_routes: usize,
+        disabled_replay_routes: usize,
+        disabled_restart_rehydrate_routes: usize,
+    },
     ConfigRejected,
 }
 
@@ -149,6 +155,10 @@ pub struct HealthSnapshot {
     pub config_removed_routes_total: u64,
     pub config_changed_routes_total: u64,
     pub config_rejections_total: u64,
+    pub launch_profile_mode: Option<String>,
+    pub launch_profile_disabled_capture_routes: usize,
+    pub launch_profile_disabled_replay_routes: usize,
+    pub launch_profile_disabled_restart_rehydrate_routes: usize,
 }
 
 #[derive(Clone, Default)]
@@ -336,6 +346,24 @@ impl InMemoryTelemetry {
             "rosc_config_rejections_total {}",
             snapshot.config_rejections_total
         );
+        if let Some(mode) = snapshot.launch_profile_mode {
+            let _ = writeln!(output, "rosc_launch_profile_mode{{mode=\"{mode}\"}} 1");
+        }
+        let _ = writeln!(
+            output,
+            "rosc_launch_profile_disabled_capture_routes {}",
+            snapshot.launch_profile_disabled_capture_routes
+        );
+        let _ = writeln!(
+            output,
+            "rosc_launch_profile_disabled_replay_routes {}",
+            snapshot.launch_profile_disabled_replay_routes
+        );
+        let _ = writeln!(
+            output,
+            "rosc_launch_profile_disabled_restart_rehydrate_routes {}",
+            snapshot.launch_profile_disabled_restart_rehydrate_routes
+        );
 
         output
     }
@@ -481,6 +509,18 @@ impl TelemetrySink for InMemoryTelemetry {
             }
             BrokerEvent::ConfigRejected => {
                 snapshot.config_rejections_total += 1;
+            }
+            BrokerEvent::LaunchProfileChanged {
+                mode,
+                disabled_capture_routes,
+                disabled_replay_routes,
+                disabled_restart_rehydrate_routes,
+            } => {
+                snapshot.launch_profile_mode = Some(mode);
+                snapshot.launch_profile_disabled_capture_routes = disabled_capture_routes;
+                snapshot.launch_profile_disabled_replay_routes = disabled_replay_routes;
+                snapshot.launch_profile_disabled_restart_rehydrate_routes =
+                    disabled_restart_rehydrate_routes;
             }
         }
     }

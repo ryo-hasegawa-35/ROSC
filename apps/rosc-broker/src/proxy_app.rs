@@ -108,6 +108,14 @@ impl UdpProxyApp {
     }
 
     pub fn set_launch_profile(&mut self, profile: ProxyLaunchProfileStatus) {
+        self.runtime
+            .telemetry
+            .emit(BrokerEvent::LaunchProfileChanged {
+                mode: profile.mode.as_str().to_owned(),
+                disabled_capture_routes: profile.disabled_capture_routes.len(),
+                disabled_replay_routes: profile.disabled_replay_routes.len(),
+                disabled_restart_rehydrate_routes: profile.disabled_restart_rehydrate_routes.len(),
+            });
         self.status.launch_profile = profile;
     }
 
