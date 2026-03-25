@@ -222,35 +222,24 @@ async fn run_udp_proxy(
     let content = fs::read_to_string(path)
         .with_context(|| format!("failed to read config file {}", path.display()))?;
     let config = rosc_config::BrokerConfig::from_toml_str(&content)?;
-    let telemetry = InMemoryTelemetry::default();
-    let mut app = rosc_broker::UdpProxyApp::from_config(&config, telemetry).await?;
-    let status = app.status_snapshot();
+    let status = rosc_broker::proxy_status_from_config(&config)?;
     for line in rosc_broker::proxy_startup_report_lines(&status) {
         println!("{line}");
     }
 
-    let blockers = rosc_broker::ProxyRuntimeSafetyPolicy {
+    let safety_policy = rosc_broker::ProxyRuntimeSafetyPolicy {
         fail_on_warnings,
         require_fallback_ready,
-    }
-    .blockers(&status);
-    if !blockers.is_empty() {
-        anyhow::bail!(
-            "udp proxy startup blocked:\n{}",
-            blockers
-                .into_iter()
-                .map(|blocker| format!("- {blocker}"))
-                .collect::<Vec<_>>()
-                .join("\n")
-        );
-    }
-
-    app.spawn_ingress_tasks(ingress_queue_depth).await?;
+    };
+    let telemetry = InMemoryTelemetry::default();
+    let mut proxy =
+        rosc_broker::ManagedUdpProxy::start(config, telemetry, ingress_queue_depth, safety_policy)
+            .await?;
     println!("udp proxy running; press Ctrl-C to stop");
     tokio::signal::ctrl_c()
         .await
         .context("failed to listen for ctrl-c")?;
-    app.shutdown().await;
+    proxy.shutdown().await;
     println!("udp proxy stopped");
     Ok(())
 }

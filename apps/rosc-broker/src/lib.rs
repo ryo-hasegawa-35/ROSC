@@ -1,9 +1,11 @@
 mod config_supervisor;
+mod managed_proxy;
 mod operator_policy;
 mod proxy_app;
 mod proxy_status;
 
 pub use config_supervisor::{ConfigFileSupervisor, ConfigReloadOutcome};
+pub use managed_proxy::ManagedUdpProxy;
 pub use operator_policy::{
     ProxyRuntimeSafetyPolicy, evaluate_proxy_runtime_policy, proxy_startup_report_lines,
 };
