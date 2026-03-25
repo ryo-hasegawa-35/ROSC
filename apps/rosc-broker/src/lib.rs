@@ -9,7 +9,9 @@ mod proxy_reload_supervisor;
 mod proxy_status;
 
 pub use config_supervisor::{ConfigFileSupervisor, ConfigReloadOutcome};
-pub use config_telemetry::{emit_applied_config, emit_initial_config_applied};
+pub use config_telemetry::{
+    emit_applied_config, emit_config_transition, emit_initial_config_applied,
+};
 pub use health_service::HealthService;
 pub use launch_profile::{
     PreparedLaunchConfig, ProxyLaunchProfileMode, ProxyLaunchProfileStatus, apply_launch_profile,

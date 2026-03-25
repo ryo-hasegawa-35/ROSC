@@ -329,7 +329,6 @@ async fn run_udp_proxy(
         launch_profile_mode,
     )
     .await?;
-    rosc_broker::emit_initial_config_applied(&telemetry, proxy.config());
     let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
     print_proxy_report(&proxy.app().status_snapshot());
     println!("udp proxy running; press Ctrl-C to stop");

@@ -2,12 +2,16 @@ use anyhow::{Context, Result};
 use rosc_config::BrokerConfig;
 use rosc_telemetry::InMemoryTelemetry;
 
-use crate::{ProxyLaunchProfileMode, ProxyRuntimeSafetyPolicy, UdpProxyApp, apply_launch_profile};
+use crate::{
+    ProxyLaunchProfileMode, ProxyRuntimeSafetyPolicy, UdpProxyApp, apply_launch_profile,
+    emit_config_transition,
+};
 
 pub struct ManagedUdpProxy {
     app: UdpProxyApp,
     config: BrokerConfig,
     telemetry: InMemoryTelemetry,
+    config_revision: u64,
     ingress_queue_depth: usize,
     safety_policy: ProxyRuntimeSafetyPolicy,
     launch_profile_mode: ProxyLaunchProfileMode,
@@ -29,11 +33,13 @@ impl ManagedUdpProxy {
             anyhow::bail!("udp proxy startup blocked:\n{}", format_blockers(blockers));
         }
         app.spawn_ingress_tasks(ingress_queue_depth).await?;
+        emit_config_transition(&telemetry, 1, None, &config);
 
         Ok(Self {
             app,
             config,
             telemetry,
+            config_revision: 1,
             ingress_queue_depth,
             safety_policy,
             launch_profile_mode,
@@ -72,8 +78,16 @@ impl ManagedUdpProxy {
         .await
         {
             Ok(app) => {
+                let next_revision = self.config_revision + 1;
+                emit_config_transition(
+                    &self.telemetry,
+                    next_revision,
+                    Some(&self.config),
+                    &next_config,
+                );
                 self.app = app;
                 self.config = next_config;
+                self.config_revision = next_revision;
                 Ok(())
             }
             Err(error) => {

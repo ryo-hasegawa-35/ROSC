@@ -1,8 +1,6 @@
 use std::time::Duration;
 
-use rosc_broker::{
-    ManagedUdpProxy, ProxyLaunchProfileMode, ProxyRuntimeSafetyPolicy, emit_initial_config_applied,
-};
+use rosc_broker::{ManagedUdpProxy, ProxyLaunchProfileMode, ProxyRuntimeSafetyPolicy};
 use rosc_config::BrokerConfig;
 use rosc_osc::{
     OscArgument, OscMessage, ParsedOscPacket, TypeTagSource, encode_packet, parse_packet,
@@ -107,6 +105,12 @@ async fn managed_proxy_reloads_to_a_new_destination() {
     assert_eq!(first_message.address, "/render/a");
 
     proxy.reload(config_b).await.unwrap();
+    let runtime = proxy
+        .app()
+        .status_snapshot()
+        .runtime
+        .expect("runtime snapshot should be present after reload");
+    assert_eq!(runtime.config_revision, 2);
 
     source
         .send_to(
@@ -181,7 +185,7 @@ async fn managed_proxy_rolls_back_when_reload_fails() {
 }
 
 #[tokio::test]
-async fn managed_proxy_status_exposes_runtime_config_after_initial_seed() {
+async fn managed_proxy_status_exposes_runtime_config_after_startup() {
     let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let ingress_addr = reserved.local_addr().unwrap();
     drop(reserved);
@@ -202,7 +206,6 @@ async fn managed_proxy_status_exposes_runtime_config_after_initial_seed() {
     .await
     .unwrap();
 
-    emit_initial_config_applied(&telemetry, proxy.config());
     let status = proxy.app().status_snapshot();
     let runtime = status.runtime.expect("runtime snapshot should be present");
 
