@@ -96,15 +96,11 @@ async fn send_test_packet(target: std::net::SocketAddr) {
 #[tokio::test]
 async fn proxy_reload_supervisor_blocks_unsafe_candidate_and_keeps_last_known_good() {
     let path = unique_config_path();
-    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let ingress_addr = reserved.local_addr().unwrap();
-    drop(reserved);
-
     let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     fs::write(
         &path,
         proxy_config(
-            &ingress_addr.to_string(),
+            "127.0.0.1:0",
             &listener.local_addr().unwrap().to_string(),
             "/render/good",
         ),
@@ -155,15 +151,11 @@ async fn proxy_reload_supervisor_blocks_unsafe_candidate_and_keeps_last_known_go
 #[tokio::test]
 async fn proxy_reload_supervisor_rolls_back_after_runtime_reload_failure() {
     let path = unique_config_path();
-    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let ingress_addr = reserved.local_addr().unwrap();
-    drop(reserved);
-
     let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     fs::write(
         &path,
         proxy_config(
-            &ingress_addr.to_string(),
+            "127.0.0.1:0",
             &listener.local_addr().unwrap().to_string(),
             "/render/good",
         ),
@@ -178,6 +170,11 @@ async fn proxy_reload_supervisor_rolls_back_after_runtime_reload_failure() {
     )
     .await
     .unwrap();
+    let ingress_addr = supervisor
+        .proxy()
+        .app()
+        .ingress_local_addr("udp_localhost_in")
+        .unwrap();
 
     fs::write(
         &path,

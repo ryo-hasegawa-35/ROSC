@@ -38,10 +38,10 @@ cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
-cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --fail-on-warnings --require-fallback-ready
+cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --fail-on-warnings --require-fallback-ready
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
-cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
+cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --health-listen 127.0.0.1:19191 --fail-on-warnings --require-fallback-ready
 ```
 
 Run the same workspace inside Docker:
@@ -74,6 +74,7 @@ Current Phase 01 runtime coverage:
 - startup and reload safety gates that can block proxy activation when operator warnings or fallback gaps are present
 - clean proxy shutdown that releases ingress ports for controlled restart and future hot reload work
 - managed proxy reload supervision with rollback to the previous live config when a replacement runtime fails
+- optional co-hosted health and metrics endpoint while the live UDP proxy is running
 
 ## Documentation Entry Points
 

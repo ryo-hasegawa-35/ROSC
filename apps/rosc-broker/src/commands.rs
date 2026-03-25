@@ -3,8 +3,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use rosc_telemetry::{BrokerEvent, HealthReporter, InMemoryTelemetry, TelemetrySink};
-use tokio::net::TcpListener;
+use rosc_telemetry::{BrokerEvent, InMemoryTelemetry, TelemetrySink};
 
 use crate::cli::Command;
 
@@ -25,6 +24,7 @@ pub async fn run(command: Command) -> Result<()> {
             config,
             poll_ms,
             ingress_queue_depth,
+            health_listen,
             fail_on_warnings,
             require_fallback_ready,
         } => {
@@ -32,6 +32,7 @@ pub async fn run(command: Command) -> Result<()> {
                 &config,
                 poll_ms,
                 ingress_queue_depth,
+                health_listen.as_deref(),
                 fail_on_warnings,
                 require_fallback_ready,
             )
@@ -42,12 +43,14 @@ pub async fn run(command: Command) -> Result<()> {
         Command::RunUdpProxy {
             config,
             ingress_queue_depth,
+            health_listen,
             fail_on_warnings,
             require_fallback_ready,
         } => {
             run_udp_proxy(
                 &config,
                 ingress_queue_depth,
+                health_listen.as_deref(),
                 fail_on_warnings,
                 require_fallback_ready,
             )
@@ -149,6 +152,7 @@ async fn watch_udp_proxy(
     path: &Path,
     poll_ms: u64,
     ingress_queue_depth: usize,
+    health_listen: Option<&str>,
     fail_on_warnings: bool,
     require_fallback_ready: bool,
 ) -> Result<()> {
@@ -157,6 +161,8 @@ async fn watch_udp_proxy(
         require_fallback_ready,
     };
     let telemetry = InMemoryTelemetry::default();
+    let mut health_service =
+        spawn_optional_health_service(health_listen, telemetry.clone()).await?;
     let mut supervisor = rosc_broker::ManagedProxyFileSupervisor::start(
         path,
         telemetry,
@@ -210,6 +216,7 @@ async fn watch_udp_proxy(
         }
     }
 
+    shutdown_optional_health_service(&mut health_service).await?;
     supervisor.shutdown().await;
     println!("managed udp proxy stopped");
     Ok(())
@@ -266,23 +273,15 @@ async fn serve_health(listen: &str, config: Option<&Path>) -> Result<()> {
         });
     }
 
-    let listener = TcpListener::bind(listen)
+    let mut health_service = rosc_broker::HealthService::spawn(listen, Arc::new(telemetry)).await?;
+    println!(
+        "health endpoint listening on {}",
+        health_service.listen_addr()
+    );
+    tokio::signal::ctrl_c()
         .await
-        .with_context(|| format!("failed to bind health listener on {listen}"))?;
-    println!("health endpoint listening on {}", listener.local_addr()?);
-
-    let reporter: Arc<dyn HealthReporter> = Arc::new(telemetry);
-    loop {
-        tokio::select! {
-            result = rosc_runtime::serve_health_http_once(&listener, Arc::clone(&reporter)) => {
-                result?;
-            }
-            result = tokio::signal::ctrl_c() => {
-                result.context("failed to listen for ctrl-c")?;
-                break;
-            }
-        }
-    }
+        .context("failed to listen for ctrl-c")?;
+    health_service.shutdown().await?;
     println!("health endpoint stopped");
     Ok(())
 }
@@ -290,6 +289,7 @@ async fn serve_health(listen: &str, config: Option<&Path>) -> Result<()> {
 async fn run_udp_proxy(
     path: &Path,
     ingress_queue_depth: usize,
+    health_listen: Option<&str>,
     fail_on_warnings: bool,
     require_fallback_ready: bool,
 ) -> Result<()> {
@@ -304,6 +304,8 @@ async fn run_udp_proxy(
         require_fallback_ready,
     };
     let telemetry = InMemoryTelemetry::default();
+    let mut health_service =
+        spawn_optional_health_service(health_listen, telemetry.clone()).await?;
     let mut proxy =
         rosc_broker::ManagedUdpProxy::start(config, telemetry, ingress_queue_depth, safety_policy)
             .await?;
@@ -311,6 +313,7 @@ async fn run_udp_proxy(
     tokio::signal::ctrl_c()
         .await
         .context("failed to listen for ctrl-c")?;
+    shutdown_optional_health_service(&mut health_service).await?;
     proxy.shutdown().await;
     println!("udp proxy stopped");
     Ok(())
@@ -336,4 +339,28 @@ fn print_proxy_report(status: &rosc_broker::UdpProxyStatusSnapshot) {
     for line in rosc_broker::proxy_startup_report_lines(status) {
         println!("{line}");
     }
+}
+
+async fn spawn_optional_health_service(
+    health_listen: Option<&str>,
+    telemetry: InMemoryTelemetry,
+) -> Result<Option<rosc_broker::HealthService>> {
+    match health_listen {
+        Some(listen) => {
+            let service = rosc_broker::HealthService::spawn(listen, Arc::new(telemetry)).await?;
+            println!("health endpoint listening on {}", service.listen_addr());
+            Ok(Some(service))
+        }
+        None => Ok(None),
+    }
+}
+
+async fn shutdown_optional_health_service(
+    service: &mut Option<rosc_broker::HealthService>,
+) -> Result<()> {
+    if let Some(service) = service.as_mut() {
+        service.shutdown().await?;
+        println!("health endpoint stopped");
+    }
+    Ok(())
 }
