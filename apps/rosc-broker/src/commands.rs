@@ -13,7 +13,8 @@ pub async fn run(command: Command) -> Result<()> {
         Command::ProxyStatus {
             config,
             resolve_bindings,
-        } => proxy_status(&config, resolve_bindings).await,
+            safe_mode,
+        } => proxy_status(&config, resolve_bindings, safe_mode).await,
         Command::WatchConfig {
             path,
             poll_ms,
@@ -27,6 +28,7 @@ pub async fn run(command: Command) -> Result<()> {
             health_listen,
             fail_on_warnings,
             require_fallback_ready,
+            safe_mode,
         } => {
             watch_udp_proxy(
                 &config,
@@ -35,6 +37,7 @@ pub async fn run(command: Command) -> Result<()> {
                 health_listen.as_deref(),
                 fail_on_warnings,
                 require_fallback_ready,
+                safe_mode,
             )
             .await
         }
@@ -46,6 +49,7 @@ pub async fn run(command: Command) -> Result<()> {
             health_listen,
             fail_on_warnings,
             require_fallback_ready,
+            safe_mode,
         } => {
             run_udp_proxy(
                 &config,
@@ -53,6 +57,7 @@ pub async fn run(command: Command) -> Result<()> {
                 health_listen.as_deref(),
                 fail_on_warnings,
                 require_fallback_ready,
+                safe_mode,
             )
             .await
         }
@@ -71,16 +76,26 @@ async fn check_config(path: &Path) -> Result<()> {
     Ok(())
 }
 
-async fn proxy_status(path: &Path, resolve_bindings: bool) -> Result<()> {
+async fn proxy_status(path: &Path, resolve_bindings: bool, safe_mode: bool) -> Result<()> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("failed to read config file {}", path.display()))?;
     let config = rosc_config::BrokerConfig::from_toml_str(&content)?;
+    let launch_profile_mode = if safe_mode {
+        rosc_broker::ProxyLaunchProfileMode::SafeMode
+    } else {
+        rosc_broker::ProxyLaunchProfileMode::Normal
+    };
+    let prepared = rosc_broker::apply_launch_profile(&config, launch_profile_mode);
     let status = if resolve_bindings {
-        let app =
-            rosc_broker::UdpProxyApp::from_config(&config, InMemoryTelemetry::default()).await?;
+        let mut app =
+            rosc_broker::UdpProxyApp::from_config(&prepared.config, InMemoryTelemetry::default())
+                .await?;
+        app.set_launch_profile(prepared.status);
         app.status_snapshot()
     } else {
-        rosc_broker::proxy_status_from_config(&config)?
+        let mut status = rosc_broker::proxy_status_from_config(&prepared.config)?;
+        status.launch_profile = prepared.status;
+        status
     };
     println!("{}", serde_json::to_string_pretty(&status)?);
     Ok(())
@@ -155,17 +170,24 @@ async fn watch_udp_proxy(
     health_listen: Option<&str>,
     fail_on_warnings: bool,
     require_fallback_ready: bool,
+    safe_mode: bool,
 ) -> Result<()> {
     let safety_policy = rosc_broker::ProxyRuntimeSafetyPolicy {
         fail_on_warnings,
         require_fallback_ready,
     };
     let telemetry = InMemoryTelemetry::default();
+    let launch_profile_mode = if safe_mode {
+        rosc_broker::ProxyLaunchProfileMode::SafeMode
+    } else {
+        rosc_broker::ProxyLaunchProfileMode::Normal
+    };
     let mut supervisor = rosc_broker::ManagedProxyFileSupervisor::start(
         path,
         telemetry.clone(),
         ingress_queue_depth,
         safety_policy,
+        launch_profile_mode,
     )
     .await?;
     let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
@@ -283,10 +305,16 @@ async fn run_udp_proxy(
     health_listen: Option<&str>,
     fail_on_warnings: bool,
     require_fallback_ready: bool,
+    safe_mode: bool,
 ) -> Result<()> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("failed to read config file {}", path.display()))?;
     let config = rosc_config::BrokerConfig::from_toml_str(&content)?;
+    let launch_profile_mode = if safe_mode {
+        rosc_broker::ProxyLaunchProfileMode::SafeMode
+    } else {
+        rosc_broker::ProxyLaunchProfileMode::Normal
+    };
 
     let safety_policy = rosc_broker::ProxyRuntimeSafetyPolicy {
         fail_on_warnings,
@@ -298,6 +326,7 @@ async fn run_udp_proxy(
         telemetry.clone(),
         ingress_queue_depth,
         safety_policy,
+        launch_profile_mode,
     )
     .await?;
     rosc_broker::emit_initial_config_applied(&telemetry, proxy.config());

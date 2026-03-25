@@ -6,8 +6,11 @@ use rosc_route::{CachePolicy, CapturePolicy, TrafficClass, TransportSelector};
 use rosc_telemetry::{BreakerStateSnapshot, HealthSnapshot};
 use serde::Serialize;
 
+use crate::ProxyLaunchProfileStatus;
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct UdpProxyStatusSnapshot {
+    pub launch_profile: ProxyLaunchProfileStatus,
     pub summary: UdpProxySummary,
     pub runtime: Option<UdpProxyRuntimeStatus>,
     pub ingresses: Vec<UdpProxyIngressStatus>,
@@ -299,6 +302,7 @@ pub fn proxy_status_from_config(config: &BrokerConfig) -> Result<UdpProxyStatusS
     };
 
     Ok(UdpProxyStatusSnapshot {
+        launch_profile: ProxyLaunchProfileStatus::default(),
         summary,
         runtime: None,
         ingresses,

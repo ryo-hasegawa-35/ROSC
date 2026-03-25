@@ -6,7 +6,8 @@ use rosc_config::{ConfigApplyResult, ConfigError, ConfigManager};
 use rosc_telemetry::{BrokerEvent, InMemoryTelemetry, TelemetrySink};
 
 use crate::{
-    ManagedUdpProxy, ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot, emit_applied_config,
+    ManagedUdpProxy, ProxyLaunchProfileMode, ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot,
+    emit_applied_config,
 };
 
 #[derive(Debug)]
@@ -31,6 +32,7 @@ impl ManagedProxyFileSupervisor {
         telemetry: InMemoryTelemetry,
         ingress_queue_depth: usize,
         safety_policy: ProxyRuntimeSafetyPolicy,
+        launch_profile_mode: ProxyLaunchProfileMode,
     ) -> Result<Self> {
         let path = path.into();
         let mut manager = ConfigManager::default();
@@ -41,6 +43,7 @@ impl ManagedProxyFileSupervisor {
             telemetry.clone(),
             ingress_queue_depth,
             safety_policy,
+            launch_profile_mode,
         )
         .await?;
         let applied = manager.apply_preview(&raw_toml, preview);

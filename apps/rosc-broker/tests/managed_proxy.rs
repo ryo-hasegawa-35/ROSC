@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use rosc_broker::{ManagedUdpProxy, ProxyRuntimeSafetyPolicy, emit_initial_config_applied};
+use rosc_broker::{
+    ManagedUdpProxy, ProxyLaunchProfileMode, ProxyRuntimeSafetyPolicy, emit_initial_config_applied,
+};
 use rosc_config::BrokerConfig;
 use rosc_osc::{
     OscArgument, OscMessage, ParsedOscPacket, TypeTagSource, encode_packet, parse_packet,
@@ -81,6 +83,7 @@ async fn managed_proxy_reloads_to_a_new_destination() {
         InMemoryTelemetry::default(),
         32,
         ProxyRuntimeSafetyPolicy::default(),
+        ProxyLaunchProfileMode::Normal,
     )
     .await
     .unwrap();
@@ -141,6 +144,7 @@ async fn managed_proxy_rolls_back_when_reload_fails() {
         InMemoryTelemetry::default(),
         32,
         ProxyRuntimeSafetyPolicy::default(),
+        ProxyLaunchProfileMode::Normal,
     )
     .await
     .unwrap();
@@ -193,6 +197,7 @@ async fn managed_proxy_status_exposes_runtime_config_after_initial_seed() {
         telemetry.clone(),
         32,
         ProxyRuntimeSafetyPolicy::default(),
+        ProxyLaunchProfileMode::Normal,
     )
     .await
     .unwrap();
@@ -203,6 +208,79 @@ async fn managed_proxy_status_exposes_runtime_config_after_initial_seed() {
 
     assert_eq!(runtime.config_revision, 1);
     assert_eq!(runtime.config_rejections_total, 0);
+
+    proxy.shutdown().await;
+}
+
+#[tokio::test]
+async fn managed_proxy_safe_mode_marks_launch_profile_and_disables_optional_features() {
+    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let ingress_addr = reserved.local_addr().unwrap();
+    drop(reserved);
+
+    let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let config = BrokerConfig::from_toml_str(&format!(
+        r#"
+        [[udp_ingresses]]
+        id = "udp_localhost_in"
+        bind = "{ingress_addr}"
+        mode = "osc1_0_strict"
+
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "127.0.0.1:0"
+        target = "{target}"
+
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+
+        [routes.match]
+        ingress_ids = ["udp_localhost_in"]
+        address_patterns = ["/ue5/camera/fov"]
+        protocols = ["osc_udp"]
+
+        [routes.recovery]
+        replay_allowed = true
+        rehydrate_on_restart = true
+
+        [routes.cache]
+        policy = "last_value_per_address"
+
+        [routes.observability]
+        capture = "always_bounded"
+
+        [[routes.destinations]]
+        target = "udp_renderer"
+        transport = "osc_udp"
+        "#,
+        target = listener.local_addr().unwrap()
+    ))
+    .unwrap();
+
+    let mut proxy = ManagedUdpProxy::start(
+        config,
+        InMemoryTelemetry::default(),
+        32,
+        ProxyRuntimeSafetyPolicy::default(),
+        ProxyLaunchProfileMode::SafeMode,
+    )
+    .await
+    .unwrap();
+
+    let status = proxy.app().status_snapshot();
+    assert_eq!(status.launch_profile.mode, ProxyLaunchProfileMode::SafeMode);
+    assert_eq!(
+        status.launch_profile.disabled_capture_routes,
+        vec!["camera"]
+    );
+    assert_eq!(status.launch_profile.disabled_replay_routes, vec!["camera"]);
+    assert_eq!(
+        status.launch_profile.disabled_restart_rehydrate_routes,
+        vec!["camera"]
+    );
 
     proxy.shutdown().await;
 }

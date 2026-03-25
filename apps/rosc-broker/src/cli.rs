@@ -18,6 +18,8 @@ pub enum Command {
         config: PathBuf,
         #[arg(long)]
         resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
     },
     WatchConfig {
         path: PathBuf,
@@ -40,6 +42,8 @@ pub enum Command {
         fail_on_warnings: bool,
         #[arg(long)]
         require_fallback_ready: bool,
+        #[arg(long)]
+        safe_mode: bool,
     },
     DiffConfig {
         current: PathBuf,
@@ -60,5 +64,7 @@ pub enum Command {
         fail_on_warnings: bool,
         #[arg(long)]
         require_fallback_ready: bool,
+        #[arg(long)]
+        safe_mode: bool,
     },
 }

@@ -1,6 +1,6 @@
 use rosc_broker::{
-    ProxyRuntimeSafetyPolicy, attach_runtime_status, evaluate_proxy_runtime_policy,
-    proxy_startup_report_lines, proxy_status_from_config,
+    ProxyLaunchProfileMode, ProxyRuntimeSafetyPolicy, attach_runtime_status,
+    evaluate_proxy_runtime_policy, proxy_startup_report_lines, proxy_status_from_config,
 };
 use rosc_config::BrokerConfig;
 use rosc_telemetry::HealthSnapshot;
@@ -69,6 +69,11 @@ fn startup_report_lines_include_summary_and_warning_lines() {
     let report = proxy_startup_report_lines(&status);
 
     assert!(report.iter().any(|line| line.starts_with("proxy summary:")));
+    assert!(
+        report
+            .iter()
+            .any(|line| line.contains("proxy launch profile: mode=normal"))
+    );
     assert!(report.iter().any(|line| line.starts_with("proxy warning:")));
 }
 
@@ -90,5 +95,25 @@ fn startup_report_lines_include_runtime_config_state_when_available() {
         report
             .iter()
             .any(|line| line.contains("config_rejections_total=2"))
+    );
+}
+
+#[test]
+fn startup_report_lines_include_safe_mode_launch_profile_when_present() {
+    let config = broad_scope_config();
+    let mut status = proxy_status_from_config(&config).expect("status should build");
+    status.launch_profile.mode = ProxyLaunchProfileMode::SafeMode;
+    status.launch_profile.disabled_capture_routes = vec!["camera".to_owned()];
+    let report = proxy_startup_report_lines(&status);
+
+    assert!(
+        report
+            .iter()
+            .any(|line| line.contains("proxy launch profile: mode=safe_mode"))
+    );
+    assert!(
+        report
+            .iter()
+            .any(|line| line.contains("disabled_capture_routes=1"))
     );
 }

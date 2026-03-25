@@ -2,7 +2,10 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rosc_broker::{ManagedProxyFileSupervisor, ProxyReloadOutcome, ProxyRuntimeSafetyPolicy};
+use rosc_broker::{
+    ManagedProxyFileSupervisor, ProxyLaunchProfileMode, ProxyReloadOutcome,
+    ProxyRuntimeSafetyPolicy,
+};
 use rosc_osc::{
     OscArgument, OscMessage, ParsedOscPacket, TypeTagSource, encode_packet, parse_packet,
 };
@@ -115,6 +118,7 @@ async fn proxy_reload_supervisor_blocks_unsafe_candidate_and_keeps_last_known_go
             fail_on_warnings: true,
             require_fallback_ready: true,
         },
+        ProxyLaunchProfileMode::Normal,
     )
     .await
     .unwrap();
@@ -173,6 +177,7 @@ async fn proxy_reload_supervisor_rolls_back_after_runtime_reload_failure() {
         InMemoryTelemetry::default(),
         32,
         ProxyRuntimeSafetyPolicy::default(),
+        ProxyLaunchProfileMode::Normal,
     )
     .await
     .unwrap();

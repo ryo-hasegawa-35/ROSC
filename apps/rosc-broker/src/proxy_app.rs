@@ -13,6 +13,7 @@ use rosc_telemetry::{BrokerEvent, HealthSnapshot, InMemoryTelemetry, TelemetrySi
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 
+use crate::ProxyLaunchProfileStatus;
 use crate::proxy_status::{
     UdpProxyStatusSnapshot, attach_runtime_status, proxy_status_from_config,
 };
@@ -104,6 +105,10 @@ impl UdpProxyApp {
 
     pub fn status_snapshot(&self) -> UdpProxyStatusSnapshot {
         attach_runtime_status(self.status.clone(), &self.telemetry_snapshot())
+    }
+
+    pub fn set_launch_profile(&mut self, profile: ProxyLaunchProfileStatus) {
+        self.status.launch_profile = profile;
     }
 
     pub fn telemetry_snapshot(&self) -> HealthSnapshot {

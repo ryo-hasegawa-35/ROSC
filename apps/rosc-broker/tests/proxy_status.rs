@@ -1,4 +1,7 @@
-use rosc_broker::{UdpProxyApp, operator_warnings, proxy_status_from_config, startup_blockers};
+use rosc_broker::{
+    ProxyLaunchProfileMode, UdpProxyApp, operator_warnings, proxy_status_from_config,
+    startup_blockers,
+};
 use rosc_config::BrokerConfig;
 use rosc_osc::{OscArgument, OscMessage, ParsedOscPacket, TypeTagSource, encode_packet};
 use rosc_telemetry::InMemoryTelemetry;
@@ -59,6 +62,7 @@ fn proxy_status_summarizes_sidecar_routes_and_fallback_targets() {
     assert_eq!(status.summary.active_destinations, 1);
     assert_eq!(status.summary.fallback_ready_routes, 1);
     assert_eq!(status.summary.fallback_missing_routes, 0);
+    assert_eq!(status.launch_profile.mode, ProxyLaunchProfileMode::Normal);
     assert!(status.runtime.is_none());
     assert_eq!(status.ingresses.len(), 1);
     assert_eq!(status.ingresses[0].route_ids, vec!["camera"]);
@@ -152,6 +156,7 @@ async fn live_proxy_status_exposes_bound_local_addr_when_requested() {
     let status = app.status_snapshot();
 
     assert_eq!(status.ingresses.len(), 1);
+    assert_eq!(status.launch_profile.mode, ProxyLaunchProfileMode::Normal);
     let bound = status.ingresses[0]
         .bound_local_addr
         .as_ref()

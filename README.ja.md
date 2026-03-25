@@ -35,11 +35,12 @@ repository は現在、最初の実装フェーズに入りました。
 cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
+cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml --safe-mode
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
-cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --fail-on-warnings --require-fallback-ready
+cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
-cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --health-listen 127.0.0.1:19191 --fail-on-warnings --require-fallback-ready
+cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --health-listen 127.0.0.1:19191 --fail-on-warnings --require-fallback-ready --safe-mode
 ```
 
 Docker 経由で同じ確認を行う場合:
@@ -70,6 +71,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - bound 済み ingress へ戻る UDP destination を startup 時点で弾く proxy loop prevention
 - ingress / destination / route と direct UDP fallback hint、runtime queue health を JSON で確認できる `proxy-status`
 - operator warning や fallback 不足があると起動 / reload を止められる safety gate
+- optional な capture / replay / restart rehydrate を落として core UDP routing を維持する最小 safe-mode launch profile
 - controlled restart と将来の hot reload に向けて ingress port をきれいに返す clean shutdown
 - 新しい runtime が立ち上がらなかった場合に直前の live config へ戻せる managed proxy reload supervision
 - live UDP proxy と同時に health / metrics endpoint を公開できる optional な co-hosted health service

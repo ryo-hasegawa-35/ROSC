@@ -45,6 +45,17 @@ pub fn proxy_startup_report_lines(status: &UdpProxyStatusSnapshot) -> Vec<String
         status.summary.warning_count
     )];
 
+    lines.push(format!(
+        "proxy launch profile: mode={} disabled_capture_routes={} disabled_replay_routes={} disabled_restart_rehydrate_routes={}",
+        status.launch_profile.mode.as_str(),
+        status.launch_profile.disabled_capture_routes.len(),
+        status.launch_profile.disabled_replay_routes.len(),
+        status
+            .launch_profile
+            .disabled_restart_rehydrate_routes
+            .len()
+    ));
+
     if let Some(runtime) = &status.runtime {
         lines.push(format!(
             "proxy runtime: config_revision={} config_rejections_total={}",
