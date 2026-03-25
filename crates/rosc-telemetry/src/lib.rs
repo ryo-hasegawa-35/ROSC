@@ -30,6 +30,11 @@ pub enum BrokerEvent {
         ingress_id: String,
         reason: String,
     },
+    DispatchFailed {
+        route_id: String,
+        destination_id: String,
+        reason: String,
+    },
     RouteMatched {
         route_id: String,
     },
@@ -75,6 +80,10 @@ pub enum BrokerEvent {
         destination_id: String,
         reason: String,
     },
+    DestinationDropped {
+        destination_id: String,
+        reason: String,
+    },
     DestinationBreakerChanged {
         destination_id: String,
         state: BreakerStateSnapshot,
@@ -114,6 +123,7 @@ impl TelemetrySink for NoopTelemetry {
 pub struct HealthSnapshot {
     pub ingress_packets_total: BTreeMap<String, u64>,
     pub ingress_drops_total: BTreeMap<(String, String), u64>,
+    pub dispatch_failures_total: BTreeMap<(String, String, String), u64>,
     pub route_matches_total: BTreeMap<String, u64>,
     pub route_transform_failures_total: BTreeMap<String, u64>,
     pub cache_entries: BTreeMap<String, usize>,
@@ -125,6 +135,7 @@ pub struct HealthSnapshot {
     pub recovery_replay_total: BTreeMap<(String, String), u64>,
     pub queue_depth: BTreeMap<String, usize>,
     pub destination_sent_total: BTreeMap<String, u64>,
+    pub destination_drops_total: BTreeMap<(String, String), u64>,
     pub destination_send_failures_total: BTreeMap<(String, String), u64>,
     pub destination_breaker_state: BTreeMap<String, BreakerStateSnapshot>,
     pub config_revision: u64,
@@ -165,6 +176,13 @@ impl InMemoryTelemetry {
             let _ = writeln!(
                 output,
                 "rosc_ingress_drops_total{{ingress_id=\"{ingress_id}\",reason=\"{reason}\"}} {count}"
+            );
+        }
+
+        for ((route_id, destination_id, reason), count) in snapshot.dispatch_failures_total {
+            let _ = writeln!(
+                output,
+                "rosc_dispatch_failures_total{{route_id=\"{route_id}\",destination_id=\"{destination_id}\",reason=\"{reason}\"}} {count}"
             );
         }
 
@@ -242,6 +260,13 @@ impl InMemoryTelemetry {
             let _ = writeln!(
                 output,
                 "rosc_destination_send_total{{destination_id=\"{destination_id}\"}} {count}"
+            );
+        }
+
+        for ((destination_id, reason), count) in snapshot.destination_drops_total {
+            let _ = writeln!(
+                output,
+                "rosc_destination_drops_total{{destination_id=\"{destination_id}\",reason=\"{reason}\"}} {count}"
             );
         }
 
@@ -338,6 +363,16 @@ impl TelemetrySink for InMemoryTelemetry {
                     .entry((ingress_id, reason))
                     .or_default() += 1;
             }
+            BrokerEvent::DispatchFailed {
+                route_id,
+                destination_id,
+                reason,
+            } => {
+                *snapshot
+                    .dispatch_failures_total
+                    .entry((route_id, destination_id, reason))
+                    .or_default() += 1;
+            }
             BrokerEvent::RouteMatched { route_id } => {
                 *snapshot.route_matches_total.entry(route_id).or_default() += 1;
             }
@@ -392,6 +427,15 @@ impl TelemetrySink for InMemoryTelemetry {
                 *snapshot
                     .destination_sent_total
                     .entry(destination_id)
+                    .or_default() += 1;
+            }
+            BrokerEvent::DestinationDropped {
+                destination_id,
+                reason,
+            } => {
+                *snapshot
+                    .destination_drops_total
+                    .entry((destination_id, reason))
                     .or_default() += 1;
             }
             BrokerEvent::DestinationSendFailed {

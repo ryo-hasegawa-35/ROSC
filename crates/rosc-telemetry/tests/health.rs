@@ -6,6 +6,15 @@ fn in_memory_telemetry_renders_prometheus_text() {
     telemetry.emit(BrokerEvent::PacketAccepted {
         ingress_id: "udp_localhost_in".to_owned(),
     });
+    telemetry.emit(BrokerEvent::PacketDropped {
+        ingress_id: "udp_localhost_in".to_owned(),
+        reason: "queue_full".to_owned(),
+    });
+    telemetry.emit(BrokerEvent::DispatchFailed {
+        route_id: "camera_fov".to_owned(),
+        destination_id: "udp_renderer".to_owned(),
+        reason: "breaker_open".to_owned(),
+    });
     telemetry.emit(BrokerEvent::RouteMatched {
         route_id: "camera_fov".to_owned(),
     });
@@ -43,6 +52,10 @@ fn in_memory_telemetry_renders_prometheus_text() {
     telemetry.emit(BrokerEvent::DestinationSent {
         destination_id: "udp_renderer".to_owned(),
     });
+    telemetry.emit(BrokerEvent::DestinationDropped {
+        destination_id: "udp_renderer".to_owned(),
+        reason: "queue_overflow".to_owned(),
+    });
     telemetry.emit(BrokerEvent::DestinationBreakerChanged {
         destination_id: "udp_renderer".to_owned(),
         state: BreakerStateSnapshot::HalfOpen,
@@ -64,6 +77,12 @@ fn in_memory_telemetry_renders_prometheus_text() {
 
     let text = telemetry.render_prometheus();
     assert!(text.contains("rosc_ingress_packets_total{ingress_id=\"udp_localhost_in\"} 1"));
+    assert!(text.contains(
+        "rosc_ingress_drops_total{ingress_id=\"udp_localhost_in\",reason=\"queue_full\"} 1"
+    ));
+    assert!(text.contains(
+        "rosc_dispatch_failures_total{route_id=\"camera_fov\",destination_id=\"udp_renderer\",reason=\"breaker_open\"} 1"
+    ));
     assert!(text.contains("rosc_route_matches_total{route_id=\"camera_fov\"} 1"));
     assert!(text.contains("rosc_route_transform_failures_total{route_id=\"camera_fov\"} 1"));
     assert!(text.contains("rosc_cache_entries{route_id=\"camera_fov\"} 2"));
@@ -78,6 +97,9 @@ fn in_memory_telemetry_renders_prometheus_text() {
     ));
     assert!(text.contains("rosc_queue_depth{queue_id=\"udp_renderer\"} 3"));
     assert!(text.contains("rosc_destination_send_total{destination_id=\"udp_renderer\"} 1"));
+    assert!(text.contains(
+        "rosc_destination_drops_total{destination_id=\"udp_renderer\",reason=\"queue_overflow\"} 1"
+    ));
     assert!(text.contains("rosc_destination_breaker_state{destination_id=\"udp_renderer\"} 2"));
     assert!(text.contains("rosc_config_revision 4"));
     assert!(text.contains("rosc_config_added_ingresses_total 1"));

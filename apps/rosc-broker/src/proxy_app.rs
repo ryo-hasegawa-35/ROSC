@@ -82,8 +82,9 @@ impl UdpProxyApp {
         self.recovery
             .observe_dispatches(&outcome.successful_dispatches);
         for failure in &outcome.failures {
-            self.runtime.telemetry.emit(BrokerEvent::PacketDropped {
-                ingress_id: failure.destination_id.clone(),
+            self.runtime.telemetry.emit(BrokerEvent::DispatchFailed {
+                route_id: failure.route_id.clone(),
+                destination_id: failure.destination_id.clone(),
                 reason: failure.reason.clone(),
             });
         }
@@ -142,8 +143,9 @@ impl UdpProxyApp {
                 let outcome = runtime.dispatch_packet(&packet, &destinations).await;
                 recovery.observe_dispatches(&outcome.successful_dispatches);
                 for failure in outcome.failures {
-                    runtime.telemetry.emit(BrokerEvent::PacketDropped {
-                        ingress_id: failure.destination_id,
+                    runtime.telemetry.emit(BrokerEvent::DispatchFailed {
+                        route_id: failure.route_id,
+                        destination_id: failure.destination_id,
                         reason: failure.reason,
                     });
                 }

@@ -34,8 +34,10 @@ pub struct UdpProxySummary {
 pub struct UdpProxyRuntimeStatus {
     pub ingress_packets_total: BTreeMap<String, u64>,
     pub ingress_drops_total: BTreeMap<String, u64>,
+    pub dispatch_failures_total: BTreeMap<String, u64>,
     pub route_matches_total: BTreeMap<String, u64>,
     pub route_transform_failures_total: BTreeMap<String, u64>,
+    pub destination_drops_total: BTreeMap<String, u64>,
     pub destinations: Vec<UdpProxyDestinationRuntimeStatus>,
 }
 
@@ -313,8 +315,10 @@ pub fn attach_runtime_status(
     status.runtime = Some(UdpProxyRuntimeStatus {
         ingress_packets_total: snapshot.ingress_packets_total.clone(),
         ingress_drops_total: collapse_reason_counts(&snapshot.ingress_drops_total),
+        dispatch_failures_total: collapse_dispatch_failures(&snapshot.dispatch_failures_total),
         route_matches_total: snapshot.route_matches_total.clone(),
         route_transform_failures_total: snapshot.route_transform_failures_total.clone(),
+        destination_drops_total: collapse_reason_counts(&snapshot.destination_drops_total),
         destinations: destination_runtime(snapshot),
     });
     status
@@ -361,6 +365,16 @@ fn collapse_reason_counts(counts: &BTreeMap<(String, String), u64>) -> BTreeMap<
     let mut collapsed = BTreeMap::new();
     for ((id, _reason), count) in counts {
         *collapsed.entry(id.clone()).or_default() += count;
+    }
+    collapsed
+}
+
+fn collapse_dispatch_failures(
+    counts: &BTreeMap<(String, String, String), u64>,
+) -> BTreeMap<String, u64> {
+    let mut collapsed = BTreeMap::new();
+    for ((route_id, _destination_id, _reason), count) in counts {
+        *collapsed.entry(route_id.clone()).or_default() += count;
     }
     collapsed
 }

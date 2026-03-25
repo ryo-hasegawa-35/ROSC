@@ -443,8 +443,8 @@ impl DestinationWorkerHandle {
                 EnqueueOutcome::DroppedNewest | EnqueueOutcome::DroppedOldest => {
                     state.status.dropped_total += 1;
                     state.status.consecutive_queue_overflows += 1;
-                    events.push(BrokerEvent::PacketDropped {
-                        ingress_id: self.destination_id.clone(),
+                    events.push(BrokerEvent::DestinationDropped {
+                        destination_id: self.destination_id.clone(),
                         reason: "destination_queue_overflow".to_owned(),
                     });
 
