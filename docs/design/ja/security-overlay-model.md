@@ -140,6 +140,20 @@ recovery は security scope を尊重する必要があります。
 - safe mode への移行
 - config change の audit
 
+## Jitter Budget Requirement
+
+security feature は cost を増やしてよいですが、jitter への影響を隠しては
+いけません。
+
+含意:
+
+- secure mode は plain compatibility mode と分けて benchmark する
+- median だけでなく p95 / p99 latency と jitter spread を必ず出す
+- frame-accurate な AV sync route は、bulk telemetry や operator traffic より
+  厳しい security profile を要求しうる
+- verification や envelope handling が route の jitter budget に収まらないなら、
+  security を暗黙に有効とみなすのではなく deployment warning として明示する
+
 ## 非交渉の不変条件
 
 - legacy peer 向け raw OSC payload に mandatory security field を混ぜない

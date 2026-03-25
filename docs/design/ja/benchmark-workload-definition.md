@@ -163,6 +163,55 @@ traffic:
 - rehydrate correctness
 - stale cache handling
 
+### Workload G: Wasm Transform Boundary
+
+意図:
+
+- packet transform における host/Wasm 境界コストの定量化
+
+traffic:
+
+- scalar control packet の反復
+- Wasm disabled / enabled を切り替えた mixed route class
+
+計測:
+
+- per-packet added latency
+- hot path の jitter 増分
+- 可能なら copy count または allocation evidence
+
+### Workload H: Schema Validation Depth
+
+意図:
+
+- validation depth と安全性向上の tradeoff を比較する
+
+traffic:
+
+- 同一 namespace を `off`、`shape_only`、`typed`、`strict` で比較
+
+計測:
+
+- throughput cost
+- p95 / p99 latency の差分
+- bursty sensor traffic への影響
+
+### Workload I: Security Overlay Jitter
+
+意図:
+
+- secure ingress が route の jitter budget に収まるかを検証する
+
+traffic:
+
+- plain mode と secure mode の synchronized control traffic
+
+計測:
+
+- verification による追加コスト
+- jitter spread の増加
+- secure mode が sync-sensitive workload の tail latency を悪化させるか
+
 ## Feature Toggle Matrix
 
 各 workload は少なくとも次の mode で実施すべきです。

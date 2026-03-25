@@ -115,6 +115,23 @@ Constraints:
 - bounded execution time
 - no direct mutation of broker state
 
+## Wasm Hot-Path Guardrails
+
+Wasm is valuable for portability and containment, but it must not quietly
+become the default mechanism for the most latency-sensitive control path.
+
+Rules:
+
+- critical low-jitter routes should default to native core transforms or
+  compile-time features
+- Wasm transforms must be opt-in per route, never implicit for all traffic
+- the host/Wasm boundary must minimize copying and prefer borrowed or shared
+  packet views where safely possible
+- every Wasm-capable route class should have benchmark evidence for added
+  latency and jitter, not just throughput
+- if deterministic performance cannot be demonstrated, the feature belongs off
+  the hot path and behind an operator warning
+
 ## External Plugin Contract
 
 Recommended properties:

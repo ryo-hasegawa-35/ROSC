@@ -36,6 +36,7 @@ cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
+cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --fail-on-warnings --require-fallback-ready
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
@@ -70,6 +71,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - ingress / destination / route と direct UDP fallback hint、runtime queue health を JSON で確認できる `proxy-status`
 - operator warning や fallback 不足があると起動 / reload を止められる safety gate
 - controlled restart と将来の hot reload に向けて ingress port をきれいに返す clean shutdown
+- 新しい runtime が立ち上がらなかった場合に直前の live config へ戻せる managed proxy reload supervision
 
 ## ドキュメント入口
 

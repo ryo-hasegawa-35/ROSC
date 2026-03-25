@@ -21,6 +21,22 @@ pub async fn run(command: Command) -> Result<()> {
             fail_on_warnings,
             require_fallback_ready,
         } => watch_config(&path, poll_ms, fail_on_warnings, require_fallback_ready).await,
+        Command::WatchUdpProxy {
+            config,
+            poll_ms,
+            ingress_queue_depth,
+            fail_on_warnings,
+            require_fallback_ready,
+        } => {
+            watch_udp_proxy(
+                &config,
+                poll_ms,
+                ingress_queue_depth,
+                fail_on_warnings,
+                require_fallback_ready,
+            )
+            .await
+        }
         Command::DiffConfig { current, candidate } => diff_config(&current, &candidate).await,
         Command::ServeHealth { listen, config } => serve_health(&listen, config.as_deref()).await,
         Command::RunUdpProxy {
@@ -99,19 +115,7 @@ async fn watch_config(
                 })? {
                     rosc_broker::ConfigReloadOutcome::Unchanged => {}
                     rosc_broker::ConfigReloadOutcome::Applied(applied) => {
-                        println!(
-                            "applied config revision={} added_ingresses={} removed_ingresses={} changed_ingresses={} added_destinations={} removed_destinations={} changed_destinations={} added_routes={} removed_routes={} changed_routes={}",
-                            applied.revision,
-                            applied.diff.added_ingresses.join(","),
-                            applied.diff.removed_ingresses.join(","),
-                            applied.diff.changed_ingresses.join(","),
-                            applied.diff.added_destinations.join(","),
-                            applied.diff.removed_destinations.join(","),
-                            applied.diff.changed_destinations.join(","),
-                            applied.diff.added_routes.join(","),
-                            applied.diff.removed_routes.join(","),
-                            applied.diff.changed_routes.join(","),
-                        );
+                        print_applied_config(&applied);
                     }
                     rosc_broker::ConfigReloadOutcome::Rejected(error) => {
                         let revision = supervisor.current_revision().unwrap_or_default();
@@ -138,6 +142,76 @@ async fn watch_config(
         }
     }
     println!("config watcher stopped");
+    Ok(())
+}
+
+async fn watch_udp_proxy(
+    path: &Path,
+    poll_ms: u64,
+    ingress_queue_depth: usize,
+    fail_on_warnings: bool,
+    require_fallback_ready: bool,
+) -> Result<()> {
+    let safety_policy = rosc_broker::ProxyRuntimeSafetyPolicy {
+        fail_on_warnings,
+        require_fallback_ready,
+    };
+    let telemetry = InMemoryTelemetry::default();
+    let mut supervisor = rosc_broker::ManagedProxyFileSupervisor::start(
+        path,
+        telemetry,
+        ingress_queue_depth,
+        safety_policy,
+    )
+    .await?;
+    print_proxy_report(&supervisor.status_snapshot());
+    println!(
+        "managed udp proxy loaded revision={}",
+        supervisor.current_revision().unwrap_or_default()
+    );
+
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(poll_ms));
+    loop {
+        tokio::select! {
+            _ = interval.tick() => {
+                match supervisor.poll_once().await? {
+                    rosc_broker::ProxyReloadOutcome::Unchanged => {}
+                    rosc_broker::ProxyReloadOutcome::Applied(applied) => {
+                        print_applied_config(&applied);
+                        print_proxy_report(&supervisor.status_snapshot());
+                    }
+                    rosc_broker::ProxyReloadOutcome::Blocked(reasons) => {
+                        println!(
+                            "blocked proxy reload; keeping revision={} reasons={}",
+                            supervisor.current_revision().unwrap_or_default(),
+                            reasons.join(" | ")
+                        );
+                    }
+                    rosc_broker::ProxyReloadOutcome::Rejected(error) => {
+                        println!(
+                            "rejected proxy reload; keeping revision={} reason={}",
+                            supervisor.current_revision().unwrap_or_default(),
+                            error
+                        );
+                    }
+                    rosc_broker::ProxyReloadOutcome::ReloadFailed(error) => {
+                        println!(
+                            "failed proxy reload; keeping revision={} reason={}",
+                            supervisor.current_revision().unwrap_or_default(),
+                            error
+                        );
+                    }
+                }
+            }
+            result = tokio::signal::ctrl_c() => {
+                result.context("failed to listen for ctrl-c")?;
+                break;
+            }
+        }
+    }
+
+    supervisor.shutdown().await;
+    println!("managed udp proxy stopped");
     Ok(())
 }
 
@@ -223,9 +297,7 @@ async fn run_udp_proxy(
         .with_context(|| format!("failed to read config file {}", path.display()))?;
     let config = rosc_config::BrokerConfig::from_toml_str(&content)?;
     let status = rosc_broker::proxy_status_from_config(&config)?;
-    for line in rosc_broker::proxy_startup_report_lines(&status) {
-        println!("{line}");
-    }
+    print_proxy_report(&status);
 
     let safety_policy = rosc_broker::ProxyRuntimeSafetyPolicy {
         fail_on_warnings,
@@ -242,4 +314,26 @@ async fn run_udp_proxy(
     proxy.shutdown().await;
     println!("udp proxy stopped");
     Ok(())
+}
+
+fn print_applied_config(applied: &rosc_config::ConfigApplyResult) {
+    println!(
+        "applied config revision={} added_ingresses={} removed_ingresses={} changed_ingresses={} added_destinations={} removed_destinations={} changed_destinations={} added_routes={} removed_routes={} changed_routes={}",
+        applied.revision,
+        applied.diff.added_ingresses.join(","),
+        applied.diff.removed_ingresses.join(","),
+        applied.diff.changed_ingresses.join(","),
+        applied.diff.added_destinations.join(","),
+        applied.diff.removed_destinations.join(","),
+        applied.diff.changed_destinations.join(","),
+        applied.diff.added_routes.join(","),
+        applied.diff.removed_routes.join(","),
+        applied.diff.changed_routes.join(","),
+    );
+}
+
+fn print_proxy_report(status: &rosc_broker::UdpProxyStatusSnapshot) {
+    for line in rosc_broker::proxy_startup_report_lines(status) {
+        println!("{line}");
+    }
 }

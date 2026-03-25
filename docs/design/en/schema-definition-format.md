@@ -194,6 +194,28 @@ Schema tools should support at least:
 - strict validation
 - migration guidance
 
+## Validation Cost Policy
+
+Schema validation must not assume every route deserves the same depth of
+checking.
+
+Recommended validation depths:
+
+- `off`: no schema validation on the data plane
+- `shape_only`: cheap arity and basic type-family checks
+- `typed`: full argument typing against the declared schema
+- `strict`: typed validation plus range, enum, and semantic constraints
+
+Recommended defaults:
+
+- critical control routes may use `typed` or `strict`
+- stateful but moderate-rate routes may use `typed`
+- high-rate sensor and telemetry routes should default to `off` or
+  `shape_only` unless an operator explicitly accepts the extra cost
+
+The routing plan, benchmark plan, and operator UI should all make this
+tradeoff visible.
+
 ## Non-Negotiable Invariants
 
 - schema remains optional

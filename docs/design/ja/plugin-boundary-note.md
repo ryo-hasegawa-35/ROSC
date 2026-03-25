@@ -114,6 +114,23 @@ in-process な native Rust dynamic library loading を主な extension model に
 - bounded execution time
 - broker state の direct mutation 禁止
 
+## Wasm Hot Path Guardrail
+
+Wasm は portability と containment に優れますが、最も latency-sensitive な
+control path の default 実行モデルにしてはいけません。
+
+ルール:
+
+- critical low-jitter route は native core transform または compile-time feature
+  を既定にする
+- Wasm transform は route ごとの opt-in とし、全 traffic に暗黙適用しない
+- host/Wasm 境界では copy を最小化し、安全に可能な範囲で borrowed view や
+  shared packet view を優先する
+- Wasm 利用 route は throughput だけでなく added latency と jitter の
+  benchmark evidence を持つ
+- deterministic performance を示せないなら、その機能は hot path に置かず
+  operator warning 付きで扱う
+
 ## External Plugin Contract
 
 推奨特性:
