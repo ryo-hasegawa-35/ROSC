@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use rosc_telemetry::{BrokerEvent, InMemoryTelemetry, TelemetrySink};
+use rosc_telemetry::InMemoryTelemetry;
 
 use crate::cli::Command;
 
@@ -258,18 +258,7 @@ async fn serve_health(listen: &str, config: Option<&Path>) -> Result<()> {
         let content = fs::read_to_string(path)
             .with_context(|| format!("failed to read config file {}", path.display()))?;
         let applied = manager.apply_toml_str(&content)?;
-        telemetry.emit(BrokerEvent::ConfigApplied {
-            revision: applied.revision,
-            added_ingresses: applied.diff.added_ingresses.len(),
-            removed_ingresses: applied.diff.removed_ingresses.len(),
-            changed_ingresses: applied.diff.changed_ingresses.len(),
-            added_destinations: applied.diff.added_destinations.len(),
-            removed_destinations: applied.diff.removed_destinations.len(),
-            changed_destinations: applied.diff.changed_destinations.len(),
-            added_routes: applied.diff.added_routes.len(),
-            removed_routes: applied.diff.removed_routes.len(),
-            changed_routes: applied.diff.changed_routes.len(),
-        });
+        rosc_broker::emit_applied_config(&telemetry, &applied);
     }
 
     let mut health_service = rosc_broker::HealthService::spawn(listen, Arc::new(telemetry)).await?;
@@ -295,8 +284,6 @@ async fn run_udp_proxy(
     let content = fs::read_to_string(path)
         .with_context(|| format!("failed to read config file {}", path.display()))?;
     let config = rosc_config::BrokerConfig::from_toml_str(&content)?;
-    let status = rosc_broker::proxy_status_from_config(&config)?;
-    print_proxy_report(&status);
 
     let safety_policy = rosc_broker::ProxyRuntimeSafetyPolicy {
         fail_on_warnings,
@@ -310,7 +297,9 @@ async fn run_udp_proxy(
         safety_policy,
     )
     .await?;
+    rosc_broker::emit_initial_config_applied(&telemetry, proxy.config());
     let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
+    print_proxy_report(&proxy.app().status_snapshot());
     println!("udp proxy running; press Ctrl-C to stop");
     tokio::signal::ctrl_c()
         .await

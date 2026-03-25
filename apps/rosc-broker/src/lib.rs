@@ -1,4 +1,5 @@
 mod config_supervisor;
+mod config_telemetry;
 mod health_service;
 mod managed_proxy;
 mod operator_policy;
@@ -7,6 +8,7 @@ mod proxy_reload_supervisor;
 mod proxy_status;
 
 pub use config_supervisor::{ConfigFileSupervisor, ConfigReloadOutcome};
+pub use config_telemetry::{emit_applied_config, emit_initial_config_applied};
 pub use health_service::HealthService;
 pub use managed_proxy::ManagedUdpProxy;
 pub use operator_policy::{

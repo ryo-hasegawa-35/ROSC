@@ -5,6 +5,8 @@ use anyhow::{Context, Result};
 use rosc_config::{BrokerConfig, ConfigApplyResult, ConfigError, ConfigManager};
 use rosc_telemetry::{BrokerEvent, TelemetrySink};
 
+use crate::emit_applied_config;
+
 #[derive(Debug)]
 pub enum ConfigReloadOutcome {
     Unchanged,
@@ -57,7 +59,7 @@ where
             ));
         }
         let applied = self.manager.apply_preview(&content, preview);
-        self.emit_config_applied(&applied);
+        emit_applied_config(&self.telemetry, &applied);
         Ok(applied)
     }
 
@@ -86,7 +88,7 @@ where
                     return Ok(ConfigReloadOutcome::Blocked(reasons));
                 }
                 let applied = self.manager.apply_preview(&content, preview);
-                self.emit_config_applied(&applied);
+                emit_applied_config(&self.telemetry, &applied);
                 Ok(ConfigReloadOutcome::Applied(applied))
             }
             Err(error) => {
@@ -94,21 +96,6 @@ where
                 Ok(ConfigReloadOutcome::Rejected(error))
             }
         }
-    }
-
-    fn emit_config_applied(&self, applied: &ConfigApplyResult) {
-        self.telemetry.emit(BrokerEvent::ConfigApplied {
-            revision: applied.revision,
-            added_ingresses: applied.diff.added_ingresses.len(),
-            removed_ingresses: applied.diff.removed_ingresses.len(),
-            changed_ingresses: applied.diff.changed_ingresses.len(),
-            added_destinations: applied.diff.added_destinations.len(),
-            removed_destinations: applied.diff.removed_destinations.len(),
-            changed_destinations: applied.diff.changed_destinations.len(),
-            added_routes: applied.diff.added_routes.len(),
-            removed_routes: applied.diff.removed_routes.len(),
-            changed_routes: applied.diff.changed_routes.len(),
-        });
     }
 }
 

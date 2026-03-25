@@ -5,7 +5,9 @@ use anyhow::{Context, Result};
 use rosc_config::{ConfigApplyResult, ConfigError, ConfigManager};
 use rosc_telemetry::{BrokerEvent, InMemoryTelemetry, TelemetrySink};
 
-use crate::{ManagedUdpProxy, ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot};
+use crate::{
+    ManagedUdpProxy, ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot, emit_applied_config,
+};
 
 #[derive(Debug)]
 pub enum ProxyReloadOutcome {
@@ -42,7 +44,7 @@ impl ManagedProxyFileSupervisor {
         )
         .await?;
         let applied = manager.apply_preview(&raw_toml, preview);
-        emit_config_applied(&telemetry, &applied);
+        emit_applied_config(&telemetry, &applied);
 
         Ok(Self {
             path,
@@ -90,7 +92,7 @@ impl ManagedProxyFileSupervisor {
         match self.proxy.reload(preview.config.clone()).await {
             Ok(()) => {
                 let applied = self.manager.apply_preview(&raw_toml, preview);
-                emit_config_applied(&self.telemetry, &applied);
+                emit_applied_config(&self.telemetry, &applied);
                 Ok(ProxyReloadOutcome::Applied(applied))
             }
             Err(error) => {
@@ -142,21 +144,6 @@ impl ManagedProxyFileSupervisor {
 enum ReloadFailureKind {
     Blocked(Vec<String>),
     Rejected(String),
-}
-
-fn emit_config_applied(telemetry: &InMemoryTelemetry, applied: &ConfigApplyResult) {
-    telemetry.emit(BrokerEvent::ConfigApplied {
-        revision: applied.revision,
-        added_ingresses: applied.diff.added_ingresses.len(),
-        removed_ingresses: applied.diff.removed_ingresses.len(),
-        changed_ingresses: applied.diff.changed_ingresses.len(),
-        added_destinations: applied.diff.added_destinations.len(),
-        removed_destinations: applied.diff.removed_destinations.len(),
-        changed_destinations: applied.diff.changed_destinations.len(),
-        added_routes: applied.diff.added_routes.len(),
-        removed_routes: applied.diff.removed_routes.len(),
-        changed_routes: applied.diff.changed_routes.len(),
-    });
 }
 
 fn read_config_file(path: &Path) -> Result<String> {
