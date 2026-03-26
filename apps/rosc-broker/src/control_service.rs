@@ -38,16 +38,7 @@ impl ControlService {
                         break;
                     }
                     Some(result) = connections.join_next(), if !connections.is_empty() => {
-                        match result {
-                            Ok(Ok(())) => {}
-                            Ok(Err(error)) => return Err(error),
-                            Err(error) if error.is_cancelled() => {}
-                            Err(error) => {
-                                return Err(io::Error::other(format!(
-                                    "control connection task join failed: {error}"
-                                )));
-                            }
-                        }
+                        process_connection_task_result(result)?;
                     }
                     result = listener.accept() => {
                         let (stream, _) = result?;
@@ -59,16 +50,7 @@ impl ControlService {
 
             connections.abort_all();
             while let Some(result) = connections.join_next().await {
-                match result {
-                    Ok(Ok(())) => {}
-                    Ok(Err(error)) => return Err(error),
-                    Err(error) if error.is_cancelled() => {}
-                    Err(error) => {
-                        return Err(io::Error::other(format!(
-                            "control connection task join failed: {error}"
-                        )));
-                    }
-                }
+                process_connection_task_result(result)?;
             }
             Ok(())
         });
@@ -105,6 +87,32 @@ impl Drop for ControlService {
             let _ = shutdown.send(true);
         }
     }
+}
+
+fn process_connection_task_result(
+    result: std::result::Result<io::Result<()>, tokio::task::JoinError>,
+) -> io::Result<()> {
+    match result {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(error)) if is_connection_local_error(&error) => Ok(()),
+        Ok(Err(error)) => Err(error),
+        Err(error) if error.is_cancelled() => Ok(()),
+        Err(error) => Err(io::Error::other(format!(
+            "control connection task join failed: {error}"
+        ))),
+    }
+}
+
+fn is_connection_local_error(error: &io::Error) -> bool {
+    matches!(
+        error.kind(),
+        io::ErrorKind::ConnectionReset
+            | io::ErrorKind::ConnectionAborted
+            | io::ErrorKind::BrokenPipe
+            | io::ErrorKind::UnexpectedEof
+            | io::ErrorKind::TimedOut
+            | io::ErrorKind::WriteZero
+    )
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -536,6 +544,7 @@ impl ResponseBody {
 
 #[cfg(test)]
 mod tests {
+    use std::io;
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -548,7 +557,7 @@ mod tests {
     use tokio::net::{TcpStream, UdpSocket};
     use tokio::sync::Mutex;
 
-    use super::ControlService;
+    use super::{ControlService, process_connection_task_result};
     use crate::{
         ManagedProxyStartupOptions, ManagedUdpProxy, ProxyLaunchProfileMode,
         ProxyRuntimeSafetyPolicy, control_plane::ManagedUdpProxyController,
@@ -1303,5 +1312,14 @@ mod tests {
             .expect("shutdown should not wait on a partial request")
             .unwrap();
         proxy.lock().await.shutdown().await;
+    }
+
+    #[test]
+    fn connection_reset_is_treated_as_connection_local_failure() {
+        let result = process_connection_task_result(Ok(Err(io::Error::new(
+            io::ErrorKind::ConnectionReset,
+            "connection reset by peer",
+        ))));
+        assert!(result.is_ok());
     }
 }
