@@ -101,6 +101,7 @@ async fn send_test_packet(target: std::net::SocketAddr) {
 async fn proxy_reload_supervisor_blocks_unsafe_candidate_and_keeps_last_known_good() {
     let path = unique_config_path();
     let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let telemetry = InMemoryTelemetry::default();
     fs::write(
         &path,
         proxy_config(
@@ -113,7 +114,7 @@ async fn proxy_reload_supervisor_blocks_unsafe_candidate_and_keeps_last_known_go
 
     let mut supervisor = ManagedProxyFileSupervisor::start(
         &path,
-        InMemoryTelemetry::default(),
+        telemetry.clone(),
         32,
         ProxyRuntimeSafetyPolicy {
             fail_on_warnings: true,
@@ -142,7 +143,13 @@ async fn proxy_reload_supervisor_blocks_unsafe_candidate_and_keeps_last_known_go
         .runtime
         .expect("managed proxy status should expose runtime");
     assert_eq!(runtime.config_revision, 1);
-    assert_eq!(runtime.config_rejections_total, 1);
+    assert_eq!(runtime.config_rejections_total, 0);
+    assert_eq!(runtime.config_blocked_total, 1);
+    assert_eq!(runtime.config_reload_failures_total, 0);
+    let metrics = telemetry.snapshot();
+    assert_eq!(metrics.config_added_ingresses_total, 1);
+    assert_eq!(metrics.config_added_destinations_total, 1);
+    assert_eq!(metrics.config_added_routes_total, 1);
 
     send_test_packet(
         supervisor
@@ -163,6 +170,7 @@ async fn proxy_reload_supervisor_blocks_unsafe_candidate_and_keeps_last_known_go
 async fn proxy_reload_supervisor_rolls_back_after_runtime_reload_failure() {
     let path = unique_config_path();
     let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let telemetry = InMemoryTelemetry::default();
     fs::write(
         &path,
         proxy_config(
@@ -175,7 +183,7 @@ async fn proxy_reload_supervisor_rolls_back_after_runtime_reload_failure() {
 
     let mut supervisor = ManagedProxyFileSupervisor::start(
         &path,
-        InMemoryTelemetry::default(),
+        telemetry.clone(),
         32,
         ProxyRuntimeSafetyPolicy::default(),
         ProxyLaunchProfileMode::Normal,
@@ -211,7 +219,13 @@ async fn proxy_reload_supervisor_rolls_back_after_runtime_reload_failure() {
         .runtime
         .expect("managed proxy status should expose runtime");
     assert_eq!(runtime.config_revision, 1);
-    assert_eq!(runtime.config_rejections_total, 1);
+    assert_eq!(runtime.config_rejections_total, 0);
+    assert_eq!(runtime.config_blocked_total, 0);
+    assert_eq!(runtime.config_reload_failures_total, 1);
+    let metrics = telemetry.snapshot();
+    assert_eq!(metrics.config_added_ingresses_total, 1);
+    assert_eq!(metrics.config_added_destinations_total, 1);
+    assert_eq!(metrics.config_added_routes_total, 1);
 
     send_test_packet(
         supervisor
@@ -223,6 +237,72 @@ async fn proxy_reload_supervisor_rolls_back_after_runtime_reload_failure() {
     .await;
     let message = recv_message(&listener).await;
     assert_eq!(message.address, "/render/good");
+
+    supervisor.shutdown().await;
+    let _ = fs::remove_file(path);
+}
+
+#[tokio::test]
+async fn proxy_reload_supervisor_applies_single_config_transition_per_reload() {
+    let path = unique_config_path();
+    let first_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let second_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let telemetry = InMemoryTelemetry::default();
+
+    fs::write(
+        &path,
+        proxy_config(
+            "127.0.0.1:0",
+            &first_listener.local_addr().unwrap().to_string(),
+            "/render/a",
+        ),
+    )
+    .unwrap();
+
+    let mut supervisor = ManagedProxyFileSupervisor::start(
+        &path,
+        telemetry.clone(),
+        32,
+        ProxyRuntimeSafetyPolicy::default(),
+        ProxyLaunchProfileMode::Normal,
+    )
+    .await
+    .unwrap();
+
+    let after_start = telemetry.snapshot();
+    assert_eq!(after_start.config_revision, 1);
+    assert_eq!(after_start.config_added_ingresses_total, 1);
+    assert_eq!(after_start.config_added_destinations_total, 1);
+    assert_eq!(after_start.config_added_routes_total, 1);
+
+    fs::write(
+        &path,
+        proxy_config(
+            "127.0.0.1:0",
+            &second_listener.local_addr().unwrap().to_string(),
+            "/render/b",
+        ),
+    )
+    .unwrap();
+
+    let outcome = supervisor.poll_once().await.unwrap();
+    match outcome {
+        ProxyReloadOutcome::Applied(applied) => {
+            assert_eq!(applied.revision, 2);
+            assert_eq!(applied.diff.changed_destinations, vec!["udp_renderer"]);
+            assert_eq!(applied.diff.changed_routes, vec!["camera"]);
+        }
+        other => panic!("expected applied reload, got {other:?}"),
+    }
+
+    let after_reload = telemetry.snapshot();
+    assert_eq!(after_reload.config_revision, 2);
+    assert_eq!(after_reload.config_added_ingresses_total, 1);
+    assert_eq!(after_reload.config_added_destinations_total, 1);
+    assert_eq!(after_reload.config_added_routes_total, 1);
+    assert_eq!(after_reload.config_changed_ingresses_total, 0);
+    assert_eq!(after_reload.config_changed_destinations_total, 1);
+    assert_eq!(after_reload.config_changed_routes_total, 1);
 
     supervisor.shutdown().await;
     let _ = fs::remove_file(path);

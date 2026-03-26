@@ -56,6 +56,7 @@ fn config_supervisor_preserves_last_known_good_after_rejection() {
     assert_eq!(supervisor.current_revision(), Some(1));
     let metrics = telemetry.render_prometheus();
     assert!(metrics.contains("rosc_config_rejections_total 1"));
+    assert!(metrics.contains("rosc_config_blocked_total 0"));
 
     let _ = fs::remove_file(path);
 }
@@ -225,7 +226,8 @@ fn config_supervisor_blocks_candidate_when_guard_rejects_it() {
 
     assert_eq!(supervisor.current_revision(), Some(1));
     let metrics = telemetry.render_prometheus();
-    assert!(metrics.contains("rosc_config_rejections_total 1"));
+    assert!(metrics.contains("rosc_config_rejections_total 0"));
+    assert!(metrics.contains("rosc_config_blocked_total 1"));
 
     let _ = fs::remove_file(path);
 }

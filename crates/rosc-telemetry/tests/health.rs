@@ -61,6 +61,7 @@ fn in_memory_telemetry_renders_prometheus_text() {
         state: BreakerStateSnapshot::HalfOpen,
         reason: "cooldown_elapsed".to_owned(),
     });
+    telemetry.emit(BrokerEvent::TrafficFreezeChanged { frozen: true });
     telemetry.emit(BrokerEvent::ConfigApplied {
         revision: 4,
         added_ingresses: 1,
@@ -74,6 +75,8 @@ fn in_memory_telemetry_renders_prometheus_text() {
         changed_routes: 2,
     });
     telemetry.emit(BrokerEvent::ConfigRejected);
+    telemetry.emit(BrokerEvent::ConfigBlocked);
+    telemetry.emit(BrokerEvent::ConfigReloadFailed);
     telemetry.emit(BrokerEvent::LaunchProfileChanged {
         mode: "safe_mode".to_owned(),
         disabled_capture_routes: 1,
@@ -107,12 +110,15 @@ fn in_memory_telemetry_renders_prometheus_text() {
         "rosc_destination_drops_total{destination_id=\"udp_renderer\",reason=\"queue_overflow\"} 1"
     ));
     assert!(text.contains("rosc_destination_breaker_state{destination_id=\"udp_renderer\"} 2"));
+    assert!(text.contains("rosc_traffic_frozen 1"));
     assert!(text.contains("rosc_config_revision 4"));
     assert!(text.contains("rosc_config_added_ingresses_total 1"));
     assert!(text.contains("rosc_config_changed_ingresses_total 2"));
     assert!(text.contains("rosc_config_added_destinations_total 3"));
     assert!(text.contains("rosc_config_changed_destinations_total 4"));
     assert!(text.contains("rosc_config_rejections_total 1"));
+    assert!(text.contains("rosc_config_blocked_total 1"));
+    assert!(text.contains("rosc_config_reload_failures_total 1"));
     assert!(text.contains("rosc_launch_profile_mode{mode=\"safe_mode\"} 1"));
     assert!(text.contains("rosc_launch_profile_disabled_capture_routes 1"));
     assert!(text.contains("rosc_launch_profile_disabled_replay_routes 2"));

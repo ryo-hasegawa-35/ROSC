@@ -54,6 +54,14 @@ impl ManagedUdpProxy {
         &self.config
     }
 
+    pub fn freeze_traffic(&self) {
+        self.app.freeze_traffic();
+    }
+
+    pub fn thaw_traffic(&self) {
+        self.app.thaw_traffic();
+    }
+
     pub async fn reload(&mut self, next_config: BrokerConfig) -> Result<()> {
         let next_prepared = apply_launch_profile(&next_config, self.launch_profile_mode);
         let next_status = {

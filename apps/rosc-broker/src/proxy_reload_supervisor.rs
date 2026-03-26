@@ -7,7 +7,6 @@ use rosc_telemetry::{BrokerEvent, InMemoryTelemetry, TelemetrySink};
 
 use crate::{
     ManagedUdpProxy, ProxyLaunchProfileMode, ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot,
-    emit_applied_config,
 };
 
 #[derive(Debug)]
@@ -46,8 +45,7 @@ impl ManagedProxyFileSupervisor {
             launch_profile_mode,
         )
         .await?;
-        let applied = manager.apply_preview(&raw_toml, preview);
-        emit_applied_config(&telemetry, &applied);
+        manager.apply_preview(&raw_toml, preview);
 
         Ok(Self {
             path,
@@ -95,18 +93,20 @@ impl ManagedProxyFileSupervisor {
         match self.proxy.reload(preview.config.clone()).await {
             Ok(()) => {
                 let applied = self.manager.apply_preview(&raw_toml, preview);
-                emit_applied_config(&self.telemetry, &applied);
                 Ok(ProxyReloadOutcome::Applied(applied))
             }
             Err(error) => {
-                self.telemetry.emit(BrokerEvent::ConfigRejected);
                 let message = format!(
                     "failed to reload managed proxy from {}: {error:#}",
                     self.path.display()
                 );
                 Ok(match self.classify_reload_error(&message) {
-                    ReloadFailureKind::Blocked(reasons) => ProxyReloadOutcome::Blocked(reasons),
+                    ReloadFailureKind::Blocked(reasons) => {
+                        self.telemetry.emit(BrokerEvent::ConfigBlocked);
+                        ProxyReloadOutcome::Blocked(reasons)
+                    }
                     ReloadFailureKind::Rejected(message) => {
+                        self.telemetry.emit(BrokerEvent::ConfigReloadFailed);
                         ProxyReloadOutcome::ReloadFailed(message)
                     }
                 })

@@ -84,7 +84,7 @@ where
         match self.manager.preview_toml_str(&content) {
             Ok(preview) => {
                 if let Err(reasons) = guard(&preview.config) {
-                    self.telemetry.emit(BrokerEvent::ConfigRejected);
+                    self.telemetry.emit(BrokerEvent::ConfigBlocked);
                     return Ok(ConfigReloadOutcome::Blocked(reasons));
                 }
                 let applied = self.manager.apply_preview(&content, preview);

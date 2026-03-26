@@ -101,6 +101,11 @@ pub enum BrokerEvent {
         removed_routes: usize,
         changed_routes: usize,
     },
+    TrafficFreezeChanged {
+        frozen: bool,
+    },
+    ConfigBlocked,
+    ConfigReloadFailed,
     LaunchProfileChanged {
         mode: String,
         disabled_capture_routes: usize,
@@ -144,6 +149,7 @@ pub struct HealthSnapshot {
     pub destination_drops_total: BTreeMap<(String, String), u64>,
     pub destination_send_failures_total: BTreeMap<(String, String), u64>,
     pub destination_breaker_state: BTreeMap<String, BreakerStateSnapshot>,
+    pub traffic_frozen: bool,
     pub config_revision: u64,
     pub config_added_ingresses_total: u64,
     pub config_removed_ingresses_total: u64,
@@ -155,6 +161,8 @@ pub struct HealthSnapshot {
     pub config_removed_routes_total: u64,
     pub config_changed_routes_total: u64,
     pub config_rejections_total: u64,
+    pub config_blocked_total: u64,
+    pub config_reload_failures_total: u64,
     pub launch_profile_mode: Option<String>,
     pub launch_profile_disabled_capture_routes: usize,
     pub launch_profile_disabled_replay_routes: usize,
@@ -295,6 +303,12 @@ impl InMemoryTelemetry {
             );
         }
 
+        let _ = writeln!(
+            output,
+            "rosc_traffic_frozen {}",
+            if snapshot.traffic_frozen { 1 } else { 0 }
+        );
+
         let _ = writeln!(output, "rosc_config_revision {}", snapshot.config_revision);
         let _ = writeln!(
             output,
@@ -345,6 +359,16 @@ impl InMemoryTelemetry {
             output,
             "rosc_config_rejections_total {}",
             snapshot.config_rejections_total
+        );
+        let _ = writeln!(
+            output,
+            "rosc_config_blocked_total {}",
+            snapshot.config_blocked_total
+        );
+        let _ = writeln!(
+            output,
+            "rosc_config_reload_failures_total {}",
+            snapshot.config_reload_failures_total
         );
         if let Some(mode) = snapshot.launch_profile_mode {
             let _ = writeln!(output, "rosc_launch_profile_mode{{mode=\"{mode}\"}} 1");
@@ -484,6 +508,9 @@ impl TelemetrySink for InMemoryTelemetry {
                     .destination_breaker_state
                     .insert(destination_id, state);
             }
+            BrokerEvent::TrafficFreezeChanged { frozen } => {
+                snapshot.traffic_frozen = frozen;
+            }
             BrokerEvent::ConfigApplied {
                 revision,
                 added_ingresses,
@@ -509,6 +536,12 @@ impl TelemetrySink for InMemoryTelemetry {
             }
             BrokerEvent::ConfigRejected => {
                 snapshot.config_rejections_total += 1;
+            }
+            BrokerEvent::ConfigBlocked => {
+                snapshot.config_blocked_total += 1;
+            }
+            BrokerEvent::ConfigReloadFailed => {
+                snapshot.config_reload_failures_total += 1;
             }
             BrokerEvent::LaunchProfileChanged {
                 mode,

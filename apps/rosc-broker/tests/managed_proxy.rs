@@ -209,8 +209,55 @@ async fn managed_proxy_status_exposes_runtime_config_after_startup() {
     let status = proxy.app().status_snapshot();
     let runtime = status.runtime.expect("runtime snapshot should be present");
 
+    assert!(!runtime.traffic_frozen);
     assert_eq!(runtime.config_revision, 1);
     assert_eq!(runtime.config_rejections_total, 0);
+    assert_eq!(runtime.config_blocked_total, 0);
+    assert_eq!(runtime.config_reload_failures_total, 0);
+
+    proxy.shutdown().await;
+}
+
+#[tokio::test]
+async fn managed_proxy_can_freeze_and_thaw_traffic() {
+    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let ingress_addr = reserved.local_addr().unwrap();
+    drop(reserved);
+
+    let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let mut proxy = ManagedUdpProxy::start(
+        proxy_config(
+            &ingress_addr.to_string(),
+            &listener.local_addr().unwrap().to_string(),
+            "/render/frozen",
+        ),
+        InMemoryTelemetry::default(),
+        32,
+        ProxyRuntimeSafetyPolicy::default(),
+        ProxyLaunchProfileMode::Normal,
+    )
+    .await
+    .unwrap();
+
+    proxy.freeze_traffic();
+    assert!(
+        proxy
+            .app()
+            .status_snapshot()
+            .runtime
+            .expect("runtime snapshot should exist")
+            .traffic_frozen
+    );
+
+    proxy.thaw_traffic();
+    assert!(
+        !proxy
+            .app()
+            .status_snapshot()
+            .runtime
+            .expect("runtime snapshot should exist")
+            .traffic_frozen
+    );
 
     proxy.shutdown().await;
 }

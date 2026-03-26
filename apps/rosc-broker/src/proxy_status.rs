@@ -35,8 +35,11 @@ pub struct UdpProxySummary {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct UdpProxyRuntimeStatus {
+    pub traffic_frozen: bool,
     pub config_revision: u64,
     pub config_rejections_total: u64,
+    pub config_blocked_total: u64,
+    pub config_reload_failures_total: u64,
     pub ingress_packets_total: BTreeMap<String, u64>,
     pub ingress_drops_total: BTreeMap<String, u64>,
     pub dispatch_failures_total: BTreeMap<String, u64>,
@@ -319,8 +322,11 @@ pub fn attach_runtime_status(
     snapshot: &HealthSnapshot,
 ) -> UdpProxyStatusSnapshot {
     status.runtime = Some(UdpProxyRuntimeStatus {
+        traffic_frozen: snapshot.traffic_frozen,
         config_revision: snapshot.config_revision,
         config_rejections_total: snapshot.config_rejections_total,
+        config_blocked_total: snapshot.config_blocked_total,
+        config_reload_failures_total: snapshot.config_reload_failures_total,
         ingress_packets_total: snapshot.ingress_packets_total.clone(),
         ingress_drops_total: collapse_reason_counts(&snapshot.ingress_drops_total),
         dispatch_failures_total: collapse_dispatch_failures(&snapshot.dispatch_failures_total),

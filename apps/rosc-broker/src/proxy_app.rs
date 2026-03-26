@@ -17,11 +17,13 @@ use crate::ProxyLaunchProfileStatus;
 use crate::proxy_status::{
     UdpProxyStatusSnapshot, attach_runtime_status, proxy_status_from_config,
 };
+use crate::traffic_control::TrafficControlState;
 
 pub struct UdpProxyApp {
     runtime: Arc<Runtime<InMemoryTelemetry>>,
     recovery: Arc<RecoveryEngine<InMemoryTelemetry>>,
     destinations: Arc<DestinationRegistry>,
+    traffic_control: TrafficControlState,
     ingress_specs: BTreeMap<String, IngressBindingSpec>,
     ingress_addrs: BTreeMap<String, SocketAddr>,
     ingresses: BTreeMap<String, UdpIngressBinding>,
@@ -95,6 +97,7 @@ impl UdpProxyApp {
             runtime,
             recovery,
             destinations: Arc::new(destinations),
+            traffic_control: TrafficControlState::default(),
             ingress_specs,
             ingress_addrs,
             ingresses,
@@ -123,6 +126,20 @@ impl UdpProxyApp {
         self.runtime.telemetry.snapshot()
     }
 
+    pub fn freeze_traffic(&self) {
+        self.traffic_control.freeze();
+        self.runtime
+            .telemetry
+            .emit(BrokerEvent::TrafficFreezeChanged { frozen: true });
+    }
+
+    pub fn thaw_traffic(&self) {
+        self.traffic_control.thaw();
+        self.runtime
+            .telemetry
+            .emit(BrokerEvent::TrafficFreezeChanged { frozen: false });
+    }
+
     pub fn ingress_local_addr(&self, ingress_id: &str) -> Option<SocketAddr> {
         self.ingress_addrs.get(ingress_id).copied()
     }
@@ -136,6 +153,13 @@ impl UdpProxyApp {
         self.runtime.telemetry.emit(BrokerEvent::PacketAccepted {
             ingress_id: packet.metadata.ingress_id.clone(),
         });
+        if self.traffic_control.is_frozen() {
+            self.runtime.telemetry.emit(BrokerEvent::PacketDropped {
+                ingress_id: packet.metadata.ingress_id.clone(),
+                reason: "traffic_frozen".to_owned(),
+            });
+            return Ok(0);
+        }
         let outcome = self
             .runtime
             .dispatch_packet(&packet, &self.destinations)
@@ -205,6 +229,7 @@ impl UdpProxyApp {
         let runtime = Arc::clone(&self.runtime);
         let recovery = Arc::clone(&self.recovery);
         let destinations = Arc::clone(&self.destinations);
+        let traffic_control = self.traffic_control.clone();
         let mut dispatcher_shutdown = shutdown_rx.clone();
         self.tasks.dispatcher = Some(tokio::spawn(async move {
             loop {
@@ -234,6 +259,7 @@ impl UdpProxyApp {
         for (ingress_id, binding) in std::mem::take(&mut self.ingresses) {
             let queue = queue.clone();
             let telemetry = self.runtime.telemetry.clone();
+            let traffic_control = traffic_control.clone();
             let mut ingress_shutdown = shutdown_rx.clone();
             self.tasks.ingresses.push(tokio::spawn(async move {
                 loop {
@@ -248,6 +274,13 @@ impl UdpProxyApp {
                                     telemetry.emit(BrokerEvent::PacketAccepted {
                                         ingress_id: packet.metadata.ingress_id.clone(),
                                     });
+                                    if traffic_control.is_frozen() {
+                                        telemetry.emit(BrokerEvent::PacketDropped {
+                                            ingress_id: ingress_id.clone(),
+                                            reason: "traffic_frozen".to_owned(),
+                                        });
+                                        continue;
+                                    }
                                     match queue.try_send(packet) {
                                         Ok(()) => {}
                                         Err(error) => telemetry.emit(BrokerEvent::PacketDropped {

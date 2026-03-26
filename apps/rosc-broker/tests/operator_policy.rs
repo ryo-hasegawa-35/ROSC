@@ -83,18 +83,36 @@ fn startup_report_lines_include_runtime_config_state_when_available() {
     let status = attach_runtime_status(
         proxy_status_from_config(&config).expect("status should build"),
         &HealthSnapshot {
+            traffic_frozen: true,
             config_revision: 7,
             config_rejections_total: 2,
+            config_blocked_total: 3,
+            config_reload_failures_total: 1,
             ..HealthSnapshot::default()
         },
     );
     let report = proxy_startup_report_lines(&status);
 
+    assert!(
+        report
+            .iter()
+            .any(|line| line.contains("traffic_frozen=true"))
+    );
     assert!(report.iter().any(|line| line.contains("config_revision=7")));
     assert!(
         report
             .iter()
             .any(|line| line.contains("config_rejections_total=2"))
+    );
+    assert!(
+        report
+            .iter()
+            .any(|line| line.contains("config_blocked_total=3"))
+    );
+    assert!(
+        report
+            .iter()
+            .any(|line| line.contains("config_reload_failures_total=1"))
     );
 }
 
