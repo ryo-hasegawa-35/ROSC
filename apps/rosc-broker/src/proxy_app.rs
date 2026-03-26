@@ -372,11 +372,16 @@ async fn wait_until_dispatch_allowed(
     traffic_control: &TrafficControlState,
     shutdown: &mut watch::Receiver<bool>,
 ) -> bool {
-    while traffic_control.is_frozen() {
+    let mut freeze_rx = traffic_control.subscribe();
+    while *freeze_rx.borrow_and_update() {
         tokio::select! {
             biased;
             _ = shutdown.changed() => return false,
-            _ = traffic_control.wait_until_thawed() => {}
+            changed = freeze_rx.changed() => {
+                if changed.is_err() {
+                    return false;
+                }
+            }
         }
     }
     true

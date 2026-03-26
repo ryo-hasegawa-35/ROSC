@@ -25,15 +25,20 @@ impl TrafficControlState {
     }
 
     pub fn freeze(&self) {
+        self.state_tx.send_replace(true);
         self.frozen.store(true, Ordering::Relaxed);
-        let _ = self.state_tx.send(true);
     }
 
     pub fn thaw(&self) {
         self.frozen.store(false, Ordering::Relaxed);
-        let _ = self.state_tx.send(false);
+        self.state_tx.send_replace(false);
     }
 
+    pub fn subscribe(&self) -> watch::Receiver<bool> {
+        self.state_tx.subscribe()
+    }
+
+    #[cfg(test)]
     pub async fn wait_until_thawed(&self) {
         if !self.is_frozen() {
             return;
