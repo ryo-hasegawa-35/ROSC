@@ -984,7 +984,7 @@ mod tests {
             .expect("operator action history should be an array");
         assert_eq!(actions.len(), 1);
         assert_eq!(actions[0]["action"], "thaw_traffic");
-        assert_eq!(actions[0]["details"], serde_json::json!([]));
+        assert_eq!(actions[0]["details"], serde_json::json!(["applied=true"]));
 
         let config_history = json_body(
             &request(
@@ -1031,7 +1031,7 @@ mod tests {
         );
         assert_eq!(
             status["status"]["runtime"]["recent_operator_actions"][0]["details"],
-            serde_json::json!([])
+            serde_json::json!(["applied=true"])
         );
         assert_eq!(
             status["status"]["runtime"]["recent_config_events"][0]["kind"],
@@ -1328,7 +1328,12 @@ mod tests {
             .expect("operator action history should be an array");
         assert!(actions.iter().any(|action| {
             action["action"] == "rehydrate_destination"
-                && action["details"] == serde_json::json!(["destination_id=udp_renderer"])
+                && action["details"]
+                    == serde_json::json!([
+                        "destination_id=udp_renderer",
+                        "dispatch_count=1",
+                        "applied=true"
+                    ])
         }));
         assert!(actions.iter().any(|action| {
             action["action"] == "sandbox_replay"
@@ -1336,7 +1341,9 @@ mod tests {
                     == serde_json::json!([
                         "route_id=camera",
                         "sandbox_destination_id=sandbox_tap",
-                        "limit=1"
+                        "limit=1",
+                        "dispatch_count=1",
+                        "applied=true"
                     ])
         }));
 

@@ -401,7 +401,7 @@ async fn managed_proxy_can_isolate_and_restore_routes() {
             .last()
             .unwrap()
             .details,
-        vec!["route_id=camera".to_owned()]
+        vec!["route_id=camera".to_owned(), "applied=true".to_owned()]
     );
 
     assert!(proxy.restore_route("camera"));
@@ -431,7 +431,7 @@ async fn managed_proxy_can_isolate_and_restore_routes() {
             .last()
             .unwrap()
             .details,
-        vec!["route_id=camera".to_owned()]
+        vec!["route_id=camera".to_owned(), "applied=true".to_owned()]
     );
 
     proxy.shutdown().await;
@@ -557,7 +557,8 @@ async fn managed_proxy_preserves_route_isolation_across_reload() {
         Some(1)
     );
     assert!(runtime.recent_operator_actions.iter().any(|action| {
-        action.action == "isolate_route" && action.details == vec!["route_id=camera".to_owned()]
+        action.action == "isolate_route"
+            && action.details == vec!["route_id=camera".to_owned(), "applied=true".to_owned()]
     }));
 
     send_packet(

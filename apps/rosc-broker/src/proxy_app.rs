@@ -140,12 +140,12 @@ impl UdpProxyApp {
     }
 
     pub fn freeze_traffic(&self) -> bool {
-        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
-            action: "freeze_traffic".to_owned(),
-            details: Vec::new(),
-        });
         let changed = !self.traffic_control.is_frozen();
         self.traffic_control.freeze();
+        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+            action: "freeze_traffic".to_owned(),
+            details: vec![format!("applied={changed}")],
+        });
         if changed {
             self.runtime
                 .telemetry
@@ -155,12 +155,12 @@ impl UdpProxyApp {
     }
 
     pub fn thaw_traffic(&self) -> bool {
-        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
-            action: "thaw_traffic".to_owned(),
-            details: Vec::new(),
-        });
         let changed = self.traffic_control.is_frozen();
         self.traffic_control.thaw();
+        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+            action: "thaw_traffic".to_owned(),
+            details: vec![format!("applied={changed}")],
+        });
         if changed {
             self.runtime
                 .telemetry
@@ -200,10 +200,11 @@ impl UdpProxyApp {
             return false;
         }
         let changed = self.route_control.isolate(route_id.to_owned());
+        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+            action: "isolate_route".to_owned(),
+            details: vec![format!("route_id={route_id}"), format!("applied={changed}")],
+        });
         if changed {
-            self.runtime
-                .telemetry
-                .emit(operator_action("isolate_route", [("route_id", route_id)]));
             self.runtime
                 .telemetry
                 .emit(BrokerEvent::RouteIsolationChanged {
@@ -215,11 +216,15 @@ impl UdpProxyApp {
     }
 
     pub fn restore_route(&self, route_id: &str) -> bool {
+        if !self.status.routes.iter().any(|route| route.id == route_id) {
+            return false;
+        }
         let changed = self.route_control.restore(route_id);
+        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+            action: "restore_route".to_owned(),
+            details: vec![format!("route_id={route_id}"), format!("applied={changed}")],
+        });
         if changed {
-            self.runtime
-                .telemetry
-                .emit(operator_action("restore_route", [("route_id", route_id)]));
             self.runtime
                 .telemetry
                 .emit(BrokerEvent::RouteIsolationChanged {
@@ -284,10 +289,6 @@ impl UdpProxyApp {
     }
 
     pub async fn rehydrate_destination(&self, destination_id: &str) -> Result<usize> {
-        self.runtime.telemetry.emit(operator_action(
-            "rehydrate_destination",
-            [("destination_id", destination_id)],
-        ));
         let outcome = self.recovery.rehydrate(RehydrateRequest {
             route_id: None,
             destination_id: Some(destination_id.to_owned()),
@@ -300,6 +301,15 @@ impl UdpProxyApp {
             }
         }
 
+        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+            action: "rehydrate_destination".to_owned(),
+            details: vec![
+                format!("destination_id={destination_id}"),
+                format!("dispatch_count={dispatched}"),
+                format!("applied={}", dispatched > 0),
+            ],
+        });
+
         Ok(dispatched)
     }
 
@@ -309,14 +319,6 @@ impl UdpProxyApp {
         sandbox_destination_id: &str,
         limit: usize,
     ) -> Result<usize> {
-        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
-            action: "sandbox_replay".to_owned(),
-            details: vec![
-                format!("route_id={route_id}"),
-                format!("sandbox_destination_id={sandbox_destination_id}"),
-                format!("limit={limit}"),
-            ],
-        });
         let outcome = self.recovery.sandbox_replay(SandboxReplayRequest {
             route_id: route_id.to_owned(),
             source_destination_id: None,
@@ -330,6 +332,17 @@ impl UdpProxyApp {
                 dispatched += 1;
             }
         }
+
+        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+            action: "sandbox_replay".to_owned(),
+            details: vec![
+                format!("route_id={route_id}"),
+                format!("sandbox_destination_id={sandbox_destination_id}"),
+                format!("limit={limit}"),
+                format!("dispatch_count={dispatched}"),
+                format!("applied={}", dispatched > 0),
+            ],
+        });
 
         Ok(dispatched)
     }
@@ -436,16 +449,6 @@ impl UdpProxyApp {
         self.runtime
             .dispatch_routing_outcome(filtered, &self.destinations)
             .await
-    }
-}
-
-fn operator_action<const N: usize>(action: &str, pairs: [(&str, &str); N]) -> BrokerEvent {
-    BrokerEvent::OperatorAction {
-        action: action.to_owned(),
-        details: pairs
-            .into_iter()
-            .map(|(key, value)| format!("{key}={value}"))
-            .collect(),
     }
 }
 
