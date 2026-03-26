@@ -5,6 +5,7 @@ pub struct RecentOperatorAction {
     pub sequence: u64,
     pub recorded_at_unix_ms: u64,
     pub action: String,
+    pub details: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

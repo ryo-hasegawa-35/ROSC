@@ -69,6 +69,7 @@ fn in_memory_telemetry_renders_prometheus_text() {
     });
     telemetry.emit(BrokerEvent::OperatorAction {
         action: "freeze_traffic".to_owned(),
+        details: vec!["source=operator_console".to_owned()],
     });
     telemetry.emit(BrokerEvent::TrafficFreezeChanged { frozen: true });
     telemetry.emit(BrokerEvent::ConfigApplied {
@@ -146,6 +147,10 @@ fn in_memory_telemetry_renders_prometheus_text() {
     assert_eq!(snapshot.recent_operator_actions.len(), 1);
     assert_eq!(snapshot.recent_operator_actions[0].sequence, 1);
     assert_eq!(snapshot.recent_operator_actions[0].action, "freeze_traffic");
+    assert_eq!(
+        snapshot.recent_operator_actions[0].details,
+        vec!["source=operator_console".to_owned()]
+    );
     assert_eq!(snapshot.recent_config_events.len(), 5);
     assert_eq!(
         snapshot.recent_config_events[0].kind,
@@ -185,6 +190,7 @@ fn in_memory_telemetry_keeps_recent_history_bounded() {
     for index in 0..40 {
         telemetry.emit(BrokerEvent::OperatorAction {
             action: format!("action_{index}"),
+            details: vec![format!("index={index}")],
         });
     }
 
@@ -192,6 +198,11 @@ fn in_memory_telemetry_keeps_recent_history_bounded() {
     assert_eq!(snapshot.recent_operator_actions.len(), 32);
     assert_eq!(snapshot.recent_operator_actions[0].action, "action_8");
     assert_eq!(snapshot.recent_operator_actions[31].action, "action_39");
+    assert_eq!(snapshot.recent_operator_actions[0].details, vec!["index=8"]);
+    assert_eq!(
+        snapshot.recent_operator_actions[31].details,
+        vec!["index=39"]
+    );
     assert_eq!(snapshot.recent_operator_actions[0].sequence, 9);
     assert_eq!(snapshot.recent_operator_actions[31].sequence, 40);
 }

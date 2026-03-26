@@ -395,6 +395,14 @@ async fn managed_proxy_can_isolate_and_restore_routes() {
         .runtime
         .expect("runtime snapshot should exist");
     assert_eq!(isolated_runtime.isolated_route_ids, vec!["camera"]);
+    assert_eq!(
+        isolated_runtime
+            .recent_operator_actions
+            .last()
+            .unwrap()
+            .details,
+        vec!["route_id=camera".to_owned()]
+    );
 
     assert!(proxy.restore_route("camera"));
     let restored_runtime = proxy
@@ -416,6 +424,14 @@ async fn managed_proxy_can_isolate_and_restore_routes() {
             .get("restore_route")
             .copied(),
         Some(1)
+    );
+    assert_eq!(
+        restored_runtime
+            .recent_operator_actions
+            .last()
+            .unwrap()
+            .details,
+        vec!["route_id=camera".to_owned()]
     );
 
     proxy.shutdown().await;
@@ -540,6 +556,9 @@ async fn managed_proxy_preserves_route_isolation_across_reload() {
         runtime.operator_actions_total.get("isolate_route").copied(),
         Some(1)
     );
+    assert!(runtime.recent_operator_actions.iter().any(|action| {
+        action.action == "isolate_route" && action.details == vec!["route_id=camera".to_owned()]
+    }));
 
     send_packet(
         proxy.app().ingress_local_addr("udp_localhost_in").unwrap(),

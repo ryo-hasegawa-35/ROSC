@@ -984,6 +984,7 @@ mod tests {
             .expect("operator action history should be an array");
         assert_eq!(actions.len(), 1);
         assert_eq!(actions[0]["action"], "thaw_traffic");
+        assert_eq!(actions[0]["details"], serde_json::json!([]));
 
         let config_history = json_body(
             &request(
@@ -1027,6 +1028,10 @@ mod tests {
         assert_eq!(
             status["status"]["runtime"]["recent_operator_actions"][0]["action"],
             "freeze_traffic"
+        );
+        assert_eq!(
+            status["status"]["runtime"]["recent_operator_actions"][0]["details"],
+            serde_json::json!([])
         );
         assert_eq!(
             status["status"]["runtime"]["recent_config_events"][0]["kind"],
@@ -1310,6 +1315,30 @@ mod tests {
         assert!(replay_response.contains("HTTP/1.1 200 OK"));
         assert!(replay_response.contains("\"action\":\"sandbox_replay\""));
         assert!(replay_response.contains("\"dispatch_count\":1"));
+
+        let operator_history = json_body(
+            &request(
+                service.listen_addr(),
+                "GET /history/operator-actions HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            )
+            .await,
+        );
+        let actions = operator_history["actions"]
+            .as_array()
+            .expect("operator action history should be an array");
+        assert!(actions.iter().any(|action| {
+            action["action"] == "rehydrate_destination"
+                && action["details"] == serde_json::json!(["destination_id=udp_renderer"])
+        }));
+        assert!(actions.iter().any(|action| {
+            action["action"] == "sandbox_replay"
+                && action["details"]
+                    == serde_json::json!([
+                        "route_id=camera",
+                        "sandbox_destination_id=sandbox_tap",
+                        "limit=1"
+                    ])
+        }));
 
         let (size, _) = tokio::time::timeout(
             Duration::from_secs(1),

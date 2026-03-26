@@ -183,6 +183,7 @@ fn operator_report_surfaces_state_and_recent_highlights() {
                 sequence: 9,
                 recorded_at_unix_ms: 1234,
                 action: "freeze_traffic".to_owned(),
+                details: Vec::new(),
             }],
             recent_config_events: vec![
                 RecentConfigEvent {

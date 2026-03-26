@@ -102,6 +102,7 @@ pub enum BrokerEvent {
     },
     OperatorAction {
         action: String,
+        details: Vec<String>,
     },
     ConfigApplied {
         revision: u64,
@@ -552,7 +553,7 @@ impl TelemetrySink for InMemoryTelemetry {
             BrokerEvent::RouteIsolationChanged { route_id, isolated } => {
                 snapshot.route_isolated.insert(route_id, isolated);
             }
-            BrokerEvent::OperatorAction { action } => {
+            BrokerEvent::OperatorAction { action, details } => {
                 *snapshot
                     .operator_actions_total
                     .entry(action.clone())
@@ -561,6 +562,7 @@ impl TelemetrySink for InMemoryTelemetry {
                     sequence: next_event_sequence(&mut snapshot),
                     recorded_at_unix_ms: unix_time_ms(),
                     action,
+                    details,
                 };
                 push_recent(&mut snapshot.recent_operator_actions, record);
             }
