@@ -1,10 +1,12 @@
 use rosc_broker::{
-    ProxyLaunchProfileMode, ProxyRuntimeSafetyPolicy, attach_runtime_status,
+    ProxyLaunchProfileMode, ProxyOperatorState, ProxyRuntimeSafetyPolicy, attach_runtime_status,
     evaluate_proxy_runtime_policy, proxy_operator_report, proxy_startup_report_lines,
     proxy_status_from_config,
 };
 use rosc_config::BrokerConfig;
-use rosc_telemetry::HealthSnapshot;
+use rosc_telemetry::{
+    HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
+};
 
 fn broad_scope_config() -> BrokerConfig {
     BrokerConfig::from_toml_str(
@@ -166,5 +168,103 @@ fn operator_report_includes_policy_and_blockers() {
             .report_lines
             .iter()
             .any(|line| line.starts_with("proxy blocker:"))
+    );
+    assert_eq!(report.state, ProxyOperatorState::Blocked);
+}
+
+#[test]
+fn operator_report_surfaces_state_and_recent_highlights() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            recent_operator_actions: vec![RecentOperatorAction {
+                sequence: 9,
+                recorded_at_unix_ms: 1234,
+                action: "freeze_traffic".to_owned(),
+            }],
+            recent_config_events: vec![
+                RecentConfigEvent {
+                    sequence: 8,
+                    recorded_at_unix_ms: 1200,
+                    kind: RecentConfigEventKind::Applied,
+                    revision: Some(1),
+                    details: Vec::new(),
+                    added_ingresses: 1,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 1,
+                    removed_destinations: 0,
+                    changed_destinations: 0,
+                    added_routes: 1,
+                    removed_routes: 0,
+                    changed_routes: 0,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                },
+                RecentConfigEvent {
+                    sequence: 10,
+                    recorded_at_unix_ms: 1400,
+                    kind: RecentConfigEventKind::ReloadFailed,
+                    revision: Some(1),
+                    details: vec!["reload rollback happened".to_owned()],
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 0,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 0,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                },
+            ],
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let report = proxy_operator_report(&status, ProxyRuntimeSafetyPolicy::default());
+
+    assert_eq!(report.state, ProxyOperatorState::Warning);
+    assert_eq!(
+        report
+            .highlights
+            .latest_operator_action
+            .as_ref()
+            .map(|action| action.action.as_str()),
+        Some("freeze_traffic")
+    );
+    assert_eq!(
+        report
+            .highlights
+            .latest_config_issue
+            .as_ref()
+            .map(|event| &event.kind),
+        Some(&RecentConfigEventKind::ReloadFailed)
+    );
+    assert!(
+        report
+            .report_lines
+            .iter()
+            .any(|line| line.contains("proxy operator state: state=warning"))
+    );
+    assert!(
+        report
+            .report_lines
+            .iter()
+            .any(|line| line.contains("latest_operator_action=freeze_traffic"))
+    );
+    assert!(
+        report
+            .report_lines
+            .iter()
+            .any(|line| line.contains("latest_config_issue=reload_failed"))
     );
 }

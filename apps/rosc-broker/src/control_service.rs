@@ -1064,6 +1064,12 @@ mod tests {
             .await
             .unwrap();
 
+        let _ = request(
+            service.listen_addr(),
+            "POST /freeze HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+
         let report = json_body(
             &request(
                 service.listen_addr(),
@@ -1074,6 +1080,11 @@ mod tests {
         assert_eq!(report["ok"], true);
         assert_eq!(report["report"]["policy"]["fail_on_warnings"], true);
         assert_eq!(report["report"]["policy"]["require_fallback_ready"], true);
+        assert_eq!(report["report"]["state"], "warning");
+        assert_eq!(
+            report["report"]["highlights"]["latest_operator_action"]["action"],
+            "freeze_traffic"
+        );
         assert!(
             report["report"]["report_lines"]
                 .as_array()
@@ -1081,6 +1092,17 @@ mod tests {
                 .iter()
                 .any(|line| line.as_str().unwrap().contains("proxy safety policy:")),
             "expected policy line in report: {report:?}"
+        );
+        assert!(
+            report["report"]["report_lines"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|line| line
+                    .as_str()
+                    .unwrap()
+                    .contains("proxy operator state: state=warning")),
+            "expected operator state line in report: {report:?}"
         );
 
         let blockers = json_body(
