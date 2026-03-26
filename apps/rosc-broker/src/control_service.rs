@@ -12,6 +12,9 @@ use tokio::task::{JoinHandle, JoinSet};
 use crate::UdpProxyStatusSnapshot;
 use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError, ProxyControlPlane};
 
+#[cfg(test)]
+const CONTROL_REQUEST_READ_TIMEOUT: Duration = Duration::from_millis(100);
+#[cfg(not(test))]
 const CONTROL_REQUEST_READ_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub struct ControlService {
@@ -1311,6 +1314,53 @@ mod tests {
             .await
             .expect("shutdown should not wait on a partial request")
             .unwrap();
+        proxy.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn control_service_times_out_partial_request_and_recovers() {
+        let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+        let proxy = Arc::new(Mutex::new(
+            ManagedUdpProxy::start(
+                proxy_config(
+                    "127.0.0.1:0",
+                    &destination_listener.local_addr().unwrap().to_string(),
+                ),
+                InMemoryTelemetry::default(),
+                32,
+                ProxyRuntimeSafetyPolicy::default(),
+                ProxyLaunchProfileMode::Normal,
+                ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
+        let mut service = ControlService::spawn("127.0.0.1:0", controller)
+            .await
+            .unwrap();
+
+        let mut slow_stream = open_partial_request(service.listen_addr()).await;
+        let mut timeout_response = String::new();
+        tokio::time::timeout(
+            Duration::from_millis(500),
+            slow_stream.read_to_string(&mut timeout_response),
+        )
+        .await
+        .expect("partial request should receive a timeout response")
+        .unwrap();
+        assert!(timeout_response.contains("HTTP/1.1 408 Request Timeout"));
+        assert!(timeout_response.contains("request headers not received within"));
+
+        let fast_response = request(
+            service.listen_addr(),
+            "GET /status HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        assert!(fast_response.contains("HTTP/1.1 200 OK"));
+
+        service.shutdown().await.unwrap();
         proxy.lock().await.shutdown().await;
     }
 
