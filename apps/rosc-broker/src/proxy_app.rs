@@ -178,6 +178,13 @@ impl UdpProxyApp {
         self.status.routes.iter().any(|route| route.id == route_id)
     }
 
+    pub fn has_destination(&self, destination_id: &str) -> bool {
+        self.status
+            .destinations
+            .iter()
+            .any(|destination| destination.id == destination_id)
+    }
+
     pub fn isolate_route(&self, route_id: &str) -> bool {
         if !self.status.routes.iter().any(|route| route.id == route_id) {
             return false;

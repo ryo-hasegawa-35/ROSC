@@ -91,6 +91,7 @@ struct ActionResponse {
     ok: bool,
     action: &'static str,
     applied: bool,
+    dispatch_count: Option<usize>,
     status: UdpProxyStatusSnapshot,
 }
 
@@ -150,15 +151,29 @@ async fn route_request(request: HttpRequest, control: Arc<dyn ProxyControlPlane>
                 control.thaw_traffic().await,
             )),
         },
-        _ => route_route_request(&request, control).await,
+        _ => route_nested_request(&request, control).await,
     }
 }
 
-async fn route_route_request(
+async fn route_nested_request(
     request: &HttpRequest,
     control: Arc<dyn ProxyControlPlane>,
 ) -> HttpResponse {
-    let Some(route_id) = request.path.strip_prefix("/routes/") else {
+    if let Some(destination_id) = request
+        .path
+        .strip_prefix("/destinations/")
+        .and_then(|path| path.strip_suffix("/rehydrate"))
+    {
+        if request.method != "POST" || destination_id.is_empty() {
+            return method_or_path_error(request);
+        }
+        return map_route_result(
+            "rehydrate_destination",
+            control.rehydrate_destination(destination_id).await,
+        );
+    }
+
+    let Some(route_path) = request.path.strip_prefix("/routes/") else {
         return HttpResponse {
             status: "404 Not Found",
             body: ResponseBody::Error(ErrorResponse {
@@ -167,19 +182,33 @@ async fn route_route_request(
             }),
         };
     };
+    let (route_path, query) = split_query(route_path);
 
-    if let Some(route_id) = route_id.strip_suffix("/isolate") {
+    if let Some(route_id) = route_path.strip_suffix("/isolate") {
         if request.method != "POST" || route_id.is_empty() {
             return method_or_path_error(request);
         }
         return map_route_result("isolate_route", control.isolate_route(route_id).await);
     }
 
-    if let Some(route_id) = route_id.strip_suffix("/restore") {
+    if let Some(route_id) = route_path.strip_suffix("/restore") {
         if request.method != "POST" || route_id.is_empty() {
             return method_or_path_error(request);
         }
         return map_route_result("restore_route", control.restore_route(route_id).await);
+    }
+
+    if let Some((route_id, sandbox_destination_id)) = route_path.split_once("/replay/") {
+        if request.method != "POST" || route_id.is_empty() || sandbox_destination_id.is_empty() {
+            return method_or_path_error(request);
+        }
+        let limit = replay_limit(query);
+        return map_route_result(
+            "sandbox_replay",
+            control
+                .replay_route_to_sandbox(route_id, sandbox_destination_id, limit)
+                .await,
+        );
     }
 
     HttpResponse {
@@ -217,6 +246,20 @@ fn map_route_result(
                 error: format!("unknown route `{route_id}`"),
             }),
         },
+        Err(ControlPlaneError::UnknownDestination(destination_id)) => HttpResponse {
+            status: "404 Not Found",
+            body: ResponseBody::Error(ErrorResponse {
+                ok: false,
+                error: format!("unknown destination `{destination_id}`"),
+            }),
+        },
+        Err(ControlPlaneError::ActionFailed(message)) => HttpResponse {
+            status: "422 Unprocessable Entity",
+            body: ResponseBody::Error(ErrorResponse {
+                ok: false,
+                error: message,
+            }),
+        },
     }
 }
 
@@ -225,8 +268,29 @@ fn action_response(action: &'static str, result: ControlPlaneActionResult) -> Ac
         ok: true,
         action,
         applied: result.applied,
+        dispatch_count: result.dispatch_count,
         status: result.status,
     }
+}
+
+fn split_query(path: &str) -> (&str, Option<&str>) {
+    match path.split_once('?') {
+        Some((path, query)) => (path, Some(query)),
+        None => (path, None),
+    }
+}
+
+fn replay_limit(query: Option<&str>) -> usize {
+    query
+        .and_then(|query| {
+            query.split('&').find_map(|pair| {
+                let (key, value) = pair.split_once('=')?;
+                (key == "limit").then_some(value)
+            })
+        })
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|limit| *limit > 0)
+        .unwrap_or(100)
 }
 
 async fn read_http_request(stream: &mut TcpStream) -> io::Result<HttpRequest> {
@@ -360,6 +424,63 @@ mod tests {
 
             [routes.transform]
             rename_address = "/render/camera/fov"
+
+            [[routes.destinations]]
+            target = "udp_renderer"
+            transport = "osc_udp"
+            "#
+        ))
+        .unwrap()
+    }
+
+    fn replayable_proxy_config(
+        ingress_bind: &str,
+        destination_addr: &str,
+        sandbox_addr: &str,
+    ) -> BrokerConfig {
+        BrokerConfig::from_toml_str(&format!(
+            r#"
+            [[udp_ingresses]]
+            id = "udp_localhost_in"
+            bind = "{ingress_bind}"
+            mode = "osc1_0_strict"
+
+            [[udp_destinations]]
+            id = "udp_renderer"
+            bind = "127.0.0.1:0"
+            target = "{destination_addr}"
+
+            [[udp_destinations]]
+            id = "sandbox_tap"
+            bind = "127.0.0.1:0"
+            target = "{sandbox_addr}"
+
+            [[routes]]
+            id = "camera"
+            enabled = true
+            mode = "osc1_0_strict"
+            class = "StatefulControl"
+
+            [routes.match]
+            ingress_ids = ["udp_localhost_in"]
+            address_patterns = ["/ue5/camera/fov"]
+            protocols = ["osc_udp"]
+
+            [routes.transform]
+            rename_address = "/render/camera/fov"
+
+            [routes.cache]
+            policy = "last_value_per_address"
+            ttl_ms = 10000
+            persist = "warm"
+
+            [routes.recovery]
+            late_joiner = "latest"
+            rehydrate_on_connect = true
+            replay_allowed = true
+
+            [routes.observability]
+            capture = "always_bounded"
 
             [[routes.destinations]]
             target = "udp_renderer"
@@ -510,6 +631,98 @@ mod tests {
         .await;
         assert!(missing_response.contains("HTTP/1.1 404 Not Found"));
         assert!(missing_response.contains("unknown route `missing`"));
+
+        service.shutdown().await.unwrap();
+        proxy.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn control_service_can_rehydrate_and_replay_to_sandbox() {
+        let live_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let sandbox_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let ingress_addr = reserved.local_addr().unwrap();
+        drop(reserved);
+
+        let proxy = Arc::new(Mutex::new(
+            ManagedUdpProxy::start(
+                replayable_proxy_config(
+                    &ingress_addr.to_string(),
+                    &live_listener.local_addr().unwrap().to_string(),
+                    &sandbox_listener.local_addr().unwrap().to_string(),
+                ),
+                InMemoryTelemetry::default(),
+                32,
+                ProxyRuntimeSafetyPolicy::default(),
+                ProxyLaunchProfileMode::Normal,
+                ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
+        let mut service = ControlService::spawn("127.0.0.1:0", controller)
+            .await
+            .unwrap();
+
+        send_packet(ingress_addr).await;
+        let mut buffer = [0u8; 2048];
+        let _ = tokio::time::timeout(Duration::from_secs(1), live_listener.recv_from(&mut buffer))
+            .await
+            .unwrap()
+            .unwrap();
+
+        let rehydrate_response = request(
+            service.listen_addr(),
+            "POST /destinations/udp_renderer/rehydrate HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        assert!(rehydrate_response.contains("HTTP/1.1 200 OK"));
+        assert!(rehydrate_response.contains("\"action\":\"rehydrate_destination\""));
+        assert!(rehydrate_response.contains("\"dispatch_count\":1"));
+
+        let (size, _) =
+            tokio::time::timeout(Duration::from_secs(1), live_listener.recv_from(&mut buffer))
+                .await
+                .unwrap()
+                .unwrap();
+        let parsed =
+            parse_packet(&buffer[..size], rosc_osc::CompatibilityMode::Osc1_0Strict).unwrap();
+        let ParsedOscPacket::Message(message) = parsed else {
+            panic!("expected rehydrated OSC message");
+        };
+        assert_eq!(message.address, "/render/camera/fov");
+
+        let replay_response = request(
+            service.listen_addr(),
+            "POST /routes/camera/replay/sandbox_tap?limit=1 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        assert!(replay_response.contains("HTTP/1.1 200 OK"));
+        assert!(replay_response.contains("\"action\":\"sandbox_replay\""));
+        assert!(replay_response.contains("\"dispatch_count\":1"));
+
+        let (size, _) = tokio::time::timeout(
+            Duration::from_secs(1),
+            sandbox_listener.recv_from(&mut buffer),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let parsed =
+            parse_packet(&buffer[..size], rosc_osc::CompatibilityMode::Osc1_0Strict).unwrap();
+        let ParsedOscPacket::Message(message) = parsed else {
+            panic!("expected sandbox replay OSC message");
+        };
+        assert_eq!(message.address, "/render/camera/fov");
+
+        let unknown_destination_response = request(
+            service.listen_addr(),
+            "POST /destinations/missing/rehydrate HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        assert!(unknown_destination_response.contains("HTTP/1.1 404 Not Found"));
+        assert!(unknown_destination_response.contains("unknown destination `missing`"));
 
         service.shutdown().await.unwrap();
         proxy.lock().await.shutdown().await;

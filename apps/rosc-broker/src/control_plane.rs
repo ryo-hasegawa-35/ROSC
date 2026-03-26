@@ -9,18 +9,25 @@ use crate::{ManagedProxyFileSupervisor, ManagedUdpProxy, UdpProxyStatusSnapshot}
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ControlPlaneActionResult {
     pub applied: bool,
+    pub dispatch_count: Option<usize>,
     pub status: UdpProxyStatusSnapshot,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ControlPlaneError {
     UnknownRoute(String),
+    UnknownDestination(String),
+    ActionFailed(String),
 }
 
 impl std::fmt::Display for ControlPlaneError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::UnknownRoute(route_id) => write!(f, "unknown route `{route_id}`"),
+            Self::UnknownDestination(destination_id) => {
+                write!(f, "unknown destination `{destination_id}`")
+            }
+            Self::ActionFailed(message) => write!(f, "{message}"),
         }
     }
 }
@@ -39,6 +46,16 @@ pub trait ProxyControlPlane: Send + Sync + 'static {
     async fn restore_route(
         &self,
         route_id: &str,
+    ) -> Result<ControlPlaneActionResult, ControlPlaneError>;
+    async fn rehydrate_destination(
+        &self,
+        destination_id: &str,
+    ) -> Result<ControlPlaneActionResult, ControlPlaneError>;
+    async fn replay_route_to_sandbox(
+        &self,
+        route_id: &str,
+        sandbox_destination_id: &str,
+        limit: usize,
     ) -> Result<ControlPlaneActionResult, ControlPlaneError>;
 }
 
@@ -63,14 +80,22 @@ impl ProxyControlPlane for ManagedUdpProxyController {
         let proxy = self.inner.lock().await;
         let applied = proxy.freeze_traffic();
         let status = proxy.status_snapshot();
-        ControlPlaneActionResult { applied, status }
+        ControlPlaneActionResult {
+            applied,
+            dispatch_count: None,
+            status,
+        }
     }
 
     async fn thaw_traffic(&self) -> ControlPlaneActionResult {
         let proxy = self.inner.lock().await;
         let applied = proxy.thaw_traffic();
         let status = proxy.status_snapshot();
-        ControlPlaneActionResult { applied, status }
+        ControlPlaneActionResult {
+            applied,
+            dispatch_count: None,
+            status,
+        }
     }
 
     async fn isolate_route(
@@ -83,7 +108,11 @@ impl ProxyControlPlane for ManagedUdpProxyController {
         }
         let applied = proxy.isolate_route(route_id);
         let status = proxy.status_snapshot();
-        Ok(ControlPlaneActionResult { applied, status })
+        Ok(ControlPlaneActionResult {
+            applied,
+            dispatch_count: None,
+            status,
+        })
     }
 
     async fn restore_route(
@@ -96,7 +125,60 @@ impl ProxyControlPlane for ManagedUdpProxyController {
         }
         let applied = proxy.restore_route(route_id);
         let status = proxy.status_snapshot();
-        Ok(ControlPlaneActionResult { applied, status })
+        Ok(ControlPlaneActionResult {
+            applied,
+            dispatch_count: None,
+            status,
+        })
+    }
+
+    async fn rehydrate_destination(
+        &self,
+        destination_id: &str,
+    ) -> Result<ControlPlaneActionResult, ControlPlaneError> {
+        let proxy = self.inner.lock().await;
+        if !proxy.has_destination(destination_id) {
+            return Err(ControlPlaneError::UnknownDestination(
+                destination_id.to_owned(),
+            ));
+        }
+        let dispatch_count = proxy
+            .rehydrate_destination(destination_id)
+            .await
+            .map_err(|error| ControlPlaneError::ActionFailed(error.to_string()))?;
+        let status = proxy.status_snapshot();
+        Ok(ControlPlaneActionResult {
+            applied: dispatch_count > 0,
+            dispatch_count: Some(dispatch_count),
+            status,
+        })
+    }
+
+    async fn replay_route_to_sandbox(
+        &self,
+        route_id: &str,
+        sandbox_destination_id: &str,
+        limit: usize,
+    ) -> Result<ControlPlaneActionResult, ControlPlaneError> {
+        let proxy = self.inner.lock().await;
+        if !proxy.has_route(route_id) {
+            return Err(ControlPlaneError::UnknownRoute(route_id.to_owned()));
+        }
+        if !proxy.has_destination(sandbox_destination_id) {
+            return Err(ControlPlaneError::UnknownDestination(
+                sandbox_destination_id.to_owned(),
+            ));
+        }
+        let dispatch_count = proxy
+            .replay_route_to_sandbox(route_id, sandbox_destination_id, limit)
+            .await
+            .map_err(|error| ControlPlaneError::ActionFailed(error.to_string()))?;
+        let status = proxy.status_snapshot();
+        Ok(ControlPlaneActionResult {
+            applied: dispatch_count > 0,
+            dispatch_count: Some(dispatch_count),
+            status,
+        })
     }
 }
 
@@ -121,14 +203,22 @@ impl ProxyControlPlane for ManagedProxyFileSupervisorController {
         let supervisor = self.inner.lock().await;
         let applied = supervisor.freeze_traffic();
         let status = supervisor.status_snapshot();
-        ControlPlaneActionResult { applied, status }
+        ControlPlaneActionResult {
+            applied,
+            dispatch_count: None,
+            status,
+        }
     }
 
     async fn thaw_traffic(&self) -> ControlPlaneActionResult {
         let supervisor = self.inner.lock().await;
         let applied = supervisor.thaw_traffic();
         let status = supervisor.status_snapshot();
-        ControlPlaneActionResult { applied, status }
+        ControlPlaneActionResult {
+            applied,
+            dispatch_count: None,
+            status,
+        }
     }
 
     async fn isolate_route(
@@ -141,7 +231,11 @@ impl ProxyControlPlane for ManagedProxyFileSupervisorController {
         }
         let applied = supervisor.isolate_route(route_id);
         let status = supervisor.status_snapshot();
-        Ok(ControlPlaneActionResult { applied, status })
+        Ok(ControlPlaneActionResult {
+            applied,
+            dispatch_count: None,
+            status,
+        })
     }
 
     async fn restore_route(
@@ -154,6 +248,59 @@ impl ProxyControlPlane for ManagedProxyFileSupervisorController {
         }
         let applied = supervisor.restore_route(route_id);
         let status = supervisor.status_snapshot();
-        Ok(ControlPlaneActionResult { applied, status })
+        Ok(ControlPlaneActionResult {
+            applied,
+            dispatch_count: None,
+            status,
+        })
+    }
+
+    async fn rehydrate_destination(
+        &self,
+        destination_id: &str,
+    ) -> Result<ControlPlaneActionResult, ControlPlaneError> {
+        let supervisor = self.inner.lock().await;
+        if !supervisor.has_destination(destination_id) {
+            return Err(ControlPlaneError::UnknownDestination(
+                destination_id.to_owned(),
+            ));
+        }
+        let dispatch_count = supervisor
+            .rehydrate_destination(destination_id)
+            .await
+            .map_err(|error| ControlPlaneError::ActionFailed(error.to_string()))?;
+        let status = supervisor.status_snapshot();
+        Ok(ControlPlaneActionResult {
+            applied: dispatch_count > 0,
+            dispatch_count: Some(dispatch_count),
+            status,
+        })
+    }
+
+    async fn replay_route_to_sandbox(
+        &self,
+        route_id: &str,
+        sandbox_destination_id: &str,
+        limit: usize,
+    ) -> Result<ControlPlaneActionResult, ControlPlaneError> {
+        let supervisor = self.inner.lock().await;
+        if !supervisor.has_route(route_id) {
+            return Err(ControlPlaneError::UnknownRoute(route_id.to_owned()));
+        }
+        if !supervisor.has_destination(sandbox_destination_id) {
+            return Err(ControlPlaneError::UnknownDestination(
+                sandbox_destination_id.to_owned(),
+            ));
+        }
+        let dispatch_count = supervisor
+            .replay_route_to_sandbox(route_id, sandbox_destination_id, limit)
+            .await
+            .map_err(|error| ControlPlaneError::ActionFailed(error.to_string()))?;
+        let status = supervisor.status_snapshot();
+        Ok(ControlPlaneActionResult {
+            applied: dispatch_count > 0,
+            dispatch_count: Some(dispatch_count),
+            status,
+        })
     }
 }

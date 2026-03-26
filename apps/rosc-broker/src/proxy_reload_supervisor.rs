@@ -86,6 +86,10 @@ impl ManagedProxyFileSupervisor {
         self.proxy.has_route(route_id)
     }
 
+    pub fn has_destination(&self, destination_id: &str) -> bool {
+        self.proxy.has_destination(destination_id)
+    }
+
     pub fn isolate_route(&self, route_id: &str) -> bool {
         self.proxy.isolate_route(route_id)
     }
