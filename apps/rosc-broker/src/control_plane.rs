@@ -57,6 +57,7 @@ pub trait ProxyControlPlane: Send + Sync + 'static {
         sandbox_destination_id: &str,
         limit: usize,
     ) -> Result<ControlPlaneActionResult, ControlPlaneError>;
+    async fn restore_all_routes(&self) -> ControlPlaneActionResult;
 }
 
 #[derive(Clone)]
@@ -180,6 +181,23 @@ impl ProxyControlPlane for ManagedUdpProxyController {
             status,
         })
     }
+
+    async fn restore_all_routes(&self) -> ControlPlaneActionResult {
+        let proxy = self.inner.lock().await;
+        let isolated_route_ids = proxy.isolated_routes();
+        let mut restored = 0usize;
+        for route_id in &isolated_route_ids {
+            if proxy.restore_route(route_id) {
+                restored += 1;
+            }
+        }
+        let status = proxy.status_snapshot();
+        ControlPlaneActionResult {
+            applied: restored > 0,
+            dispatch_count: Some(restored),
+            status,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -302,5 +320,22 @@ impl ProxyControlPlane for ManagedProxyFileSupervisorController {
             dispatch_count: Some(dispatch_count),
             status,
         })
+    }
+
+    async fn restore_all_routes(&self) -> ControlPlaneActionResult {
+        let supervisor = self.inner.lock().await;
+        let isolated_route_ids = supervisor.isolated_routes();
+        let mut restored = 0usize;
+        for route_id in &isolated_route_ids {
+            if supervisor.restore_route(route_id) {
+                restored += 1;
+            }
+        }
+        let status = supervisor.status_snapshot();
+        ControlPlaneActionResult {
+            applied: restored > 0,
+            dispatch_count: Some(restored),
+            status,
+        }
     }
 }

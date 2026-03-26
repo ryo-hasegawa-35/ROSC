@@ -90,6 +90,10 @@ impl ManagedProxyFileSupervisor {
         self.proxy.has_destination(destination_id)
     }
 
+    pub fn isolated_routes(&self) -> Vec<String> {
+        self.proxy.isolated_routes()
+    }
+
     pub fn isolate_route(&self, route_id: &str) -> bool {
         self.proxy.isolate_route(route_id)
     }

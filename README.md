@@ -45,6 +45,7 @@ cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase
 cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 curl -X POST http://127.0.0.1:19292/freeze
 curl -X POST http://127.0.0.1:19292/routes/camera/isolate
+curl -X POST http://127.0.0.1:19292/routes/restore-all
 curl -X POST http://127.0.0.1:19292/destinations/udp_renderer/rehydrate
 curl -X POST "http://127.0.0.1:19292/routes/camera/replay/sandbox_tap?limit=1"
 curl http://127.0.0.1:19292/status
@@ -84,6 +85,7 @@ Current Phase 01 runtime coverage:
 - optional co-hosted health and metrics endpoint while the live UDP proxy is running
 - optional co-hosted control endpoint for freeze/thaw, route isolation, and live status inspection while the proxy is running
 - control endpoint now also exposes destination rehydrate and sandbox replay actions for live operator workflows
+- control endpoint also supports bulk route restore plus percent-decoded resource ids for safer operator recovery flows
 
 ## Documentation Entry Points
 

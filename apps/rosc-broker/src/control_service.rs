@@ -151,6 +151,13 @@ async fn route_request(request: HttpRequest, control: Arc<dyn ProxyControlPlane>
                 control.thaw_traffic().await,
             )),
         },
+        ("POST", "/routes/restore-all") => HttpResponse {
+            status: "200 OK",
+            body: ResponseBody::Action(action_response(
+                "restore_all_routes",
+                control.restore_all_routes().await,
+            )),
+        },
         _ => route_nested_request(&request, control).await,
     }
 }
@@ -746,6 +753,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn control_service_can_restore_all_isolated_routes() {
+        let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let ingress_addr = reserved.local_addr().unwrap();
+        drop(reserved);
+
+        let proxy = Arc::new(Mutex::new(
+            ManagedUdpProxy::start(
+                proxy_config(
+                    &ingress_addr.to_string(),
+                    &destination_listener.local_addr().unwrap().to_string(),
+                ),
+                InMemoryTelemetry::default(),
+                32,
+                ProxyRuntimeSafetyPolicy::default(),
+                ProxyLaunchProfileMode::Normal,
+                ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
+        let mut service = ControlService::spawn("127.0.0.1:0", controller)
+            .await
+            .unwrap();
+
+        let _ = request(
+            service.listen_addr(),
+            "POST /routes/camera/isolate HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+
+        let restore_response = request(
+            service.listen_addr(),
+            "POST /routes/restore-all HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        assert!(restore_response.contains("HTTP/1.1 200 OK"));
+        assert!(restore_response.contains("\"action\":\"restore_all_routes\""));
+        assert!(restore_response.contains("\"dispatch_count\":1"));
+        assert!(restore_response.contains("\"isolated_route_ids\":[]"));
+
+        send_packet(ingress_addr).await;
+        let mut buffer = [0u8; 2048];
+        let _ = tokio::time::timeout(
+            Duration::from_secs(1),
+            destination_listener.recv_from(&mut buffer),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        service.shutdown().await.unwrap();
+        proxy.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
     async fn control_service_can_rehydrate_and_replay_to_sandbox() {
         let live_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         let sandbox_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -911,6 +975,45 @@ mod tests {
         .await;
         assert!(rehydrate_response.contains("HTTP/1.1 200 OK"));
         assert!(rehydrate_response.contains("\"dispatch_count\":1"));
+
+        service.shutdown().await.unwrap();
+        proxy.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn control_service_rejects_invalid_percent_encoding() {
+        let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let ingress_addr = reserved.local_addr().unwrap();
+        drop(reserved);
+
+        let proxy = Arc::new(Mutex::new(
+            ManagedUdpProxy::start(
+                proxy_config(
+                    &ingress_addr.to_string(),
+                    &destination_listener.local_addr().unwrap().to_string(),
+                ),
+                InMemoryTelemetry::default(),
+                32,
+                ProxyRuntimeSafetyPolicy::default(),
+                ProxyLaunchProfileMode::Normal,
+                ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
+        let mut service = ControlService::spawn("127.0.0.1:0", controller)
+            .await
+            .unwrap();
+
+        let response = request(
+            service.listen_addr(),
+            "POST /routes/camera%2/isolate HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        assert!(response.contains("HTTP/1.1 400 Bad Request"));
+        assert!(response.contains("invalid percent-encoding in route id"));
 
         service.shutdown().await.unwrap();
         proxy.lock().await.shutdown().await;
