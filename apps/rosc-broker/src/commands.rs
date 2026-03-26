@@ -202,11 +202,15 @@ async fn watch_udp_proxy(
         ingress_queue_depth,
         safety_policy,
         launch_profile_mode,
+        rosc_broker::ManagedProxyStartupOptions {
+            frozen_behavior: if options.start_frozen {
+                rosc_broker::FrozenStartupBehavior::OperatorRequested
+            } else {
+                rosc_broker::FrozenStartupBehavior::Normal
+            },
+        },
     )
     .await?;
-    if options.start_frozen {
-        supervisor.freeze_traffic();
-    }
     let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
     print_proxy_report(&supervisor.status_snapshot());
     println!(
@@ -342,11 +346,15 @@ async fn run_udp_proxy(
         ingress_queue_depth,
         safety_policy,
         launch_profile_mode,
+        rosc_broker::ManagedProxyStartupOptions {
+            frozen_behavior: if options.start_frozen {
+                rosc_broker::FrozenStartupBehavior::OperatorRequested
+            } else {
+                rosc_broker::FrozenStartupBehavior::Normal
+            },
+        },
     )
     .await?;
-    if options.start_frozen {
-        proxy.freeze_traffic();
-    }
     let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
     print_proxy_report(&proxy.app().status_snapshot());
     println!("udp proxy running; press Ctrl-C to stop");

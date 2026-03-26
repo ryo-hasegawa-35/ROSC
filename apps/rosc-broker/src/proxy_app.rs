@@ -147,6 +147,20 @@ impl UdpProxyApp {
             .emit(BrokerEvent::TrafficFreezeChanged { frozen: false });
     }
 
+    pub fn restore_frozen_traffic(&self) {
+        if self.traffic_control.is_frozen() {
+            return;
+        }
+        self.traffic_control.freeze();
+        self.runtime
+            .telemetry
+            .emit(BrokerEvent::TrafficFreezeChanged { frozen: true });
+    }
+
+    pub fn is_traffic_frozen(&self) -> bool {
+        self.traffic_control.is_frozen()
+    }
+
     pub fn ingress_local_addr(&self, ingress_id: &str) -> Option<SocketAddr> {
         self.ingress_addrs.get(ingress_id).copied()
     }

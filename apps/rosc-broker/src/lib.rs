@@ -17,7 +17,7 @@ pub use health_service::HealthService;
 pub use launch_profile::{
     PreparedLaunchConfig, ProxyLaunchProfileMode, ProxyLaunchProfileStatus, apply_launch_profile,
 };
-pub use managed_proxy::ManagedUdpProxy;
+pub use managed_proxy::{FrozenStartupBehavior, ManagedProxyStartupOptions, ManagedUdpProxy};
 pub use operator_policy::{
     ProxyRuntimeSafetyPolicy, evaluate_proxy_runtime_policy, proxy_startup_report_lines,
 };

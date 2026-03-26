@@ -4,8 +4,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use rosc_broker::{
-    ManagedProxyFileSupervisor, ProxyLaunchProfileMode, ProxyReloadOutcome,
-    ProxyRuntimeSafetyPolicy,
+    FrozenStartupBehavior, ManagedProxyFileSupervisor, ManagedProxyStartupOptions,
+    ProxyLaunchProfileMode, ProxyReloadOutcome, ProxyRuntimeSafetyPolicy,
 };
 use rosc_osc::{
     OscArgument, OscMessage, ParsedOscPacket, TypeTagSource, encode_packet, parse_packet,
@@ -121,6 +121,7 @@ async fn proxy_reload_supervisor_blocks_unsafe_candidate_and_keeps_last_known_go
             require_fallback_ready: true,
         },
         ProxyLaunchProfileMode::Normal,
+        ManagedProxyStartupOptions::default(),
     )
     .await
     .unwrap();
@@ -187,6 +188,7 @@ async fn proxy_reload_supervisor_rolls_back_after_runtime_reload_failure() {
         32,
         ProxyRuntimeSafetyPolicy::default(),
         ProxyLaunchProfileMode::Normal,
+        ManagedProxyStartupOptions::default(),
     )
     .await
     .unwrap();
@@ -265,6 +267,7 @@ async fn proxy_reload_supervisor_applies_single_config_transition_per_reload() {
         32,
         ProxyRuntimeSafetyPolicy::default(),
         ProxyLaunchProfileMode::Normal,
+        ManagedProxyStartupOptions::default(),
     )
     .await
     .unwrap();
@@ -330,10 +333,12 @@ async fn proxy_reload_supervisor_can_start_frozen() {
         32,
         ProxyRuntimeSafetyPolicy::default(),
         ProxyLaunchProfileMode::Normal,
+        ManagedProxyStartupOptions {
+            frozen_behavior: FrozenStartupBehavior::OperatorRequested,
+        },
     )
     .await
     .unwrap();
-    supervisor.freeze_traffic();
 
     let runtime = supervisor
         .status_snapshot()

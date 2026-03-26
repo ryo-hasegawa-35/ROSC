@@ -7,6 +7,19 @@ use crate::{
     emit_config_transition,
 };
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum FrozenStartupBehavior {
+    #[default]
+    Normal,
+    OperatorRequested,
+    Restored,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ManagedProxyStartupOptions {
+    pub frozen_behavior: FrozenStartupBehavior,
+}
+
 pub struct ManagedUdpProxy {
     app: UdpProxyApp,
     config: BrokerConfig,
@@ -24,6 +37,7 @@ impl ManagedUdpProxy {
         ingress_queue_depth: usize,
         safety_policy: ProxyRuntimeSafetyPolicy,
         launch_profile_mode: ProxyLaunchProfileMode,
+        startup_options: ManagedProxyStartupOptions,
     ) -> Result<Self> {
         let prepared = apply_launch_profile(&config, launch_profile_mode);
         let mut app = UdpProxyApp::from_config(&prepared.config, telemetry.clone()).await?;
@@ -32,7 +46,7 @@ impl ManagedUdpProxy {
         if !blockers.is_empty() {
             anyhow::bail!("udp proxy startup blocked:\n{}", format_blockers(blockers));
         }
-        app.spawn_ingress_tasks(ingress_queue_depth).await?;
+        start_ingress_tasks(&mut app, ingress_queue_depth, startup_options).await?;
         emit_config_transition(&telemetry, 1, None, &config);
 
         Ok(Self {
@@ -74,6 +88,13 @@ impl ManagedUdpProxy {
             anyhow::bail!("udp proxy reload blocked:\n{}", format_blockers(blockers));
         }
 
+        let startup_options = if self.app.is_traffic_frozen() {
+            ManagedProxyStartupOptions {
+                frozen_behavior: FrozenStartupBehavior::Restored,
+            }
+        } else {
+            ManagedProxyStartupOptions::default()
+        };
         let previous_config = self.config.clone();
         self.app.shutdown().await;
 
@@ -82,6 +103,7 @@ impl ManagedUdpProxy {
             self.telemetry.clone(),
             self.ingress_queue_depth,
             next_prepared.status,
+            startup_options,
         )
         .await
         {
@@ -106,6 +128,7 @@ impl ManagedUdpProxy {
                     self.telemetry.clone(),
                     self.ingress_queue_depth,
                     rollback_prepared.status,
+                    startup_options,
                 )
                 .await
                 .with_context(
@@ -136,9 +159,23 @@ async fn start_app(
     telemetry: InMemoryTelemetry,
     ingress_queue_depth: usize,
     launch_profile: crate::ProxyLaunchProfileStatus,
+    startup_options: ManagedProxyStartupOptions,
 ) -> Result<UdpProxyApp> {
     let mut app = UdpProxyApp::from_config(config, telemetry).await?;
     app.set_launch_profile(launch_profile);
-    app.spawn_ingress_tasks(ingress_queue_depth).await?;
+    start_ingress_tasks(&mut app, ingress_queue_depth, startup_options).await?;
     Ok(app)
+}
+
+async fn start_ingress_tasks(
+    app: &mut UdpProxyApp,
+    ingress_queue_depth: usize,
+    startup_options: ManagedProxyStartupOptions,
+) -> Result<()> {
+    match startup_options.frozen_behavior {
+        FrozenStartupBehavior::Normal => {}
+        FrozenStartupBehavior::OperatorRequested => app.freeze_traffic(),
+        FrozenStartupBehavior::Restored => app.restore_frozen_traffic(),
+    }
+    app.spawn_ingress_tasks(ingress_queue_depth).await
 }
