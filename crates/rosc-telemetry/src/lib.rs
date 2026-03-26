@@ -118,15 +118,21 @@ pub enum BrokerEvent {
     TrafficFreezeChanged {
         frozen: bool,
     },
-    ConfigBlocked,
-    ConfigReloadFailed,
+    ConfigBlocked {
+        reasons: Vec<String>,
+    },
+    ConfigReloadFailed {
+        reason: String,
+    },
     LaunchProfileChanged {
         mode: String,
         disabled_capture_routes: usize,
         disabled_replay_routes: usize,
         disabled_restart_rehydrate_routes: usize,
     },
-    ConfigRejected,
+    ConfigRejected {
+        reason: String,
+    },
 }
 
 pub trait TelemetrySink: Send + Sync {
@@ -587,6 +593,7 @@ impl TelemetrySink for InMemoryTelemetry {
                     recorded_at_unix_ms: unix_time_ms(),
                     kind: RecentConfigEventKind::Applied,
                     revision: Some(revision),
+                    details: Vec::new(),
                     added_ingresses,
                     removed_ingresses,
                     changed_ingresses,
@@ -603,13 +610,14 @@ impl TelemetrySink for InMemoryTelemetry {
                 };
                 push_recent(&mut snapshot.recent_config_events, record);
             }
-            BrokerEvent::ConfigRejected => {
+            BrokerEvent::ConfigRejected { reason } => {
                 snapshot.config_rejections_total += 1;
                 let record = RecentConfigEvent {
                     sequence: next_event_sequence(&mut snapshot),
                     recorded_at_unix_ms: unix_time_ms(),
                     kind: RecentConfigEventKind::Rejected,
                     revision: Some(snapshot.config_revision),
+                    details: vec![reason],
                     added_ingresses: 0,
                     removed_ingresses: 0,
                     changed_ingresses: 0,
@@ -626,13 +634,14 @@ impl TelemetrySink for InMemoryTelemetry {
                 };
                 push_recent(&mut snapshot.recent_config_events, record);
             }
-            BrokerEvent::ConfigBlocked => {
+            BrokerEvent::ConfigBlocked { reasons } => {
                 snapshot.config_blocked_total += 1;
                 let record = RecentConfigEvent {
                     sequence: next_event_sequence(&mut snapshot),
                     recorded_at_unix_ms: unix_time_ms(),
                     kind: RecentConfigEventKind::Blocked,
                     revision: Some(snapshot.config_revision),
+                    details: reasons,
                     added_ingresses: 0,
                     removed_ingresses: 0,
                     changed_ingresses: 0,
@@ -649,13 +658,14 @@ impl TelemetrySink for InMemoryTelemetry {
                 };
                 push_recent(&mut snapshot.recent_config_events, record);
             }
-            BrokerEvent::ConfigReloadFailed => {
+            BrokerEvent::ConfigReloadFailed { reason } => {
                 snapshot.config_reload_failures_total += 1;
                 let record = RecentConfigEvent {
                     sequence: next_event_sequence(&mut snapshot),
                     recorded_at_unix_ms: unix_time_ms(),
                     kind: RecentConfigEventKind::ReloadFailed,
                     revision: Some(snapshot.config_revision),
+                    details: vec![reason],
                     added_ingresses: 0,
                     removed_ingresses: 0,
                     changed_ingresses: 0,
@@ -688,6 +698,7 @@ impl TelemetrySink for InMemoryTelemetry {
                     recorded_at_unix_ms: unix_time_ms(),
                     kind: RecentConfigEventKind::LaunchProfileChanged,
                     revision: Some(snapshot.config_revision),
+                    details: Vec::new(),
                     added_ingresses: 0,
                     removed_ingresses: 0,
                     changed_ingresses: 0,

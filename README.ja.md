@@ -93,6 +93,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - control endpoint は bulk route restore と percent-decoded resource id にも対応し、operator recovery flow を扱いやすくした
 - runtime status と control history endpoint から bounded な recent operator action / config transition を追えるようになり、インシデント後の追跡がしやすくなった
 - CLI の report 表示と control-plane の `/report` `/blockers` が同じ safety evaluation を共有するようになり、運用判断のズレを減らした
+- config の reject / block / reload failure も counters だけでなく reason 付きの recent history として残るようになった
 
 ## ドキュメント入口
 

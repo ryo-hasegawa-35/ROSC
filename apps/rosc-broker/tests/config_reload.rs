@@ -57,6 +57,14 @@ fn config_supervisor_preserves_last_known_good_after_rejection() {
     let metrics = telemetry.render_prometheus();
     assert!(metrics.contains("rosc_config_rejections_total 1"));
     assert!(metrics.contains("rosc_config_blocked_total 0"));
+    let snapshot = telemetry.snapshot();
+    assert_eq!(snapshot.recent_config_events.len(), 2);
+    assert!(
+        snapshot.recent_config_events[1]
+            .details
+            .iter()
+            .any(|detail| detail.contains("unsupported schema version"))
+    );
 
     let _ = fs::remove_file(path);
 }
@@ -228,6 +236,20 @@ fn config_supervisor_blocks_candidate_when_guard_rejects_it() {
     let metrics = telemetry.render_prometheus();
     assert!(metrics.contains("rosc_config_rejections_total 0"));
     assert!(metrics.contains("rosc_config_blocked_total 1"));
+    let snapshot = telemetry.snapshot();
+    assert_eq!(snapshot.recent_config_events.len(), 2);
+    assert!(
+        snapshot.recent_config_events[1]
+            .details
+            .iter()
+            .any(|detail| detail.contains("direct UDP fallback"))
+    );
+    assert!(
+        snapshot.recent_config_events[1]
+            .details
+            .iter()
+            .any(|detail| detail.contains("matches all ingresses"))
+    );
 
     let _ = fs::remove_file(path);
 }

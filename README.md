@@ -95,6 +95,7 @@ Current Phase 01 runtime coverage:
 - control endpoint also supports bulk route restore plus percent-decoded resource ids for safer operator recovery flows
 - runtime status and control history endpoints now expose bounded recent operator actions and config transitions for post-incident tracing
 - CLI reports and control-plane `/report` / `/blockers` now share the same structured operator safety evaluation
+- config rejection / block / reload-failure history now retains reason details instead of only counters
 
 ## Documentation Entry Points
 

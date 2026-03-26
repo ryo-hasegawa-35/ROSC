@@ -135,7 +135,9 @@ impl ManagedProxyFileSupervisor {
         let preview = match self.manager.preview_toml_str(&raw_toml) {
             Ok(preview) => preview,
             Err(error) => {
-                self.telemetry.emit(BrokerEvent::ConfigRejected);
+                self.telemetry.emit(BrokerEvent::ConfigRejected {
+                    reason: error.to_string(),
+                });
                 return Ok(ProxyReloadOutcome::Rejected(error));
             }
         };
@@ -152,11 +154,15 @@ impl ManagedProxyFileSupervisor {
                 );
                 Ok(match self.classify_reload_error(&message) {
                     ReloadFailureKind::Blocked(reasons) => {
-                        self.telemetry.emit(BrokerEvent::ConfigBlocked);
+                        self.telemetry.emit(BrokerEvent::ConfigBlocked {
+                            reasons: reasons.clone(),
+                        });
                         ProxyReloadOutcome::Blocked(reasons)
                     }
                     ReloadFailureKind::Rejected(message) => {
-                        self.telemetry.emit(BrokerEvent::ConfigReloadFailed);
+                        self.telemetry.emit(BrokerEvent::ConfigReloadFailed {
+                            reason: message.clone(),
+                        });
                         ProxyReloadOutcome::ReloadFailed(message)
                     }
                 })

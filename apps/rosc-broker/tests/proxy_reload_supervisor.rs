@@ -151,6 +151,18 @@ async fn proxy_reload_supervisor_blocks_unsafe_candidate_and_keeps_last_known_go
     assert_eq!(metrics.config_added_ingresses_total, 1);
     assert_eq!(metrics.config_added_destinations_total, 1);
     assert_eq!(metrics.config_added_routes_total, 1);
+    assert!(metrics.recent_config_events.len() >= 3);
+    assert!(
+        metrics
+            .recent_config_events
+            .iter()
+            .rev()
+            .find(|event| event.kind == rosc_telemetry::RecentConfigEventKind::Blocked)
+            .expect("blocked config event should be recorded")
+            .details
+            .iter()
+            .any(|detail| detail.contains("direct UDP fallback"))
+    );
 
     send_test_packet(
         supervisor
@@ -228,6 +240,18 @@ async fn proxy_reload_supervisor_rolls_back_after_runtime_reload_failure() {
     assert_eq!(metrics.config_added_ingresses_total, 1);
     assert_eq!(metrics.config_added_destinations_total, 1);
     assert_eq!(metrics.config_added_routes_total, 1);
+    assert!(metrics.recent_config_events.len() >= 3);
+    assert!(
+        metrics
+            .recent_config_events
+            .iter()
+            .rev()
+            .find(|event| event.kind == rosc_telemetry::RecentConfigEventKind::ReloadFailed)
+            .expect("reload failure event should be recorded")
+            .details
+            .iter()
+            .any(|detail| detail.contains("failed to reload managed proxy"))
+    );
 
     send_test_packet(
         supervisor

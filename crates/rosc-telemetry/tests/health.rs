@@ -83,9 +83,15 @@ fn in_memory_telemetry_renders_prometheus_text() {
         removed_routes: 0,
         changed_routes: 2,
     });
-    telemetry.emit(BrokerEvent::ConfigRejected);
-    telemetry.emit(BrokerEvent::ConfigBlocked);
-    telemetry.emit(BrokerEvent::ConfigReloadFailed);
+    telemetry.emit(BrokerEvent::ConfigRejected {
+        reason: "schema mismatch".to_owned(),
+    });
+    telemetry.emit(BrokerEvent::ConfigBlocked {
+        reasons: vec!["missing direct UDP fallback".to_owned()],
+    });
+    telemetry.emit(BrokerEvent::ConfigReloadFailed {
+        reason: "runtime replacement failed".to_owned(),
+    });
     telemetry.emit(BrokerEvent::LaunchProfileChanged {
         mode: "safe_mode".to_owned(),
         disabled_capture_routes: 1,
@@ -145,7 +151,20 @@ fn in_memory_telemetry_renders_prometheus_text() {
         RecentConfigEventKind::Applied
     );
     assert_eq!(snapshot.recent_config_events[0].revision, Some(4));
+    assert!(snapshot.recent_config_events[0].details.is_empty());
     assert_eq!(snapshot.recent_config_events[0].changed_routes, 2);
+    assert_eq!(
+        snapshot.recent_config_events[1].details,
+        vec!["schema mismatch".to_owned()]
+    );
+    assert_eq!(
+        snapshot.recent_config_events[2].details,
+        vec!["missing direct UDP fallback".to_owned()]
+    );
+    assert_eq!(
+        snapshot.recent_config_events[3].details,
+        vec!["runtime replacement failed".to_owned()]
+    );
     assert_eq!(
         snapshot.recent_config_events[4].kind,
         RecentConfigEventKind::LaunchProfileChanged

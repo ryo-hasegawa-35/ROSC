@@ -52,7 +52,9 @@ where
         let content = read_config_file(&self.path)?;
         let preview = self.manager.preview_toml_str(&content)?;
         if let Err(reasons) = guard(&preview.config) {
-            self.telemetry.emit(BrokerEvent::ConfigRejected);
+            self.telemetry.emit(BrokerEvent::ConfigBlocked {
+                reasons: reasons.clone(),
+            });
             anyhow::bail!(format_blocked_reasons(
                 "initial config blocked by runtime safety policy",
                 reasons
@@ -84,7 +86,9 @@ where
         match self.manager.preview_toml_str(&content) {
             Ok(preview) => {
                 if let Err(reasons) = guard(&preview.config) {
-                    self.telemetry.emit(BrokerEvent::ConfigBlocked);
+                    self.telemetry.emit(BrokerEvent::ConfigBlocked {
+                        reasons: reasons.clone(),
+                    });
                     return Ok(ConfigReloadOutcome::Blocked(reasons));
                 }
                 let applied = self.manager.apply_preview(&content, preview);
@@ -92,7 +96,9 @@ where
                 Ok(ConfigReloadOutcome::Applied(applied))
             }
             Err(error) => {
-                self.telemetry.emit(BrokerEvent::ConfigRejected);
+                self.telemetry.emit(BrokerEvent::ConfigRejected {
+                    reason: error.to_string(),
+                });
                 Ok(ConfigReloadOutcome::Rejected(error))
             }
         }

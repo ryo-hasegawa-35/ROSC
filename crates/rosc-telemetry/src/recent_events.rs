@@ -22,6 +22,7 @@ pub struct RecentConfigEvent {
     pub recorded_at_unix_ms: u64,
     pub kind: RecentConfigEventKind,
     pub revision: Option<u64>,
+    pub details: Vec<String>,
     pub added_ingresses: usize,
     pub removed_ingresses: usize,
     pub changed_ingresses: usize,
