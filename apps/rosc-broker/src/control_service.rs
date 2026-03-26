@@ -1,15 +1,18 @@
 use std::io;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, ensure};
 use serde::Serialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
-use tokio::task::JoinHandle;
+use tokio::task::{JoinHandle, JoinSet};
 
 use crate::UdpProxyStatusSnapshot;
 use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError, ProxyControlPlane};
+
+const CONTROL_REQUEST_READ_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub struct ControlService {
     listen_addr: std::net::SocketAddr,
@@ -27,14 +30,43 @@ impl ControlService {
         let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
 
         let task = tokio::spawn(async move {
+            let mut connections = JoinSet::new();
             loop {
                 tokio::select! {
                     biased;
                     _ = shutdown_rx.changed() => {
                         break;
                     }
-                    result = serve_control_http_once(&listener, Arc::clone(&control)) => {
-                        result?;
+                    Some(result) = connections.join_next(), if !connections.is_empty() => {
+                        match result {
+                            Ok(Ok(())) => {}
+                            Ok(Err(error)) => return Err(error),
+                            Err(error) if error.is_cancelled() => {}
+                            Err(error) => {
+                                return Err(io::Error::other(format!(
+                                    "control connection task join failed: {error}"
+                                )));
+                            }
+                        }
+                    }
+                    result = listener.accept() => {
+                        let (stream, _) = result?;
+                        let control = Arc::clone(&control);
+                        connections.spawn(async move { serve_control_connection(stream, control).await });
+                    }
+                }
+            }
+
+            connections.abort_all();
+            while let Some(result) = connections.join_next().await {
+                match result {
+                    Ok(Ok(())) => {}
+                    Ok(Err(error)) => return Err(error),
+                    Err(error) if error.is_cancelled() => {}
+                    Err(error) => {
+                        return Err(io::Error::other(format!(
+                            "control connection task join failed: {error}"
+                        )));
                     }
                 }
             }
@@ -102,26 +134,43 @@ struct ErrorResponse {
     error: String,
 }
 
-async fn serve_control_http_once(
-    listener: &TcpListener,
+async fn serve_control_connection(
+    mut stream: TcpStream,
     control: Arc<dyn ProxyControlPlane>,
 ) -> io::Result<()> {
-    let (mut stream, _) = listener.accept().await?;
-    let request = match read_http_request(&mut stream).await {
-        Ok(request) => request,
-        Err(error) => {
-            write_json_response(
-                &mut stream,
-                "400 Bad Request",
-                &ResponseBody::Error(ErrorResponse {
-                    ok: false,
-                    error: error.to_string(),
-                }),
-            )
-            .await?;
-            return Ok(());
-        }
-    };
+    let request =
+        match tokio::time::timeout(CONTROL_REQUEST_READ_TIMEOUT, read_http_request(&mut stream))
+            .await
+        {
+            Ok(Ok(request)) => request,
+            Ok(Err(error)) => {
+                write_json_response(
+                    &mut stream,
+                    "400 Bad Request",
+                    &ResponseBody::Error(ErrorResponse {
+                        ok: false,
+                        error: error.to_string(),
+                    }),
+                )
+                .await?;
+                return Ok(());
+            }
+            Err(_) => {
+                write_json_response(
+                    &mut stream,
+                    "408 Request Timeout",
+                    &ResponseBody::Error(ErrorResponse {
+                        ok: false,
+                        error: format!(
+                            "request headers not received within {} ms",
+                            CONTROL_REQUEST_READ_TIMEOUT.as_millis()
+                        ),
+                    }),
+                )
+                .await?;
+                return Ok(());
+            }
+        };
 
     let response = route_request(request, control).await;
     write_json_response(&mut stream, response.status, &response.body).await?;
@@ -665,6 +714,15 @@ mod tests {
         response
     }
 
+    async fn open_partial_request(addr: std::net::SocketAddr) -> TcpStream {
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        stream
+            .write_all(b"GET /status HTTP/1.1\r\nHost: localhost\r\n")
+            .await
+            .unwrap();
+        stream
+    }
+
     #[tokio::test]
     async fn control_service_freezes_and_thaws_live_proxy() {
         let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -1171,6 +1229,79 @@ mod tests {
         assert!(service.listen_addr().ip().is_loopback());
 
         service.shutdown().await.unwrap();
+        proxy.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn control_service_slow_client_does_not_block_other_requests() {
+        let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+        let proxy = Arc::new(Mutex::new(
+            ManagedUdpProxy::start(
+                proxy_config(
+                    "127.0.0.1:0",
+                    &destination_listener.local_addr().unwrap().to_string(),
+                ),
+                InMemoryTelemetry::default(),
+                32,
+                ProxyRuntimeSafetyPolicy::default(),
+                ProxyLaunchProfileMode::Normal,
+                ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
+        let mut service = ControlService::spawn("127.0.0.1:0", controller)
+            .await
+            .unwrap();
+
+        let slow_stream = open_partial_request(service.listen_addr()).await;
+        let fast_response = tokio::time::timeout(
+            Duration::from_millis(500),
+            request(
+                service.listen_addr(),
+                "GET /status HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            ),
+        )
+        .await
+        .expect("a slow client should not block later requests");
+        assert!(fast_response.contains("HTTP/1.1 200 OK"));
+
+        drop(slow_stream);
+        service.shutdown().await.unwrap();
+        proxy.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn control_service_shutdown_is_not_blocked_by_partial_request() {
+        let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+        let proxy = Arc::new(Mutex::new(
+            ManagedUdpProxy::start(
+                proxy_config(
+                    "127.0.0.1:0",
+                    &destination_listener.local_addr().unwrap().to_string(),
+                ),
+                InMemoryTelemetry::default(),
+                32,
+                ProxyRuntimeSafetyPolicy::default(),
+                ProxyLaunchProfileMode::Normal,
+                ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
+        let mut service = ControlService::spawn("127.0.0.1:0", controller)
+            .await
+            .unwrap();
+
+        let _slow_stream = open_partial_request(service.listen_addr()).await;
+        tokio::time::timeout(Duration::from_millis(500), service.shutdown())
+            .await
+            .expect("shutdown should not wait on a partial request")
+            .unwrap();
         proxy.lock().await.shutdown().await;
     }
 }
