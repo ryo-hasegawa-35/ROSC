@@ -167,9 +167,12 @@ async fn route_nested_request(
         if request.method != "POST" || destination_id.is_empty() {
             return method_or_path_error(request);
         }
+        let Ok(destination_id) = decode_uri_component(destination_id) else {
+            return invalid_component_error("destination id");
+        };
         return map_route_result(
             "rehydrate_destination",
-            control.rehydrate_destination(destination_id).await,
+            control.rehydrate_destination(&destination_id).await,
         );
     }
 
@@ -188,25 +191,37 @@ async fn route_nested_request(
         if request.method != "POST" || route_id.is_empty() {
             return method_or_path_error(request);
         }
-        return map_route_result("isolate_route", control.isolate_route(route_id).await);
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        return map_route_result("isolate_route", control.isolate_route(&route_id).await);
     }
 
     if let Some(route_id) = route_path.strip_suffix("/restore") {
         if request.method != "POST" || route_id.is_empty() {
             return method_or_path_error(request);
         }
-        return map_route_result("restore_route", control.restore_route(route_id).await);
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        return map_route_result("restore_route", control.restore_route(&route_id).await);
     }
 
     if let Some((route_id, sandbox_destination_id)) = route_path.split_once("/replay/") {
         if request.method != "POST" || route_id.is_empty() || sandbox_destination_id.is_empty() {
             return method_or_path_error(request);
         }
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        let Ok(sandbox_destination_id) = decode_uri_component(sandbox_destination_id) else {
+            return invalid_component_error("sandbox destination id");
+        };
         let limit = replay_limit(query);
         return map_route_result(
             "sandbox_replay",
             control
-                .replay_route_to_sandbox(route_id, sandbox_destination_id, limit)
+                .replay_route_to_sandbox(&route_id, &sandbox_destination_id, limit)
                 .await,
         );
     }
@@ -291,6 +306,51 @@ fn replay_limit(query: Option<&str>) -> usize {
         .and_then(|value| value.parse::<usize>().ok())
         .filter(|limit| *limit > 0)
         .unwrap_or(100)
+}
+
+fn decode_uri_component(component: &str) -> Result<String, ()> {
+    let bytes = component.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0usize;
+
+    while index < bytes.len() {
+        match bytes[index] {
+            b'%' => {
+                if index + 2 >= bytes.len() {
+                    return Err(());
+                }
+                let high = decode_hex_nibble(bytes[index + 1]).ok_or(())?;
+                let low = decode_hex_nibble(bytes[index + 2]).ok_or(())?;
+                decoded.push((high << 4) | low);
+                index += 3;
+            }
+            byte => {
+                decoded.push(byte);
+                index += 1;
+            }
+        }
+    }
+
+    String::from_utf8(decoded).map_err(|_| ())
+}
+
+fn decode_hex_nibble(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn invalid_component_error(label: &str) -> HttpResponse {
+    HttpResponse {
+        status: "400 Bad Request",
+        body: ResponseBody::Error(ErrorResponse {
+            ok: false,
+            error: format!("invalid percent-encoding in {label}"),
+        }),
+    }
 }
 
 async fn read_http_request(stream: &mut TcpStream) -> io::Result<HttpRequest> {
@@ -484,6 +544,55 @@ mod tests {
 
             [[routes.destinations]]
             target = "udp_renderer"
+            transport = "osc_udp"
+            "#
+        ))
+        .unwrap()
+    }
+
+    fn custom_id_proxy_config(
+        ingress_bind: &str,
+        destination_addr: &str,
+        destination_id: &str,
+        route_id: &str,
+    ) -> BrokerConfig {
+        BrokerConfig::from_toml_str(&format!(
+            r#"
+            [[udp_ingresses]]
+            id = "udp_localhost_in"
+            bind = "{ingress_bind}"
+            mode = "osc1_0_strict"
+
+            [[udp_destinations]]
+            id = "{destination_id}"
+            bind = "127.0.0.1:0"
+            target = "{destination_addr}"
+
+            [[routes]]
+            id = "{route_id}"
+            enabled = true
+            mode = "osc1_0_strict"
+            class = "StatefulControl"
+
+            [routes.match]
+            ingress_ids = ["udp_localhost_in"]
+            address_patterns = ["/ue5/camera/fov"]
+            protocols = ["osc_udp"]
+
+            [routes.transform]
+            rename_address = "/render/camera/fov"
+
+            [routes.cache]
+            policy = "last_value_per_address"
+            ttl_ms = 10000
+            persist = "warm"
+
+            [routes.recovery]
+            late_joiner = "latest"
+            rehydrate_on_connect = true
+
+            [[routes.destinations]]
+            target = "{destination_id}"
             transport = "osc_udp"
             "#
         ))
@@ -723,6 +832,85 @@ mod tests {
         .await;
         assert!(unknown_destination_response.contains("HTTP/1.1 404 Not Found"));
         assert!(unknown_destination_response.contains("unknown destination `missing`"));
+
+        service.shutdown().await.unwrap();
+        proxy.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn control_service_decodes_percent_encoded_route_and_destination_ids() {
+        let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let ingress_addr = reserved.local_addr().unwrap();
+        drop(reserved);
+
+        let route_id = "camera/main?1";
+        let destination_id = "udp/renderer?1";
+        let proxy = Arc::new(Mutex::new(
+            ManagedUdpProxy::start(
+                custom_id_proxy_config(
+                    &ingress_addr.to_string(),
+                    &destination_listener.local_addr().unwrap().to_string(),
+                    destination_id,
+                    route_id,
+                ),
+                InMemoryTelemetry::default(),
+                32,
+                ProxyRuntimeSafetyPolicy::default(),
+                ProxyLaunchProfileMode::Normal,
+                ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
+        let mut service = ControlService::spawn("127.0.0.1:0", controller)
+            .await
+            .unwrap();
+
+        let isolate_response = request(
+            service.listen_addr(),
+            "POST /routes/camera%2Fmain%3F1/isolate HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        assert!(isolate_response.contains("HTTP/1.1 200 OK"));
+        assert!(isolate_response.contains("\"isolated_route_ids\":[\"camera/main?1\"]"));
+
+        send_packet(ingress_addr).await;
+        let mut buffer = [0u8; 2048];
+        let blocked = tokio::time::timeout(
+            Duration::from_millis(200),
+            destination_listener.recv_from(&mut buffer),
+        )
+        .await;
+        assert!(
+            blocked.is_err(),
+            "encoded route isolation should block dispatch"
+        );
+
+        let restore_response = request(
+            service.listen_addr(),
+            "POST /routes/camera%2Fmain%3F1/restore HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        assert!(restore_response.contains("HTTP/1.1 200 OK"));
+
+        send_packet(ingress_addr).await;
+        let _ = tokio::time::timeout(
+            Duration::from_secs(1),
+            destination_listener.recv_from(&mut buffer),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        let rehydrate_response = request(
+            service.listen_addr(),
+            "POST /destinations/udp%2Frenderer%3F1/rehydrate HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        assert!(rehydrate_response.contains("HTTP/1.1 200 OK"));
+        assert!(rehydrate_response.contains("\"dispatch_count\":1"));
 
         service.shutdown().await.unwrap();
         proxy.lock().await.shutdown().await;
