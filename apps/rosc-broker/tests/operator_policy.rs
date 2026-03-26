@@ -1,6 +1,7 @@
 use rosc_broker::{
     ProxyLaunchProfileMode, ProxyRuntimeSafetyPolicy, attach_runtime_status,
-    evaluate_proxy_runtime_policy, proxy_startup_report_lines, proxy_status_from_config,
+    evaluate_proxy_runtime_policy, proxy_operator_report, proxy_startup_report_lines,
+    proxy_status_from_config,
 };
 use rosc_config::BrokerConfig;
 use rosc_telemetry::HealthSnapshot;
@@ -135,5 +136,35 @@ fn startup_report_lines_include_safe_mode_launch_profile_when_present() {
         report
             .iter()
             .any(|line| line.contains("disabled_capture_routes=1"))
+    );
+}
+
+#[test]
+fn operator_report_includes_policy_and_blockers() {
+    let config = broad_scope_config();
+    let status = proxy_status_from_config(&config).expect("status should build");
+    let policy = ProxyRuntimeSafetyPolicy {
+        fail_on_warnings: true,
+        require_fallback_ready: true,
+    };
+
+    let report = proxy_operator_report(&status, policy);
+
+    assert_eq!(report.policy, policy);
+    assert!(!report.warnings.is_empty());
+    assert!(
+        report
+            .blockers
+            .iter()
+            .any(|line| line.contains("matches all ingresses"))
+    );
+    assert!(report.report_lines.iter().any(|line| {
+        line.contains("proxy safety policy: fail_on_warnings=true require_fallback_ready=true")
+    }));
+    assert!(
+        report
+            .report_lines
+            .iter()
+            .any(|line| line.starts_with("proxy blocker:"))
     );
 }

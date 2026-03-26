@@ -232,7 +232,7 @@ async fn watch_udp_proxy(
     )
     .await?;
     let initial_status = supervisor.lock().await.status_snapshot();
-    print_proxy_report(&initial_status);
+    print_proxy_report(&initial_status, safety_policy);
     println!(
         "managed udp proxy loaded revision={}",
         supervisor
@@ -255,7 +255,7 @@ async fn watch_udp_proxy(
                     rosc_broker::ProxyReloadOutcome::Applied(applied) => {
                         print_applied_config(&applied);
                         let status = supervisor.lock().await.status_snapshot();
-                        print_proxy_report(&status);
+                        print_proxy_report(&status, safety_policy);
                     }
                     rosc_broker::ProxyReloadOutcome::Blocked(reasons) => {
                         let revision = supervisor.lock().await.current_revision().unwrap_or_default();
@@ -265,7 +265,7 @@ async fn watch_udp_proxy(
                             reasons.join(" | ")
                         );
                         let status = supervisor.lock().await.status_snapshot();
-                        print_proxy_report(&status);
+                        print_proxy_report(&status, safety_policy);
                     }
                     rosc_broker::ProxyReloadOutcome::Rejected(error) => {
                         let revision = supervisor.lock().await.current_revision().unwrap_or_default();
@@ -275,7 +275,7 @@ async fn watch_udp_proxy(
                             error
                         );
                         let status = supervisor.lock().await.status_snapshot();
-                        print_proxy_report(&status);
+                        print_proxy_report(&status, safety_policy);
                     }
                     rosc_broker::ProxyReloadOutcome::ReloadFailed(error) => {
                         let revision = supervisor.lock().await.current_revision().unwrap_or_default();
@@ -285,7 +285,7 @@ async fn watch_udp_proxy(
                             error
                         );
                         let status = supervisor.lock().await.status_snapshot();
-                        print_proxy_report(&status);
+                        print_proxy_report(&status, safety_policy);
                     }
                 }
             }
@@ -407,7 +407,7 @@ async fn run_udp_proxy(
     )
     .await?;
     let status = proxy.lock().await.status_snapshot();
-    print_proxy_report(&status);
+    print_proxy_report(&status, safety_policy);
     println!("udp proxy running; press Ctrl-C to stop");
     tokio::signal::ctrl_c()
         .await
@@ -435,8 +435,12 @@ fn print_applied_config(applied: &rosc_config::ConfigApplyResult) {
     );
 }
 
-fn print_proxy_report(status: &rosc_broker::UdpProxyStatusSnapshot) {
-    for line in rosc_broker::proxy_startup_report_lines(status) {
+fn print_proxy_report(
+    status: &rosc_broker::UdpProxyStatusSnapshot,
+    safety_policy: rosc_broker::ProxyRuntimeSafetyPolicy,
+) {
+    let report = rosc_broker::proxy_operator_report(status, safety_policy);
+    for line in report.report_lines {
         println!("{line}");
     }
 }

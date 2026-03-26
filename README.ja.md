@@ -47,6 +47,8 @@ curl -X POST http://127.0.0.1:19292/routes/restore-all
 curl -X POST http://127.0.0.1:19292/destinations/udp_renderer/rehydrate
 curl -X POST "http://127.0.0.1:19292/routes/camera/replay/sandbox_tap?limit=1"
 curl http://127.0.0.1:19292/status
+curl http://127.0.0.1:19292/report
+curl http://127.0.0.1:19292/blockers
 curl http://127.0.0.1:19292/history/operator-actions
 curl http://127.0.0.1:19292/history/config-events
 ```
@@ -90,6 +92,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - control endpoint から destination rehydrate と sandbox replay も叩けるようになり、live operator workflow を外から再現可能
 - control endpoint は bulk route restore と percent-decoded resource id にも対応し、operator recovery flow を扱いやすくした
 - runtime status と control history endpoint から bounded な recent operator action / config transition を追えるようになり、インシデント後の追跡がしやすくなった
+- CLI の report 表示と control-plane の `/report` `/blockers` が同じ safety evaluation を共有するようになり、運用判断のズレを減らした
 
 ## ドキュメント入口
 

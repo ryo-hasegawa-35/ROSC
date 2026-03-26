@@ -153,6 +153,18 @@ struct RecentConfigEventsResponse {
 }
 
 #[derive(Serialize)]
+struct OperatorReportResponse {
+    ok: bool,
+    report: crate::ProxyOperatorReport,
+}
+
+#[derive(Serialize)]
+struct BlockersResponse {
+    ok: bool,
+    blockers: Vec<String>,
+}
+
+#[derive(Serialize)]
 struct ErrorResponse {
     ok: bool,
     error: String,
@@ -212,6 +224,23 @@ async fn route_request(request: HttpRequest, control: Arc<dyn ProxyControlPlane>
                 status: control.status_snapshot().await,
             }),
         },
+        ("GET", "/report") => HttpResponse {
+            status: "200 OK",
+            body: ResponseBody::OperatorReport(OperatorReportResponse {
+                ok: true,
+                report: control.operator_report().await,
+            }),
+        },
+        ("GET", "/blockers") => {
+            let report = control.operator_report().await;
+            HttpResponse {
+                status: "200 OK",
+                body: ResponseBody::Blockers(BlockersResponse {
+                    ok: true,
+                    blockers: report.blockers,
+                }),
+            }
+        }
         ("GET", "/history/operator-actions") => {
             let Ok(limit) = history_limit(query) else {
                 return invalid_query_error("limit");
@@ -607,6 +636,8 @@ async fn write_json_response(
 enum ResponseBody {
     Status(StatusResponse),
     Action(ActionResponse),
+    OperatorReport(OperatorReportResponse),
+    Blockers(BlockersResponse),
     RecentOperatorActions(RecentOperatorActionsResponse),
     RecentConfigEvents(RecentConfigEventsResponse),
     Error(ErrorResponse),
@@ -622,6 +653,8 @@ impl ResponseBody {
         match self {
             Self::Status(body) => serde_json::to_vec(body),
             Self::Action(body) => serde_json::to_vec(body),
+            Self::OperatorReport(body) => serde_json::to_vec(body),
+            Self::Blockers(body) => serde_json::to_vec(body),
             Self::RecentOperatorActions(body) => serde_json::to_vec(body),
             Self::RecentConfigEvents(body) => serde_json::to_vec(body),
             Self::Error(body) => serde_json::to_vec(body),
@@ -998,6 +1031,69 @@ mod tests {
         assert_eq!(
             status["status"]["runtime"]["recent_config_events"][0]["kind"],
             "LaunchProfileChanged"
+        );
+
+        service.shutdown().await.unwrap();
+        proxy.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn control_service_exposes_operator_report_and_blockers() {
+        let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+        let proxy = Arc::new(Mutex::new(
+            ManagedUdpProxy::start(
+                proxy_config(
+                    "127.0.0.1:0",
+                    &destination_listener.local_addr().unwrap().to_string(),
+                ),
+                InMemoryTelemetry::default(),
+                32,
+                ProxyRuntimeSafetyPolicy {
+                    fail_on_warnings: true,
+                    require_fallback_ready: true,
+                },
+                ProxyLaunchProfileMode::Normal,
+                ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
+        let mut service = ControlService::spawn("127.0.0.1:0", controller)
+            .await
+            .unwrap();
+
+        let report = json_body(
+            &request(
+                service.listen_addr(),
+                "GET /report HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            )
+            .await,
+        );
+        assert_eq!(report["ok"], true);
+        assert_eq!(report["report"]["policy"]["fail_on_warnings"], true);
+        assert_eq!(report["report"]["policy"]["require_fallback_ready"], true);
+        assert!(
+            report["report"]["report_lines"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|line| line.as_str().unwrap().contains("proxy safety policy:")),
+            "expected policy line in report: {report:?}"
+        );
+
+        let blockers = json_body(
+            &request(
+                service.listen_addr(),
+                "GET /blockers HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            )
+            .await,
+        );
+        assert_eq!(blockers["ok"], true);
+        assert!(
+            blockers["blockers"].as_array().unwrap().is_empty(),
+            "expected no blockers for healthy proxy: {blockers:?}"
         );
 
         service.shutdown().await.unwrap();

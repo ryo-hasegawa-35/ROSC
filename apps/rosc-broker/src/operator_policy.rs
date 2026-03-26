@@ -1,11 +1,12 @@
 use anyhow::Result;
 use rosc_config::BrokerConfig;
+use serde::Serialize;
 
 use crate::{
     UdpProxyStatusSnapshot, operator_warnings, proxy_status_from_config, startup_blockers,
 };
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct ProxyRuntimeSafetyPolicy {
     pub fail_on_warnings: bool,
     pub require_fallback_ready: bool,
@@ -15,6 +16,14 @@ impl ProxyRuntimeSafetyPolicy {
     pub fn blockers(self, status: &UdpProxyStatusSnapshot) -> Vec<String> {
         startup_blockers(status, self.fail_on_warnings, self.require_fallback_ready)
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ProxyOperatorReport {
+    pub policy: ProxyRuntimeSafetyPolicy,
+    pub warnings: Vec<String>,
+    pub blockers: Vec<String>,
+    pub report_lines: Vec<String>,
 }
 
 pub fn evaluate_proxy_runtime_policy(
@@ -30,6 +39,31 @@ pub fn evaluate_proxy_runtime_policy(
         Ok(())
     } else {
         Err(blockers)
+    }
+}
+
+pub fn proxy_operator_report(
+    status: &UdpProxyStatusSnapshot,
+    policy: ProxyRuntimeSafetyPolicy,
+) -> ProxyOperatorReport {
+    let warnings = operator_warnings(status);
+    let blockers = policy.blockers(status);
+    let mut report_lines = proxy_startup_report_lines(status);
+    report_lines.push(format!(
+        "proxy safety policy: fail_on_warnings={} require_fallback_ready={}",
+        policy.fail_on_warnings, policy.require_fallback_ready
+    ));
+    report_lines.extend(
+        blockers
+            .iter()
+            .map(|blocker| format!("proxy blocker: {blocker}")),
+    );
+
+    ProxyOperatorReport {
+        policy,
+        warnings,
+        blockers,
+        report_lines,
     }
 }
 

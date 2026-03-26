@@ -70,6 +70,10 @@ impl ManagedProxyFileSupervisor {
         self.proxy.status_snapshot()
     }
 
+    pub fn operator_report(&self) -> crate::ProxyOperatorReport {
+        self.proxy.operator_report()
+    }
+
     pub fn proxy(&self) -> &ManagedUdpProxy {
         &self.proxy
     }
