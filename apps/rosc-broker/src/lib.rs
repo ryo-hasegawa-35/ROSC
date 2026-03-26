@@ -7,6 +7,7 @@ mod operator_policy;
 mod proxy_app;
 mod proxy_reload_supervisor;
 mod proxy_status;
+mod traffic_control;
 
 pub use config_supervisor::{ConfigFileSupervisor, ConfigReloadOutcome};
 pub use config_telemetry::{
