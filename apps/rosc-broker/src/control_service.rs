@@ -1,7 +1,7 @@
 use std::io;
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, ensure};
 use serde::Serialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -23,6 +23,10 @@ impl ControlService {
             .await
             .with_context(|| format!("failed to bind control listener on {listen}"))?;
         let listen_addr = listener.local_addr()?;
+        ensure!(
+            listen_addr.ip().is_loopback(),
+            "control listener must bind to a loopback address, got {listen_addr}"
+        );
         let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
 
         let task = tokio::spawn(async move {
@@ -1022,6 +1026,40 @@ mod tests {
         assert!(response.contains("invalid percent-encoding in route id"));
 
         service.shutdown().await.unwrap();
+        proxy.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn control_service_rejects_non_loopback_listener() {
+        let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+        let proxy = Arc::new(Mutex::new(
+            ManagedUdpProxy::start(
+                proxy_config(
+                    "127.0.0.1:0",
+                    &destination_listener.local_addr().unwrap().to_string(),
+                ),
+                InMemoryTelemetry::default(),
+                32,
+                ProxyRuntimeSafetyPolicy::default(),
+                ProxyLaunchProfileMode::Normal,
+                ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
+        let error = match ControlService::spawn("0.0.0.0:0", controller).await {
+            Ok(_) => panic!("non-loopback control listener should be rejected"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("control listener must bind to a loopback address"),
+            "unexpected error: {error:#}"
+        );
+
         proxy.lock().await.shutdown().await;
     }
 }

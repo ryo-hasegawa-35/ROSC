@@ -51,6 +51,9 @@ curl -X POST "http://127.0.0.1:19292/routes/camera/replay/sandbox_tap?limit=1"
 curl http://127.0.0.1:19292/status
 ```
 
+`--control-listen` is intentionally loopback-only. Bind it to `127.0.0.1`, `::1`, or another
+local-only alias such as `localhost`; wildcard or externally reachable addresses are rejected.
+
 Run the same workspace inside Docker:
 
 ```bash

@@ -220,11 +220,17 @@ async fn watch_udp_proxy(
         )
         .await?,
     ));
-    let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
     let control_plane: Arc<dyn rosc_broker::ProxyControlPlane> = Arc::new(
         rosc_broker::ManagedProxyFileSupervisorController::new(Arc::clone(&supervisor)),
     );
-    let mut control_service = spawn_optional_control_service(control_listen, control_plane).await?;
+    let (mut health_service, mut control_service) = start_supervisor_sidecars(
+        &supervisor,
+        telemetry,
+        health_listen,
+        control_listen,
+        control_plane,
+    )
+    .await?;
     let initial_status = supervisor.lock().await.status_snapshot();
     print_proxy_report(&initial_status);
     println!(
@@ -389,11 +395,17 @@ async fn run_udp_proxy(
         )
         .await?,
     ));
-    let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
     let control_plane: Arc<dyn rosc_broker::ProxyControlPlane> = Arc::new(
         rosc_broker::ManagedUdpProxyController::new(Arc::clone(&proxy)),
     );
-    let mut control_service = spawn_optional_control_service(control_listen, control_plane).await?;
+    let (mut health_service, mut control_service) = start_managed_proxy_sidecars(
+        &proxy,
+        telemetry,
+        health_listen,
+        control_listen,
+        control_plane,
+    )
+    .await?;
     let status = proxy.lock().await.status_snapshot();
     print_proxy_report(&status);
     println!("udp proxy running; press Ctrl-C to stop");
@@ -467,6 +479,68 @@ async fn spawn_optional_control_service(
     }
 }
 
+async fn start_managed_proxy_sidecars(
+    proxy: &Arc<Mutex<rosc_broker::ManagedUdpProxy>>,
+    telemetry: InMemoryTelemetry,
+    health_listen: Option<&str>,
+    control_listen: Option<&str>,
+    control_plane: Arc<dyn rosc_broker::ProxyControlPlane>,
+) -> Result<(
+    Option<rosc_broker::HealthService>,
+    Option<rosc_broker::ControlService>,
+)> {
+    let mut health_service = match spawn_optional_health_service(health_listen, telemetry).await {
+        Ok(service) => service,
+        Err(error) => {
+            proxy.lock().await.shutdown().await;
+            return Err(error);
+        }
+    };
+
+    let control_service = match spawn_optional_control_service(control_listen, control_plane).await
+    {
+        Ok(service) => service,
+        Err(error) => {
+            shutdown_optional_health_service(&mut health_service).await?;
+            proxy.lock().await.shutdown().await;
+            return Err(error);
+        }
+    };
+
+    Ok((health_service, control_service))
+}
+
+async fn start_supervisor_sidecars(
+    supervisor: &Arc<Mutex<rosc_broker::ManagedProxyFileSupervisor>>,
+    telemetry: InMemoryTelemetry,
+    health_listen: Option<&str>,
+    control_listen: Option<&str>,
+    control_plane: Arc<dyn rosc_broker::ProxyControlPlane>,
+) -> Result<(
+    Option<rosc_broker::HealthService>,
+    Option<rosc_broker::ControlService>,
+)> {
+    let mut health_service = match spawn_optional_health_service(health_listen, telemetry).await {
+        Ok(service) => service,
+        Err(error) => {
+            supervisor.lock().await.shutdown().await;
+            return Err(error);
+        }
+    };
+
+    let control_service = match spawn_optional_control_service(control_listen, control_plane).await
+    {
+        Ok(service) => service,
+        Err(error) => {
+            shutdown_optional_health_service(&mut health_service).await?;
+            supervisor.lock().await.shutdown().await;
+            return Err(error);
+        }
+    };
+
+    Ok((health_service, control_service))
+}
+
 async fn shutdown_optional_control_service(
     service: &mut Option<rosc_broker::ControlService>,
 ) -> Result<()> {
@@ -475,4 +549,102 @@ async fn shutdown_optional_control_service(
         println!("control endpoint stopped");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use rosc_config::BrokerConfig;
+    use rosc_telemetry::InMemoryTelemetry;
+    use tokio::net::UdpSocket;
+    use tokio::sync::Mutex;
+
+    use super::start_managed_proxy_sidecars;
+
+    fn proxy_config(ingress_bind: &str, destination_addr: &str) -> BrokerConfig {
+        BrokerConfig::from_toml_str(&format!(
+            r#"
+            [[udp_ingresses]]
+            id = "udp_localhost_in"
+            bind = "{ingress_bind}"
+            mode = "osc1_0_strict"
+
+            [[udp_destinations]]
+            id = "udp_renderer"
+            bind = "127.0.0.1:0"
+            target = "{destination_addr}"
+
+            [[routes]]
+            id = "camera"
+            enabled = true
+            mode = "osc1_0_strict"
+            class = "StatefulControl"
+
+            [routes.match]
+            ingress_ids = ["udp_localhost_in"]
+            address_patterns = ["/ue5/camera/fov"]
+            protocols = ["osc_udp"]
+
+            [[routes.destinations]]
+            target = "udp_renderer"
+            transport = "osc_udp"
+            "#
+        ))
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn start_managed_proxy_sidecars_releases_ingress_port_when_control_startup_fails() {
+        let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let telemetry = InMemoryTelemetry::default();
+        let proxy = Arc::new(Mutex::new(
+            rosc_broker::ManagedUdpProxy::start(
+                proxy_config(
+                    "127.0.0.1:0",
+                    &destination_listener.local_addr().unwrap().to_string(),
+                ),
+                telemetry.clone(),
+                32,
+                rosc_broker::ProxyRuntimeSafetyPolicy::default(),
+                rosc_broker::ProxyLaunchProfileMode::Normal,
+                rosc_broker::ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let ingress_addr = proxy
+            .lock()
+            .await
+            .app()
+            .ingress_local_addr("udp_localhost_in")
+            .unwrap();
+        let control_plane: Arc<dyn rosc_broker::ProxyControlPlane> = Arc::new(
+            rosc_broker::ManagedUdpProxyController::new(Arc::clone(&proxy)),
+        );
+
+        let error = match start_managed_proxy_sidecars(
+            &proxy,
+            telemetry,
+            None,
+            Some("0.0.0.0:0"),
+            control_plane,
+        )
+        .await
+        {
+            Ok(_) => panic!("non-loopback control listener should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("control listener must bind to a loopback address"),
+            "unexpected error: {error:#}"
+        );
+
+        let rebound = UdpSocket::bind(ingress_addr)
+            .await
+            .expect("ingress port should be released after control startup failure");
+        assert_eq!(rebound.local_addr().unwrap(), ingress_addr);
+    }
 }
