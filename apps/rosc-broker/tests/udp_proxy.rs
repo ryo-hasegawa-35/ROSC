@@ -160,6 +160,15 @@ async fn udp_proxy_rehydrates_cached_state_for_destination() {
     .unwrap();
 
     assert_eq!(app.rehydrate_destination("udp_renderer").await.unwrap(), 1);
+    assert_eq!(
+        app.status_snapshot()
+            .runtime
+            .expect("runtime snapshot should exist")
+            .operator_actions_total
+            .get("rehydrate_destination")
+            .copied(),
+        Some(1)
+    );
 
     let (size, _) = tokio::time::timeout(
         Duration::from_secs(1),
@@ -261,6 +270,15 @@ async fn udp_proxy_replays_captured_state_to_a_sandbox_destination() {
             .await
             .unwrap(),
         1
+    );
+    assert_eq!(
+        app.status_snapshot()
+            .runtime
+            .expect("runtime snapshot should exist")
+            .operator_actions_total
+            .get("sandbox_replay")
+            .copied(),
+        Some(1)
     );
 
     let (size, _) = tokio::time::timeout(
@@ -568,6 +586,115 @@ async fn udp_proxy_freeze_and_thaw_controls_live_ingress_dispatch() {
             .expect("runtime snapshot should exist")
             .traffic_frozen
     );
+
+    app.shutdown().await;
+}
+
+#[tokio::test]
+async fn udp_proxy_route_isolation_blocks_dispatch_until_restored() {
+    let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let destination_addr = destination_listener.local_addr().unwrap();
+
+    let config = BrokerConfig::from_toml_str(&format!(
+        r#"
+        [[udp_ingresses]]
+        id = "udp_localhost_in"
+        bind = "127.0.0.1:0"
+        mode = "osc1_0_strict"
+
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "127.0.0.1:0"
+        target = "{destination_addr}"
+
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+
+        [routes.match]
+        ingress_ids = ["udp_localhost_in"]
+        address_patterns = ["/ue5/camera/fov"]
+        protocols = ["osc_udp"]
+
+        [routes.transform]
+        rename_address = "/render/camera/fov"
+
+        [[routes.destinations]]
+        target = "udp_renderer"
+        transport = "osc_udp"
+        "#
+    ))
+    .unwrap();
+
+    let mut app = UdpProxyApp::from_config(&config, InMemoryTelemetry::default())
+        .await
+        .unwrap();
+    let ingress_addr = app.ingress_local_addr("udp_localhost_in").unwrap();
+    app.spawn_ingress_tasks(32).await.unwrap();
+
+    assert!(app.isolate_route("camera"));
+    let isolated_runtime = app
+        .status_snapshot()
+        .runtime
+        .expect("runtime snapshot should exist");
+    assert_eq!(isolated_runtime.isolated_route_ids, vec!["camera"]);
+    assert_eq!(
+        isolated_runtime
+            .operator_actions_total
+            .get("isolate_route")
+            .copied(),
+        Some(1)
+    );
+
+    let source = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let payload = encode_packet(&ParsedOscPacket::Message(OscMessage {
+        address: "/ue5/camera/fov".to_owned(),
+        type_tag_source: TypeTagSource::Explicit,
+        arguments: vec![OscArgument::Float32(87.0)],
+    }))
+    .unwrap();
+    source.send_to(&payload, ingress_addr).await.unwrap();
+
+    let mut buffer = [0u8; 2048];
+    let isolated_result = tokio::time::timeout(
+        Duration::from_millis(200),
+        destination_listener.recv_from(&mut buffer),
+    )
+    .await;
+    assert!(
+        isolated_result.is_err(),
+        "isolated route should not dispatch"
+    );
+
+    assert!(app.restore_route("camera"));
+    let restored_runtime = app
+        .status_snapshot()
+        .runtime
+        .expect("runtime snapshot should exist");
+    assert!(restored_runtime.isolated_route_ids.is_empty());
+    assert_eq!(
+        restored_runtime
+            .operator_actions_total
+            .get("restore_route")
+            .copied(),
+        Some(1)
+    );
+
+    source.send_to(&payload, ingress_addr).await.unwrap();
+    let (size, _) = tokio::time::timeout(
+        Duration::from_secs(1),
+        destination_listener.recv_from(&mut buffer),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let parsed = parse_packet(&buffer[..size], rosc_osc::CompatibilityMode::Osc1_0Strict).unwrap();
+    let ParsedOscPacket::Message(message) = parsed else {
+        panic!("expected relayed OSC message after route restore");
+    };
+    assert_eq!(message.address, "/render/camera/fov");
 
     app.shutdown().await;
 }

@@ -335,6 +335,7 @@ async fn proxy_reload_supervisor_can_start_frozen() {
         ProxyLaunchProfileMode::Normal,
         ManagedProxyStartupOptions {
             frozen_behavior: FrozenStartupBehavior::OperatorRequested,
+            ..ManagedProxyStartupOptions::default()
         },
     )
     .await

@@ -216,9 +216,13 @@ where
     TTelemetry: TelemetrySink,
 {
     pub fn route_packet(&self, packet: &PacketEnvelope) -> usize {
-        let outcome = self.routing.route(packet);
+        let outcome = self.route_outcome(packet);
         self.emit_routing_events(&outcome);
         outcome.dispatches.len()
+    }
+
+    pub fn route_outcome(&self, packet: &PacketEnvelope) -> RoutingOutcome {
+        self.routing.route(packet)
     }
 
     pub async fn dispatch_packet(
@@ -226,7 +230,15 @@ where
         packet: &PacketEnvelope,
         destinations: &DestinationRegistry,
     ) -> DispatchOutcome {
-        let outcome = self.routing.route(packet);
+        let outcome = self.route_outcome(packet);
+        self.dispatch_routing_outcome(outcome, destinations).await
+    }
+
+    pub async fn dispatch_routing_outcome(
+        &self,
+        outcome: RoutingOutcome,
+        destinations: &DestinationRegistry,
+    ) -> DispatchOutcome {
         self.emit_routing_events(&outcome);
 
         let mut dispatch_outcome = DispatchOutcome {

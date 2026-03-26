@@ -84,6 +84,7 @@ fn startup_report_lines_include_runtime_config_state_when_available() {
         proxy_status_from_config(&config).expect("status should build"),
         &HealthSnapshot {
             traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
             config_revision: 7,
             config_rejections_total: 2,
             config_blocked_total: 3,
@@ -98,6 +99,7 @@ fn startup_report_lines_include_runtime_config_state_when_available() {
             .iter()
             .any(|line| line.contains("traffic_frozen=true"))
     );
+    assert!(report.iter().any(|line| line.contains("isolated_routes=1")));
     assert!(report.iter().any(|line| line.contains("config_revision=7")));
     assert!(
         report

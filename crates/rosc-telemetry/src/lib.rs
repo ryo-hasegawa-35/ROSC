@@ -89,6 +89,10 @@ pub enum BrokerEvent {
         state: BreakerStateSnapshot,
         reason: String,
     },
+    RouteIsolationChanged {
+        route_id: String,
+        isolated: bool,
+    },
     OperatorAction {
         action: String,
     },
@@ -152,6 +156,7 @@ pub struct HealthSnapshot {
     pub destination_drops_total: BTreeMap<(String, String), u64>,
     pub destination_send_failures_total: BTreeMap<(String, String), u64>,
     pub destination_breaker_state: BTreeMap<String, BreakerStateSnapshot>,
+    pub route_isolated: BTreeMap<String, bool>,
     pub operator_actions_total: BTreeMap<String, u64>,
     pub traffic_frozen: bool,
     pub config_revision: u64,
@@ -304,6 +309,14 @@ impl InMemoryTelemetry {
                 output,
                 "rosc_destination_breaker_state{{destination_id=\"{destination_id}\"}} {}",
                 state.as_metric_value()
+            );
+        }
+
+        for (route_id, isolated) in snapshot.route_isolated {
+            let _ = writeln!(
+                output,
+                "rosc_route_isolated{{route_id=\"{route_id}\"}} {}",
+                if isolated { 1 } else { 0 }
             );
         }
 
@@ -518,6 +531,9 @@ impl TelemetrySink for InMemoryTelemetry {
                 snapshot
                     .destination_breaker_state
                     .insert(destination_id, state);
+            }
+            BrokerEvent::RouteIsolationChanged { route_id, isolated } => {
+                snapshot.route_isolated.insert(route_id, isolated);
             }
             BrokerEvent::OperatorAction { action } => {
                 *snapshot.operator_actions_total.entry(action).or_default() += 1;

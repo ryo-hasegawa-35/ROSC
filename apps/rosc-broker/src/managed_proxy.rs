@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use rosc_config::BrokerConfig;
-use rosc_telemetry::InMemoryTelemetry;
+use rosc_telemetry::{InMemoryTelemetry, TelemetrySink};
 
 use crate::{
     ProxyLaunchProfileMode, ProxyRuntimeSafetyPolicy, UdpProxyApp, apply_launch_profile,
@@ -15,9 +15,10 @@ pub enum FrozenStartupBehavior {
     Restored,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct ManagedProxyStartupOptions {
     pub frozen_behavior: FrozenStartupBehavior,
+    pub isolated_route_ids: Vec<String>,
 }
 
 pub struct ManagedUdpProxy {
@@ -76,6 +77,29 @@ impl ManagedUdpProxy {
         self.app.thaw_traffic();
     }
 
+    pub fn isolate_route(&self, route_id: &str) -> bool {
+        self.app.isolate_route(route_id)
+    }
+
+    pub fn restore_route(&self, route_id: &str) -> bool {
+        self.app.restore_route(route_id)
+    }
+
+    pub async fn rehydrate_destination(&self, destination_id: &str) -> Result<usize> {
+        self.app.rehydrate_destination(destination_id).await
+    }
+
+    pub async fn replay_route_to_sandbox(
+        &self,
+        route_id: &str,
+        sandbox_destination_id: &str,
+        limit: usize,
+    ) -> Result<usize> {
+        self.app
+            .replay_route_to_sandbox(route_id, sandbox_destination_id, limit)
+            .await
+    }
+
     pub async fn reload(&mut self, next_config: BrokerConfig) -> Result<()> {
         let next_prepared = apply_launch_profile(&next_config, self.launch_profile_mode);
         let next_status = {
@@ -91,10 +115,15 @@ impl ManagedUdpProxy {
         let startup_options = if self.app.is_traffic_frozen() {
             ManagedProxyStartupOptions {
                 frozen_behavior: FrozenStartupBehavior::Restored,
+                isolated_route_ids: self.app.isolated_routes(),
             }
         } else {
-            ManagedProxyStartupOptions::default()
+            ManagedProxyStartupOptions {
+                frozen_behavior: FrozenStartupBehavior::Normal,
+                isolated_route_ids: self.app.isolated_routes(),
+            }
         };
+        let previous_isolated_routes = self.app.isolated_routes();
         let previous_config = self.config.clone();
         self.app.shutdown().await;
 
@@ -103,12 +132,23 @@ impl ManagedUdpProxy {
             self.telemetry.clone(),
             self.ingress_queue_depth,
             next_prepared.status,
-            startup_options,
+            startup_options.clone(),
         )
         .await
         {
             Ok(app) => {
                 let next_revision = self.config_revision + 1;
+                let next_isolated_routes = app.isolated_routes();
+                for route_id in previous_isolated_routes
+                    .iter()
+                    .filter(|route_id| !next_isolated_routes.contains(*route_id))
+                {
+                    self.telemetry
+                        .emit(rosc_telemetry::BrokerEvent::RouteIsolationChanged {
+                            route_id: route_id.clone(),
+                            isolated: false,
+                        });
+                }
                 emit_config_transition(
                     &self.telemetry,
                     next_revision,
@@ -176,6 +216,9 @@ async fn start_ingress_tasks(
         FrozenStartupBehavior::Normal => {}
         FrozenStartupBehavior::OperatorRequested => app.freeze_traffic(),
         FrozenStartupBehavior::Restored => app.restore_frozen_traffic(),
+    }
+    for route_id in &startup_options.isolated_route_ids {
+        app.restore_route_isolation(route_id);
     }
     app.spawn_ingress_tasks(ingress_queue_depth).await
 }

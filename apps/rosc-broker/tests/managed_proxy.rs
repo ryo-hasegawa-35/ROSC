@@ -254,6 +254,7 @@ async fn managed_proxy_start_frozen_blocks_startup_traffic_without_a_race() {
         ProxyLaunchProfileMode::Normal,
         ManagedProxyStartupOptions {
             frozen_behavior: FrozenStartupBehavior::OperatorRequested,
+            ..ManagedProxyStartupOptions::default()
         },
     )
     .await
@@ -349,6 +350,61 @@ async fn managed_proxy_can_freeze_and_thaw_traffic() {
 }
 
 #[tokio::test]
+async fn managed_proxy_can_isolate_and_restore_routes() {
+    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let ingress_addr = reserved.local_addr().unwrap();
+    drop(reserved);
+
+    let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let mut proxy = ManagedUdpProxy::start(
+        proxy_config(
+            &ingress_addr.to_string(),
+            &listener.local_addr().unwrap().to_string(),
+            "/render/isolation",
+        ),
+        InMemoryTelemetry::default(),
+        32,
+        ProxyRuntimeSafetyPolicy::default(),
+        ProxyLaunchProfileMode::Normal,
+        ManagedProxyStartupOptions::default(),
+    )
+    .await
+    .unwrap();
+
+    assert!(proxy.isolate_route("camera"));
+    let isolated_runtime = proxy
+        .app()
+        .status_snapshot()
+        .runtime
+        .expect("runtime snapshot should exist");
+    assert_eq!(isolated_runtime.isolated_route_ids, vec!["camera"]);
+
+    assert!(proxy.restore_route("camera"));
+    let restored_runtime = proxy
+        .app()
+        .status_snapshot()
+        .runtime
+        .expect("runtime snapshot should exist");
+    assert!(restored_runtime.isolated_route_ids.is_empty());
+    assert_eq!(
+        restored_runtime
+            .operator_actions_total
+            .get("isolate_route")
+            .copied(),
+        Some(1)
+    );
+    assert_eq!(
+        restored_runtime
+            .operator_actions_total
+            .get("restore_route")
+            .copied(),
+        Some(1)
+    );
+
+    proxy.shutdown().await;
+}
+
+#[tokio::test]
 async fn managed_proxy_preserves_frozen_state_across_reload() {
     let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let ingress_addr = reserved.local_addr().unwrap();
@@ -416,6 +472,78 @@ async fn managed_proxy_preserves_frozen_state_across_reload() {
     send_packet(
         proxy.app().ingress_local_addr("udp_localhost_in").unwrap(),
         86.0,
+    )
+    .await;
+    let message = recv_message(&second_listener).await;
+    assert_eq!(message.address, "/render/b");
+
+    proxy.shutdown().await;
+}
+
+#[tokio::test]
+async fn managed_proxy_preserves_route_isolation_across_reload() {
+    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let ingress_addr = reserved.local_addr().unwrap();
+    drop(reserved);
+
+    let first_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let second_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let config_a = proxy_config(
+        &ingress_addr.to_string(),
+        &first_listener.local_addr().unwrap().to_string(),
+        "/render/a",
+    );
+    let config_b = proxy_config(
+        &ingress_addr.to_string(),
+        &second_listener.local_addr().unwrap().to_string(),
+        "/render/b",
+    );
+
+    let mut proxy = ManagedUdpProxy::start(
+        config_a,
+        InMemoryTelemetry::default(),
+        32,
+        ProxyRuntimeSafetyPolicy::default(),
+        ProxyLaunchProfileMode::Normal,
+        ManagedProxyStartupOptions::default(),
+    )
+    .await
+    .unwrap();
+
+    assert!(proxy.isolate_route("camera"));
+    proxy.reload(config_b).await.unwrap();
+
+    let runtime = proxy
+        .app()
+        .status_snapshot()
+        .runtime
+        .expect("runtime snapshot should exist after reload");
+    assert_eq!(runtime.isolated_route_ids, vec!["camera"]);
+    assert_eq!(
+        runtime.operator_actions_total.get("isolate_route").copied(),
+        Some(1)
+    );
+
+    send_packet(
+        proxy.app().ingress_local_addr("udp_localhost_in").unwrap(),
+        88.0,
+    )
+    .await;
+    let mut buffer = [0u8; 2048];
+    let no_delivery = tokio::time::timeout(
+        Duration::from_millis(150),
+        second_listener.recv_from(&mut buffer),
+    )
+    .await;
+    assert!(
+        no_delivery.is_err(),
+        "reloaded isolated route should stay blocked"
+    );
+
+    assert!(proxy.restore_route("camera"));
+    send_packet(
+        proxy.app().ingress_local_addr("udp_localhost_in").unwrap(),
+        89.0,
     )
     .await;
     let message = recv_message(&second_listener).await;

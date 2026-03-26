@@ -58,8 +58,9 @@ pub fn proxy_startup_report_lines(status: &UdpProxyStatusSnapshot) -> Vec<String
 
     if let Some(runtime) = &status.runtime {
         lines.push(format!(
-            "proxy runtime: traffic_frozen={} config_revision={} config_rejections_total={} config_blocked_total={} config_reload_failures_total={}",
+            "proxy runtime: traffic_frozen={} isolated_routes={} config_revision={} config_rejections_total={} config_blocked_total={} config_reload_failures_total={}",
             runtime.traffic_frozen,
+            runtime.isolated_route_ids.len(),
             runtime.config_revision,
             runtime.config_rejections_total,
             runtime.config_blocked_total,

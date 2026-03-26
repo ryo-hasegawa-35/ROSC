@@ -208,6 +208,7 @@ async fn watch_udp_proxy(
             } else {
                 rosc_broker::FrozenStartupBehavior::Normal
             },
+            ..rosc_broker::ManagedProxyStartupOptions::default()
         },
     )
     .await?;
@@ -352,6 +353,7 @@ async fn run_udp_proxy(
             } else {
                 rosc_broker::FrozenStartupBehavior::Normal
             },
+            ..rosc_broker::ManagedProxyStartupOptions::default()
         },
     )
     .await?;

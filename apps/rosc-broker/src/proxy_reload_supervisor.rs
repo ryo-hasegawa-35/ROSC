@@ -82,6 +82,29 @@ impl ManagedProxyFileSupervisor {
         self.proxy.thaw_traffic();
     }
 
+    pub fn isolate_route(&self, route_id: &str) -> bool {
+        self.proxy.isolate_route(route_id)
+    }
+
+    pub fn restore_route(&self, route_id: &str) -> bool {
+        self.proxy.restore_route(route_id)
+    }
+
+    pub async fn rehydrate_destination(&self, destination_id: &str) -> Result<usize> {
+        self.proxy.rehydrate_destination(destination_id).await
+    }
+
+    pub async fn replay_route_to_sandbox(
+        &self,
+        route_id: &str,
+        sandbox_destination_id: &str,
+        limit: usize,
+    ) -> Result<usize> {
+        self.proxy
+            .replay_route_to_sandbox(route_id, sandbox_destination_id, limit)
+            .await
+    }
+
     pub async fn poll_once(&mut self) -> Result<ProxyReloadOutcome> {
         let raw_toml = read_config_file(&self.path)?;
         if self

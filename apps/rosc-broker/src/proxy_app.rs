@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use rosc_config::{BrokerConfig, DropPolicyConfig};
+use rosc_packet::PacketEnvelope;
 use rosc_recovery::{RecoveryEngine, RehydrateRequest, SandboxReplayRequest};
 use rosc_runtime::{
     BreakerPolicy, DestinationPolicy, DestinationRegistry, DestinationWorkerHandle, DropPolicy,
@@ -17,6 +18,7 @@ use crate::ProxyLaunchProfileStatus;
 use crate::proxy_status::{
     UdpProxyStatusSnapshot, attach_runtime_status, proxy_status_from_config,
 };
+use crate::route_control::RouteControlState;
 use crate::traffic_control::TrafficControlState;
 use rosc_runtime::IngressReceiver;
 
@@ -25,6 +27,7 @@ pub struct UdpProxyApp {
     recovery: Arc<RecoveryEngine<InMemoryTelemetry>>,
     destinations: Arc<DestinationRegistry>,
     traffic_control: TrafficControlState,
+    route_control: RouteControlState,
     ingress_specs: BTreeMap<String, IngressBindingSpec>,
     ingress_addrs: BTreeMap<String, SocketAddr>,
     ingresses: BTreeMap<String, UdpIngressBinding>,
@@ -99,6 +102,7 @@ impl UdpProxyApp {
             recovery,
             destinations: Arc::new(destinations),
             traffic_control: TrafficControlState::default(),
+            route_control: RouteControlState::default(),
             ingress_specs,
             ingress_addrs,
             ingresses,
@@ -161,6 +165,61 @@ impl UdpProxyApp {
         self.traffic_control.is_frozen()
     }
 
+    pub fn isolate_route(&self, route_id: &str) -> bool {
+        if !self.status.routes.iter().any(|route| route.id == route_id) {
+            return false;
+        }
+        let changed = self.route_control.isolate(route_id.to_owned());
+        if changed {
+            self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+                action: "isolate_route".to_owned(),
+            });
+            self.runtime
+                .telemetry
+                .emit(BrokerEvent::RouteIsolationChanged {
+                    route_id: route_id.to_owned(),
+                    isolated: true,
+                });
+        }
+        changed
+    }
+
+    pub fn restore_route(&self, route_id: &str) -> bool {
+        let changed = self.route_control.restore(route_id);
+        if changed {
+            self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+                action: "restore_route".to_owned(),
+            });
+            self.runtime
+                .telemetry
+                .emit(BrokerEvent::RouteIsolationChanged {
+                    route_id: route_id.to_owned(),
+                    isolated: false,
+                });
+        }
+        changed
+    }
+
+    pub fn restore_route_isolation(&self, route_id: &str) -> bool {
+        if !self.status.routes.iter().any(|route| route.id == route_id) {
+            return false;
+        }
+        let changed = self.route_control.isolate(route_id.to_owned());
+        if changed {
+            self.runtime
+                .telemetry
+                .emit(BrokerEvent::RouteIsolationChanged {
+                    route_id: route_id.to_owned(),
+                    isolated: true,
+                });
+        }
+        changed
+    }
+
+    pub fn isolated_routes(&self) -> Vec<String> {
+        self.route_control.snapshot()
+    }
+
     pub fn ingress_local_addr(&self, ingress_id: &str) -> Option<SocketAddr> {
         self.ingress_addrs.get(ingress_id).copied()
     }
@@ -181,10 +240,7 @@ impl UdpProxyApp {
             });
             return Ok(0);
         }
-        let outcome = self
-            .runtime
-            .dispatch_packet(&packet, &self.destinations)
-            .await;
+        let outcome = self.dispatch_packet(&packet).await;
         self.recovery
             .observe_dispatches(&outcome.successful_dispatches);
         for failure in &outcome.failures {
@@ -198,6 +254,9 @@ impl UdpProxyApp {
     }
 
     pub async fn rehydrate_destination(&self, destination_id: &str) -> Result<usize> {
+        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+            action: "rehydrate_destination".to_owned(),
+        });
         let outcome = self.recovery.rehydrate(RehydrateRequest {
             route_id: None,
             destination_id: Some(destination_id.to_owned()),
@@ -219,6 +278,9 @@ impl UdpProxyApp {
         sandbox_destination_id: &str,
         limit: usize,
     ) -> Result<usize> {
+        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+            action: "sandbox_replay".to_owned(),
+        });
         let outcome = self.recovery.sandbox_replay(SandboxReplayRequest {
             route_id: route_id.to_owned(),
             source_destination_id: None,
@@ -251,6 +313,7 @@ impl UdpProxyApp {
         let recovery = Arc::clone(&self.recovery);
         let destinations = Arc::clone(&self.destinations);
         let traffic_control = self.traffic_control.clone();
+        let route_control = self.route_control.clone();
         let dispatcher_traffic_control = traffic_control.clone();
         let dispatcher_shutdown = shutdown_rx.clone();
         self.tasks.dispatcher = Some(tokio::spawn(async move {
@@ -259,6 +322,7 @@ impl UdpProxyApp {
                 recovery,
                 destinations,
                 dispatcher_traffic_control,
+                route_control,
                 rx,
                 dispatcher_shutdown,
             )
@@ -329,6 +393,14 @@ impl UdpProxyApp {
         refresh_ingress_status(&mut self.status, &self.ingress_addrs);
         Ok(())
     }
+
+    async fn dispatch_packet(&self, packet: &PacketEnvelope) -> rosc_runtime::DispatchOutcome {
+        let outcome = self.runtime.route_outcome(packet);
+        let filtered = filter_isolated_routes(outcome, &self.route_control);
+        self.runtime
+            .dispatch_routing_outcome(filtered, &self.destinations)
+            .await
+    }
 }
 
 async fn run_dispatcher_loop(
@@ -336,6 +408,7 @@ async fn run_dispatcher_loop(
     recovery: Arc<RecoveryEngine<InMemoryTelemetry>>,
     destinations: Arc<DestinationRegistry>,
     traffic_control: TrafficControlState,
+    route_control: RouteControlState,
     mut rx: IngressReceiver,
     mut shutdown: watch::Receiver<bool>,
 ) {
@@ -354,7 +427,12 @@ async fn run_dispatcher_loop(
                     break;
                 }
 
-                let outcome = runtime.dispatch_packet(&packet, &destinations).await;
+                let outcome = runtime
+                    .dispatch_routing_outcome(
+                        filter_isolated_routes(runtime.route_outcome(&packet), &route_control),
+                        &destinations,
+                    )
+                    .await;
                 recovery.observe_dispatches(&outcome.successful_dispatches);
                 for failure in outcome.failures {
                     runtime.telemetry.emit(BrokerEvent::DispatchFailed {
@@ -366,6 +444,19 @@ async fn run_dispatcher_loop(
             }
         }
     }
+}
+
+fn filter_isolated_routes(
+    mut outcome: rosc_route::RoutingOutcome,
+    route_control: &RouteControlState,
+) -> rosc_route::RoutingOutcome {
+    outcome
+        .dispatches
+        .retain(|dispatch| !route_control.is_isolated(&dispatch.route_id));
+    outcome
+        .failures
+        .retain(|failure| !route_control.is_isolated(&failure.route_id));
+    outcome
 }
 
 async fn wait_until_dispatch_allowed(
@@ -545,7 +636,7 @@ fn ingress_receives_target(ingress_addr: SocketAddr, target: SocketAddr) -> bool
 
 #[cfg(test)]
 mod tests {
-    use super::{TrafficControlState, run_dispatcher_loop};
+    use super::{RouteControlState, TrafficControlState, run_dispatcher_loop};
     use std::sync::Arc;
     use std::time::{Duration, SystemTime};
 
@@ -634,6 +725,7 @@ mod tests {
             recovery,
             destinations,
             traffic_control.clone(),
+            RouteControlState::default(),
             rx,
             shutdown_rx,
         ));
