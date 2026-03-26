@@ -117,6 +117,12 @@ async fn managed_proxy_reloads_to_a_new_destination() {
         .runtime
         .expect("runtime snapshot should be present after reload");
     assert_eq!(runtime.config_revision, 2);
+    assert!(runtime.recent_config_events.iter().any(|event| event.kind
+        == rosc_telemetry::RecentConfigEventKind::Applied
+        && event.revision == Some(2)));
+    assert!(runtime.recent_config_events.iter().any(|event| event.kind
+        == rosc_telemetry::RecentConfigEventKind::LaunchProfileChanged
+        && event.revision == Some(2)));
 
     send_packet(
         proxy.app().ingress_local_addr("udp_localhost_in").unwrap(),
@@ -210,6 +216,17 @@ async fn managed_proxy_status_exposes_runtime_config_after_startup() {
     assert_eq!(runtime.config_rejections_total, 0);
     assert_eq!(runtime.config_blocked_total, 0);
     assert_eq!(runtime.config_reload_failures_total, 0);
+    assert_eq!(runtime.recent_config_events.len(), 2);
+    assert_eq!(
+        runtime.recent_config_events[0].kind,
+        rosc_telemetry::RecentConfigEventKind::Applied
+    );
+    assert_eq!(runtime.recent_config_events[0].revision, Some(1));
+    assert_eq!(
+        runtime.recent_config_events[1].kind,
+        rosc_telemetry::RecentConfigEventKind::LaunchProfileChanged
+    );
+    assert_eq!(runtime.recent_config_events[1].revision, Some(1));
 
     proxy.shutdown().await;
 }

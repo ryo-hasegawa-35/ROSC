@@ -1030,7 +1030,15 @@ mod tests {
         );
         assert_eq!(
             status["status"]["runtime"]["recent_config_events"][0]["kind"],
+            "Applied"
+        );
+        assert_eq!(
+            status["status"]["runtime"]["recent_config_events"][1]["kind"],
             "LaunchProfileChanged"
+        );
+        assert_eq!(
+            status["status"]["runtime"]["recent_config_events"][1]["revision"],
+            1
         );
 
         service.shutdown().await.unwrap();

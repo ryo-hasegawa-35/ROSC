@@ -43,13 +43,14 @@ impl ManagedUdpProxy {
     ) -> Result<Self> {
         let prepared = apply_launch_profile(&config, launch_profile_mode);
         let mut app = UdpProxyApp::from_config(&prepared.config, telemetry.clone()).await?;
-        app.set_launch_profile(prepared.status);
+        app.apply_launch_profile(prepared.status);
         let blockers = safety_policy.blockers(&app.status_snapshot());
         if !blockers.is_empty() {
             anyhow::bail!("udp proxy startup blocked:\n{}", format_blockers(blockers));
         }
         start_ingress_tasks(&mut app, ingress_queue_depth, startup_options).await?;
         emit_config_transition(&telemetry, 1, None, &config);
+        app.emit_launch_profile_event(1);
 
         Ok(Self {
             app,
@@ -176,6 +177,7 @@ impl ManagedUdpProxy {
                     Some(&self.config),
                     &next_config,
                 );
+                app.emit_launch_profile_event(next_revision);
                 self.app = app;
                 self.config = next_config;
                 self.config_revision = next_revision;
@@ -223,7 +225,7 @@ async fn start_app(
     startup_options: ManagedProxyStartupOptions,
 ) -> Result<UdpProxyApp> {
     let mut app = UdpProxyApp::from_config(config, telemetry).await?;
-    app.set_launch_profile(launch_profile);
+    app.apply_launch_profile(launch_profile);
     start_ingress_tasks(&mut app, ingress_queue_depth, startup_options).await?;
     Ok(app)
 }

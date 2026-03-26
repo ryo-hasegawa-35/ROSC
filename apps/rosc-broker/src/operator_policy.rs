@@ -66,7 +66,7 @@ pub fn proxy_operator_report(
     let warnings = operator_warnings(status);
     let blockers = policy.blockers(status);
     let highlights = operator_highlights(status);
-    let state = operator_state(status, &warnings, &blockers, &highlights);
+    let state = operator_state(status, &warnings, &blockers);
     let mut report_lines = proxy_startup_report_lines(status);
     report_lines.push(format!(
         "proxy operator state: state={} warnings={} blockers={} latest_operator_action={} latest_config_issue={}",
@@ -151,7 +151,6 @@ fn operator_state(
     status: &UdpProxyStatusSnapshot,
     warnings: &[String],
     blockers: &[String],
-    highlights: &ProxyOperatorHighlights,
 ) -> ProxyOperatorState {
     if !blockers.is_empty() {
         return ProxyOperatorState::Blocked;
@@ -161,7 +160,7 @@ fn operator_state(
         .runtime
         .as_ref()
         .is_some_and(|runtime| runtime.traffic_frozen || !runtime.isolated_route_ids.is_empty());
-    if !warnings.is_empty() || has_runtime_override || highlights.latest_config_issue.is_some() {
+    if !warnings.is_empty() || has_runtime_override {
         ProxyOperatorState::Warning
     } else {
         ProxyOperatorState::Healthy

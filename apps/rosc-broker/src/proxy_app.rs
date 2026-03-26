@@ -115,16 +115,24 @@ impl UdpProxyApp {
         attach_runtime_status(self.status.clone(), &self.telemetry_snapshot())
     }
 
-    pub fn set_launch_profile(&mut self, profile: ProxyLaunchProfileStatus) {
+    pub fn apply_launch_profile(&mut self, profile: ProxyLaunchProfileStatus) {
+        self.status.launch_profile = profile;
+    }
+
+    pub fn emit_launch_profile_event(&self, revision: u64) {
         self.runtime
             .telemetry
             .emit(BrokerEvent::LaunchProfileChanged {
-                mode: profile.mode.as_str().to_owned(),
-                disabled_capture_routes: profile.disabled_capture_routes.len(),
-                disabled_replay_routes: profile.disabled_replay_routes.len(),
-                disabled_restart_rehydrate_routes: profile.disabled_restart_rehydrate_routes.len(),
+                revision,
+                mode: self.status.launch_profile.mode.as_str().to_owned(),
+                disabled_capture_routes: self.status.launch_profile.disabled_capture_routes.len(),
+                disabled_replay_routes: self.status.launch_profile.disabled_replay_routes.len(),
+                disabled_restart_rehydrate_routes: self
+                    .status
+                    .launch_profile
+                    .disabled_restart_rehydrate_routes
+                    .len(),
             });
-        self.status.launch_profile = profile;
     }
 
     pub fn telemetry_snapshot(&self) -> HealthSnapshot {

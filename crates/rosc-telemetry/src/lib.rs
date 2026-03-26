@@ -125,6 +125,7 @@ pub enum BrokerEvent {
         reason: String,
     },
     LaunchProfileChanged {
+        revision: u64,
         mode: String,
         disabled_capture_routes: usize,
         disabled_replay_routes: usize,
@@ -683,6 +684,7 @@ impl TelemetrySink for InMemoryTelemetry {
                 push_recent(&mut snapshot.recent_config_events, record);
             }
             BrokerEvent::LaunchProfileChanged {
+                revision,
                 mode,
                 disabled_capture_routes,
                 disabled_replay_routes,
@@ -697,7 +699,7 @@ impl TelemetrySink for InMemoryTelemetry {
                     sequence: next_event_sequence(&mut snapshot),
                     recorded_at_unix_ms: unix_time_ms(),
                     kind: RecentConfigEventKind::LaunchProfileChanged,
-                    revision: Some(snapshot.config_revision),
+                    revision: Some(revision),
                     details: Vec::new(),
                     added_ingresses: 0,
                     removed_ingresses: 0,

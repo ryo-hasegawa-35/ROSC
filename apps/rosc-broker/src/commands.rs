@@ -111,7 +111,7 @@ async fn proxy_status(path: &Path, resolve_bindings: bool, safe_mode: bool) -> R
         let mut app =
             rosc_broker::UdpProxyApp::from_config(&prepared.config, InMemoryTelemetry::default())
                 .await?;
-        app.set_launch_profile(prepared.status);
+        app.apply_launch_profile(prepared.status);
         app.status_snapshot()
     } else {
         let mut status = rosc_broker::proxy_status_from_config(&prepared.config)?;

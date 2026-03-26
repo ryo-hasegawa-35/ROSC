@@ -93,6 +93,7 @@ fn in_memory_telemetry_renders_prometheus_text() {
         reason: "runtime replacement failed".to_owned(),
     });
     telemetry.emit(BrokerEvent::LaunchProfileChanged {
+        revision: 4,
         mode: "safe_mode".to_owned(),
         disabled_capture_routes: 1,
         disabled_replay_routes: 2,
@@ -169,6 +170,7 @@ fn in_memory_telemetry_renders_prometheus_text() {
         snapshot.recent_config_events[4].kind,
         RecentConfigEventKind::LaunchProfileChanged
     );
+    assert_eq!(snapshot.recent_config_events[4].revision, Some(4));
     assert_eq!(
         snapshot.recent_config_events[4]
             .launch_profile_mode

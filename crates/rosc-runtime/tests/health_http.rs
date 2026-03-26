@@ -12,6 +12,7 @@ async fn health_endpoint_serves_healthz_and_metrics() {
         route_id: "camera_fov".to_owned(),
     });
     telemetry.emit(BrokerEvent::LaunchProfileChanged {
+        revision: 1,
         mode: "safe_mode".to_owned(),
         disabled_capture_routes: 1,
         disabled_replay_routes: 0,

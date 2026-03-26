@@ -268,3 +268,99 @@ fn operator_report_surfaces_state_and_recent_highlights() {
             .any(|line| line.contains("latest_config_issue=reload_failed"))
     );
 }
+
+#[test]
+fn operator_report_returns_to_healthy_after_later_apply() {
+    let config = BrokerConfig::from_toml_str(
+        r#"
+        [[udp_ingresses]]
+        id = "udp_localhost_in"
+        bind = "127.0.0.1:0"
+        mode = "osc1_0_strict"
+
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "127.0.0.1:0"
+        target = "127.0.0.1:9001"
+
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+
+        [routes.match]
+        ingress_ids = ["udp_localhost_in"]
+        address_patterns = ["/ue5/camera/fov"]
+        protocols = ["osc_udp"]
+
+        [routes.fallback]
+        direct_udp_target = "127.0.0.1:9002"
+
+        [[routes.destinations]]
+        target = "udp_renderer"
+        transport = "osc_udp"
+        "#,
+    )
+    .expect("config should parse");
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            recent_config_events: vec![
+                RecentConfigEvent {
+                    sequence: 10,
+                    recorded_at_unix_ms: 1400,
+                    kind: RecentConfigEventKind::ReloadFailed,
+                    revision: Some(1),
+                    details: vec!["reload rollback happened".to_owned()],
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 0,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 0,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                },
+                RecentConfigEvent {
+                    sequence: 11,
+                    recorded_at_unix_ms: 1500,
+                    kind: RecentConfigEventKind::Applied,
+                    revision: Some(2),
+                    details: Vec::new(),
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 0,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 1,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                },
+            ],
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let report = proxy_operator_report(&status, ProxyRuntimeSafetyPolicy::default());
+
+    assert_eq!(report.state, ProxyOperatorState::Healthy);
+    assert_eq!(
+        report
+            .highlights
+            .latest_config_issue
+            .as_ref()
+            .map(|event| &event.kind),
+        Some(&RecentConfigEventKind::ReloadFailed)
+    );
+}
