@@ -1,7 +1,7 @@
 use std::io;
 use std::sync::Arc;
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result, anyhow, ensure};
 use serde::Serialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -19,14 +19,11 @@ pub struct ControlService {
 
 impl ControlService {
     pub async fn spawn(listen: &str, control: Arc<dyn ProxyControlPlane>) -> Result<Self> {
+        validate_control_listen_target(listen).await?;
         let listener = TcpListener::bind(listen)
             .await
             .with_context(|| format!("failed to bind control listener on {listen}"))?;
         let listen_addr = listener.local_addr()?;
-        ensure!(
-            listen_addr.ip().is_loopback(),
-            "control listener must bind to a loopback address, got {listen_addr}"
-        );
         let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
 
         let task = tokio::spawn(async move {
@@ -228,7 +225,9 @@ async fn route_nested_request(
         let Ok(sandbox_destination_id) = decode_uri_component(sandbox_destination_id) else {
             return invalid_component_error("sandbox destination id");
         };
-        let limit = replay_limit(query);
+        let Ok(limit) = replay_limit(query) else {
+            return invalid_query_error("limit");
+        };
         return map_route_result(
             "sandbox_replay",
             control
@@ -306,17 +305,22 @@ fn split_query(path: &str) -> (&str, Option<&str>) {
     }
 }
 
-fn replay_limit(query: Option<&str>) -> usize {
-    query
-        .and_then(|query| {
-            query.split('&').find_map(|pair| {
-                let (key, value) = pair.split_once('=')?;
-                (key == "limit").then_some(value)
-            })
+fn replay_limit(query: Option<&str>) -> Result<usize, ()> {
+    let Some(value) = query.and_then(|query| {
+        query.split('&').find_map(|pair| {
+            let (key, value) = pair.split_once('=')?;
+            (key == "limit").then_some(value)
         })
-        .and_then(|value| value.parse::<usize>().ok())
-        .filter(|limit| *limit > 0)
-        .unwrap_or(100)
+    }) else {
+        return Ok(100);
+    };
+
+    let limit = value.parse::<usize>().map_err(|_| ())?;
+    if limit == 0 {
+        return Err(());
+    }
+
+    Ok(limit)
 }
 
 fn decode_uri_component(component: &str) -> Result<String, ()> {
@@ -362,6 +366,38 @@ fn invalid_component_error(label: &str) -> HttpResponse {
             error: format!("invalid percent-encoding in {label}"),
         }),
     }
+}
+
+fn invalid_query_error(label: &str) -> HttpResponse {
+    HttpResponse {
+        status: "400 Bad Request",
+        body: ResponseBody::Error(ErrorResponse {
+            ok: false,
+            error: format!("invalid query parameter `{label}`"),
+        }),
+    }
+}
+
+async fn validate_control_listen_target(listen: &str) -> Result<()> {
+    let mut resolved_any = false;
+    for addr in tokio::net::lookup_host(listen)
+        .await
+        .with_context(|| format!("failed to resolve control listener on {listen}"))?
+    {
+        resolved_any = true;
+        ensure!(
+            addr.ip().is_loopback(),
+            "control listener must bind to a loopback address, got {addr}"
+        );
+    }
+
+    if !resolved_any {
+        return Err(anyhow!(
+            "failed to resolve control listener on {listen}: no socket addresses"
+        ));
+    }
+
+    Ok(())
 }
 
 async fn read_http_request(stream: &mut TcpStream) -> io::Result<HttpRequest> {
@@ -1030,6 +1066,52 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn control_service_rejects_invalid_replay_limit() {
+        let live_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let sandbox_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+        let proxy = Arc::new(Mutex::new(
+            ManagedUdpProxy::start(
+                replayable_proxy_config(
+                    "127.0.0.1:0",
+                    &live_listener.local_addr().unwrap().to_string(),
+                    &sandbox_listener.local_addr().unwrap().to_string(),
+                ),
+                InMemoryTelemetry::default(),
+                32,
+                ProxyRuntimeSafetyPolicy::default(),
+                ProxyLaunchProfileMode::Normal,
+                ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
+        let mut service = ControlService::spawn("127.0.0.1:0", controller)
+            .await
+            .unwrap();
+
+        let zero_response = request(
+            service.listen_addr(),
+            "POST /routes/camera/replay/sandbox_tap?limit=0 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        assert!(zero_response.contains("HTTP/1.1 400 Bad Request"));
+        assert!(zero_response.contains("invalid query parameter `limit`"));
+
+        let malformed_response = request(
+            service.listen_addr(),
+            "POST /routes/camera/replay/sandbox_tap?limit=1x HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        assert!(malformed_response.contains("HTTP/1.1 400 Bad Request"));
+        assert!(malformed_response.contains("invalid query parameter `limit`"));
+
+        service.shutdown().await.unwrap();
+        proxy.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
     async fn control_service_rejects_non_loopback_listener() {
         let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
 
@@ -1060,6 +1142,35 @@ mod tests {
             "unexpected error: {error:#}"
         );
 
+        proxy.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn control_service_accepts_localhost_listener() {
+        let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+        let proxy = Arc::new(Mutex::new(
+            ManagedUdpProxy::start(
+                proxy_config(
+                    "127.0.0.1:0",
+                    &destination_listener.local_addr().unwrap().to_string(),
+                ),
+                InMemoryTelemetry::default(),
+                32,
+                ProxyRuntimeSafetyPolicy::default(),
+                ProxyLaunchProfileMode::Normal,
+                ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
+        let mut service = ControlService::spawn("localhost:0", controller)
+            .await
+            .unwrap();
+        assert!(service.listen_addr().ip().is_loopback());
+
+        service.shutdown().await.unwrap();
         proxy.lock().await.shutdown().await;
     }
 }
