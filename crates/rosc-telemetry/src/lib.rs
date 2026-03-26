@@ -89,6 +89,9 @@ pub enum BrokerEvent {
         state: BreakerStateSnapshot,
         reason: String,
     },
+    OperatorAction {
+        action: String,
+    },
     ConfigApplied {
         revision: u64,
         added_ingresses: usize,
@@ -149,6 +152,7 @@ pub struct HealthSnapshot {
     pub destination_drops_total: BTreeMap<(String, String), u64>,
     pub destination_send_failures_total: BTreeMap<(String, String), u64>,
     pub destination_breaker_state: BTreeMap<String, BreakerStateSnapshot>,
+    pub operator_actions_total: BTreeMap<String, u64>,
     pub traffic_frozen: bool,
     pub config_revision: u64,
     pub config_added_ingresses_total: u64,
@@ -300,6 +304,13 @@ impl InMemoryTelemetry {
                 output,
                 "rosc_destination_breaker_state{{destination_id=\"{destination_id}\"}} {}",
                 state.as_metric_value()
+            );
+        }
+
+        for (action, count) in snapshot.operator_actions_total {
+            let _ = writeln!(
+                output,
+                "rosc_operator_actions_total{{action=\"{action}\"}} {count}"
             );
         }
 
@@ -507,6 +518,9 @@ impl TelemetrySink for InMemoryTelemetry {
                 snapshot
                     .destination_breaker_state
                     .insert(destination_id, state);
+            }
+            BrokerEvent::OperatorAction { action } => {
+                *snapshot.operator_actions_total.entry(action).or_default() += 1;
             }
             BrokerEvent::TrafficFreezeChanged { frozen } => {
                 snapshot.traffic_frozen = frozen;

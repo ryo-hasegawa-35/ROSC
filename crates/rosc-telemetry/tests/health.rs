@@ -61,6 +61,9 @@ fn in_memory_telemetry_renders_prometheus_text() {
         state: BreakerStateSnapshot::HalfOpen,
         reason: "cooldown_elapsed".to_owned(),
     });
+    telemetry.emit(BrokerEvent::OperatorAction {
+        action: "freeze_traffic".to_owned(),
+    });
     telemetry.emit(BrokerEvent::TrafficFreezeChanged { frozen: true });
     telemetry.emit(BrokerEvent::ConfigApplied {
         revision: 4,
@@ -110,6 +113,7 @@ fn in_memory_telemetry_renders_prometheus_text() {
         "rosc_destination_drops_total{destination_id=\"udp_renderer\",reason=\"queue_overflow\"} 1"
     ));
     assert!(text.contains("rosc_destination_breaker_state{destination_id=\"udp_renderer\"} 2"));
+    assert!(text.contains("rosc_operator_actions_total{action=\"freeze_traffic\"} 1"));
     assert!(text.contains("rosc_traffic_frozen 1"));
     assert!(text.contains("rosc_config_revision 4"));
     assert!(text.contains("rosc_config_added_ingresses_total 1"));

@@ -307,3 +307,47 @@ async fn proxy_reload_supervisor_applies_single_config_transition_per_reload() {
     supervisor.shutdown().await;
     let _ = fs::remove_file(path);
 }
+
+#[tokio::test]
+async fn proxy_reload_supervisor_can_start_frozen() {
+    let path = unique_config_path();
+    let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let telemetry = InMemoryTelemetry::default();
+
+    fs::write(
+        &path,
+        proxy_config(
+            "127.0.0.1:0",
+            &listener.local_addr().unwrap().to_string(),
+            "/render/frozen",
+        ),
+    )
+    .unwrap();
+
+    let mut supervisor = ManagedProxyFileSupervisor::start(
+        &path,
+        telemetry,
+        32,
+        ProxyRuntimeSafetyPolicy::default(),
+        ProxyLaunchProfileMode::Normal,
+    )
+    .await
+    .unwrap();
+    supervisor.freeze_traffic();
+
+    let runtime = supervisor
+        .status_snapshot()
+        .runtime
+        .expect("managed proxy status should expose runtime");
+    assert!(runtime.traffic_frozen);
+    assert_eq!(
+        runtime
+            .operator_actions_total
+            .get("freeze_traffic")
+            .copied(),
+        Some(1)
+    );
+
+    supervisor.shutdown().await;
+    let _ = fs::remove_file(path);
+}

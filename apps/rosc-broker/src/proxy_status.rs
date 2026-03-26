@@ -36,6 +36,7 @@ pub struct UdpProxySummary {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct UdpProxyRuntimeStatus {
     pub traffic_frozen: bool,
+    pub operator_actions_total: BTreeMap<String, u64>,
     pub config_revision: u64,
     pub config_rejections_total: u64,
     pub config_blocked_total: u64,
@@ -323,6 +324,7 @@ pub fn attach_runtime_status(
 ) -> UdpProxyStatusSnapshot {
     status.runtime = Some(UdpProxyRuntimeStatus {
         traffic_frozen: snapshot.traffic_frozen,
+        operator_actions_total: snapshot.operator_actions_total.clone(),
         config_revision: snapshot.config_revision,
         config_rejections_total: snapshot.config_rejections_total,
         config_blocked_total: snapshot.config_blocked_total,

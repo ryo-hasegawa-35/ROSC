@@ -240,23 +240,33 @@ async fn managed_proxy_can_freeze_and_thaw_traffic() {
     .unwrap();
 
     proxy.freeze_traffic();
-    assert!(
-        proxy
-            .app()
-            .status_snapshot()
-            .runtime
-            .expect("runtime snapshot should exist")
-            .traffic_frozen
+    let frozen_runtime = proxy
+        .app()
+        .status_snapshot()
+        .runtime
+        .expect("runtime snapshot should exist");
+    assert!(frozen_runtime.traffic_frozen);
+    assert_eq!(
+        frozen_runtime
+            .operator_actions_total
+            .get("freeze_traffic")
+            .copied(),
+        Some(1)
     );
 
     proxy.thaw_traffic();
-    assert!(
-        !proxy
-            .app()
-            .status_snapshot()
-            .runtime
-            .expect("runtime snapshot should exist")
-            .traffic_frozen
+    let thawed_runtime = proxy
+        .app()
+        .status_snapshot()
+        .runtime
+        .expect("runtime snapshot should exist");
+    assert!(!thawed_runtime.traffic_frozen);
+    assert_eq!(
+        thawed_runtime
+            .operator_actions_total
+            .get("thaw_traffic")
+            .copied(),
+        Some(1)
     );
 
     proxy.shutdown().await;

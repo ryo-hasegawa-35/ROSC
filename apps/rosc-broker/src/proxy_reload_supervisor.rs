@@ -71,6 +71,14 @@ impl ManagedProxyFileSupervisor {
         &self.proxy
     }
 
+    pub fn freeze_traffic(&self) {
+        self.proxy.freeze_traffic();
+    }
+
+    pub fn thaw_traffic(&self) {
+        self.proxy.thaw_traffic();
+    }
+
     pub async fn poll_once(&mut self) -> Result<ProxyReloadOutcome> {
         let raw_toml = read_config_file(&self.path)?;
         if self

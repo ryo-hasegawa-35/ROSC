@@ -44,6 +44,8 @@ pub enum Command {
         require_fallback_ready: bool,
         #[arg(long)]
         safe_mode: bool,
+        #[arg(long)]
+        start_frozen: bool,
     },
     DiffConfig {
         current: PathBuf,
@@ -66,5 +68,7 @@ pub enum Command {
         require_fallback_ready: bool,
         #[arg(long)]
         safe_mode: bool,
+        #[arg(long)]
+        start_frozen: bool,
     },
 }

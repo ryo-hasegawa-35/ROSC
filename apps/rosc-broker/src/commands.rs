@@ -7,6 +7,14 @@ use rosc_telemetry::InMemoryTelemetry;
 
 use crate::cli::Command;
 
+#[derive(Clone, Copy)]
+struct ProxyCommandOptions {
+    fail_on_warnings: bool,
+    require_fallback_ready: bool,
+    safe_mode: bool,
+    start_frozen: bool,
+}
+
 pub async fn run(command: Command) -> Result<()> {
     match command {
         Command::CheckConfig { path } => check_config(&path).await,
@@ -29,15 +37,19 @@ pub async fn run(command: Command) -> Result<()> {
             fail_on_warnings,
             require_fallback_ready,
             safe_mode,
+            start_frozen,
         } => {
             watch_udp_proxy(
                 &config,
                 poll_ms,
                 ingress_queue_depth,
                 health_listen.as_deref(),
-                fail_on_warnings,
-                require_fallback_ready,
-                safe_mode,
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen,
+                },
             )
             .await
         }
@@ -50,14 +62,18 @@ pub async fn run(command: Command) -> Result<()> {
             fail_on_warnings,
             require_fallback_ready,
             safe_mode,
+            start_frozen,
         } => {
             run_udp_proxy(
                 &config,
                 ingress_queue_depth,
                 health_listen.as_deref(),
-                fail_on_warnings,
-                require_fallback_ready,
-                safe_mode,
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen,
+                },
             )
             .await
         }
@@ -168,16 +184,14 @@ async fn watch_udp_proxy(
     poll_ms: u64,
     ingress_queue_depth: usize,
     health_listen: Option<&str>,
-    fail_on_warnings: bool,
-    require_fallback_ready: bool,
-    safe_mode: bool,
+    options: ProxyCommandOptions,
 ) -> Result<()> {
     let safety_policy = rosc_broker::ProxyRuntimeSafetyPolicy {
-        fail_on_warnings,
-        require_fallback_ready,
+        fail_on_warnings: options.fail_on_warnings,
+        require_fallback_ready: options.require_fallback_ready,
     };
     let telemetry = InMemoryTelemetry::default();
-    let launch_profile_mode = if safe_mode {
+    let launch_profile_mode = if options.safe_mode {
         rosc_broker::ProxyLaunchProfileMode::SafeMode
     } else {
         rosc_broker::ProxyLaunchProfileMode::Normal
@@ -190,6 +204,9 @@ async fn watch_udp_proxy(
         launch_profile_mode,
     )
     .await?;
+    if options.start_frozen {
+        supervisor.freeze_traffic();
+    }
     let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
     print_proxy_report(&supervisor.status_snapshot());
     println!(
@@ -303,22 +320,20 @@ async fn run_udp_proxy(
     path: &Path,
     ingress_queue_depth: usize,
     health_listen: Option<&str>,
-    fail_on_warnings: bool,
-    require_fallback_ready: bool,
-    safe_mode: bool,
+    options: ProxyCommandOptions,
 ) -> Result<()> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("failed to read config file {}", path.display()))?;
     let config = rosc_config::BrokerConfig::from_toml_str(&content)?;
-    let launch_profile_mode = if safe_mode {
+    let launch_profile_mode = if options.safe_mode {
         rosc_broker::ProxyLaunchProfileMode::SafeMode
     } else {
         rosc_broker::ProxyLaunchProfileMode::Normal
     };
 
     let safety_policy = rosc_broker::ProxyRuntimeSafetyPolicy {
-        fail_on_warnings,
-        require_fallback_ready,
+        fail_on_warnings: options.fail_on_warnings,
+        require_fallback_ready: options.require_fallback_ready,
     };
     let telemetry = InMemoryTelemetry::default();
     let mut proxy = rosc_broker::ManagedUdpProxy::start(
@@ -329,6 +344,9 @@ async fn run_udp_proxy(
         launch_profile_mode,
     )
     .await?;
+    if options.start_frozen {
+        proxy.freeze_traffic();
+    }
     let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
     print_proxy_report(&proxy.app().status_snapshot());
     println!("udp proxy running; press Ctrl-C to stop");

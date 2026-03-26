@@ -127,6 +127,9 @@ impl UdpProxyApp {
     }
 
     pub fn freeze_traffic(&self) {
+        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+            action: "freeze_traffic".to_owned(),
+        });
         self.traffic_control.freeze();
         self.runtime
             .telemetry
@@ -134,6 +137,9 @@ impl UdpProxyApp {
     }
 
     pub fn thaw_traffic(&self) {
+        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+            action: "thaw_traffic".to_owned(),
+        });
         self.traffic_control.thaw();
         self.runtime
             .telemetry
