@@ -18,6 +18,7 @@ use crate::proxy_status::{
     UdpProxyStatusSnapshot, attach_runtime_status, proxy_status_from_config,
 };
 use crate::traffic_control::TrafficControlState;
+use rosc_runtime::IngressReceiver;
 
 pub struct UdpProxyApp {
     runtime: Arc<Runtime<InMemoryTelemetry>>,
@@ -227,7 +228,7 @@ impl UdpProxyApp {
         }
         self.ensure_ingresses_bound().await?;
 
-        let (queue, mut rx) = IngressQueue::new(QueuePolicy {
+        let (queue, rx) = IngressQueue::new(QueuePolicy {
             max_depth: ingress_queue_depth,
         });
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
@@ -236,30 +237,18 @@ impl UdpProxyApp {
         let recovery = Arc::clone(&self.recovery);
         let destinations = Arc::clone(&self.destinations);
         let traffic_control = self.traffic_control.clone();
-        let mut dispatcher_shutdown = shutdown_rx.clone();
+        let dispatcher_traffic_control = traffic_control.clone();
+        let dispatcher_shutdown = shutdown_rx.clone();
         self.tasks.dispatcher = Some(tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    biased;
-                    _ = dispatcher_shutdown.changed() => {
-                        break;
-                    }
-                    packet = rx.recv() => {
-                        let Some(packet) = packet else {
-                            break;
-                        };
-                        let outcome = runtime.dispatch_packet(&packet, &destinations).await;
-                        recovery.observe_dispatches(&outcome.successful_dispatches);
-                        for failure in outcome.failures {
-                            runtime.telemetry.emit(BrokerEvent::DispatchFailed {
-                                route_id: failure.route_id,
-                                destination_id: failure.destination_id,
-                                reason: failure.reason,
-                            });
-                        }
-                    }
-                }
-            }
+            run_dispatcher_loop(
+                runtime,
+                recovery,
+                destinations,
+                dispatcher_traffic_control,
+                rx,
+                dispatcher_shutdown,
+            )
+            .await;
         }));
 
         for (ingress_id, binding) in std::mem::take(&mut self.ingresses) {
@@ -326,6 +315,57 @@ impl UdpProxyApp {
         refresh_ingress_status(&mut self.status, &self.ingress_addrs);
         Ok(())
     }
+}
+
+async fn run_dispatcher_loop(
+    runtime: Arc<Runtime<InMemoryTelemetry>>,
+    recovery: Arc<RecoveryEngine<InMemoryTelemetry>>,
+    destinations: Arc<DestinationRegistry>,
+    traffic_control: TrafficControlState,
+    mut rx: IngressReceiver,
+    mut shutdown: watch::Receiver<bool>,
+) {
+    loop {
+        tokio::select! {
+            biased;
+            _ = shutdown.changed() => {
+                break;
+            }
+            packet = rx.recv() => {
+                let Some(packet) = packet else {
+                    break;
+                };
+
+                if !wait_until_dispatch_allowed(&traffic_control, &mut shutdown).await {
+                    break;
+                }
+
+                let outcome = runtime.dispatch_packet(&packet, &destinations).await;
+                recovery.observe_dispatches(&outcome.successful_dispatches);
+                for failure in outcome.failures {
+                    runtime.telemetry.emit(BrokerEvent::DispatchFailed {
+                        route_id: failure.route_id,
+                        destination_id: failure.destination_id,
+                        reason: failure.reason,
+                    });
+                }
+            }
+        }
+    }
+}
+
+async fn wait_until_dispatch_allowed(
+    traffic_control: &TrafficControlState,
+    shutdown: &mut watch::Receiver<bool>,
+) -> bool {
+    while traffic_control.is_frozen() {
+        tokio::select! {
+            biased;
+            _ = shutdown.changed() => return false,
+            _ = traffic_control.wait_until_thawed() => {}
+        }
+    }
+    true
 }
 
 async fn bind_ingresses(config: &BrokerConfig) -> Result<BTreeMap<String, UdpIngressBinding>> {
@@ -481,5 +521,138 @@ fn ingress_receives_target(ingress_addr: SocketAddr, target: SocketAddr) -> bool
             ingress_ip.is_unspecified() && (target_ip.is_loopback() || target_ip.is_unspecified())
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TrafficControlState, run_dispatcher_loop};
+    use std::sync::Arc;
+    use std::time::{Duration, SystemTime};
+
+    use rosc_osc::{
+        CompatibilityMode, OscArgument, OscMessage, ParsedOscPacket, TypeTagSource, encode_packet,
+    };
+    use rosc_packet::{IngressMetadata, PacketEnvelope, TransportKind};
+    use rosc_recovery::RecoveryEngine;
+    use rosc_route::RoutingEngine;
+    use rosc_runtime::{
+        BreakerPolicy, DestinationPolicy, DestinationRegistry, DestinationWorkerHandle, DropPolicy,
+        IngressQueue, QueuePolicy, Runtime, UdpEgressSink,
+    };
+    use rosc_telemetry::InMemoryTelemetry;
+    use tokio::net::UdpSocket;
+    use tokio::sync::watch;
+
+    #[tokio::test]
+    async fn dispatcher_holds_queued_packet_while_traffic_is_frozen() {
+        let config = rosc_config::BrokerConfig::from_toml_str(
+            r#"
+            [[udp_ingresses]]
+            id = "udp_localhost_in"
+            bind = "127.0.0.1:0"
+            mode = "osc1_0_strict"
+
+            [[udp_destinations]]
+            id = "udp_renderer"
+            bind = "127.0.0.1:0"
+            target = "127.0.0.1:9001"
+
+            [[routes]]
+            id = "camera"
+            enabled = true
+            mode = "osc1_0_strict"
+            class = "StatefulControl"
+
+            [routes.match]
+            ingress_ids = ["udp_localhost_in"]
+            address_patterns = ["/ue5/camera/fov"]
+            protocols = ["osc_udp"]
+
+            [routes.transform]
+            rename_address = "/render/camera/fov"
+
+            [[routes.destinations]]
+            target = "udp_renderer"
+            transport = "osc_udp"
+            "#,
+        )
+        .unwrap();
+
+        let telemetry = InMemoryTelemetry::default();
+        let runtime = Arc::new(Runtime {
+            routing: RoutingEngine::new(config.routes).unwrap(),
+            telemetry: telemetry.clone(),
+        });
+        let recovery = Arc::new(RecoveryEngine::new(telemetry));
+        let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let sink = Arc::new(
+            UdpEgressSink::bind("127.0.0.1:0", listener.local_addr().unwrap())
+                .await
+                .unwrap(),
+        );
+
+        let mut destinations = DestinationRegistry::default();
+        destinations.register(DestinationWorkerHandle::spawn(
+            "udp_renderer",
+            DestinationPolicy {
+                queue_depth: 8,
+                drop_policy: DropPolicy::DropOldest,
+                breaker: BreakerPolicy::default(),
+            },
+            sink,
+            Arc::new(InMemoryTelemetry::default()),
+        ));
+        let destinations = Arc::new(destinations);
+
+        let traffic_control = TrafficControlState::default();
+        traffic_control.freeze();
+
+        let (queue, rx) = IngressQueue::new(QueuePolicy { max_depth: 8 });
+        let (_shutdown_tx, shutdown_rx) = watch::channel(false);
+        let dispatcher = tokio::spawn(run_dispatcher_loop(
+            runtime,
+            recovery,
+            destinations,
+            traffic_control.clone(),
+            rx,
+            shutdown_rx,
+        ));
+
+        let payload = encode_packet(&ParsedOscPacket::Message(OscMessage {
+            address: "/ue5/camera/fov".to_owned(),
+            type_tag_source: TypeTagSource::Explicit,
+            arguments: vec![OscArgument::Float32(80.0)],
+        }))
+        .unwrap();
+        let packet = PacketEnvelope::parse_osc(
+            payload,
+            IngressMetadata {
+                ingress_id: "udp_localhost_in".to_owned(),
+                transport: TransportKind::OscUdp,
+                source_endpoint: Some("127.0.0.1:4000".to_owned()),
+                compatibility_mode: CompatibilityMode::Osc1_0Strict,
+                received_at: SystemTime::now(),
+            },
+        )
+        .unwrap();
+        queue.try_send(packet).unwrap();
+
+        let mut buffer = vec![0u8; 2048];
+        let frozen_send =
+            tokio::time::timeout(Duration::from_millis(150), listener.recv_from(&mut buffer)).await;
+        assert!(
+            frozen_send.is_err(),
+            "queued packet should not dispatch while frozen"
+        );
+
+        traffic_control.thaw();
+        let _ = tokio::time::timeout(Duration::from_secs(1), listener.recv_from(&mut buffer))
+            .await
+            .expect("queued packet should dispatch after thaw")
+            .expect("queued packet receive should succeed");
+
+        dispatcher.abort();
+        let _ = dispatcher.await;
     }
 }

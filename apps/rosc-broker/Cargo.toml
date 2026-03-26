@@ -17,3 +17,6 @@ rosc-telemetry = { path = "../../crates/rosc-telemetry" }
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
+
+[dev-dependencies]
+rosc-packet = { path = "../../crates/rosc-packet" }
