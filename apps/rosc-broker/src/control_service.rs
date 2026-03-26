@@ -628,14 +628,11 @@ mod tests {
     #[tokio::test]
     async fn control_service_freezes_and_thaws_live_proxy() {
         let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let ingress_addr = reserved.local_addr().unwrap();
-        drop(reserved);
 
         let proxy = Arc::new(Mutex::new(
             ManagedUdpProxy::start(
                 proxy_config(
-                    &ingress_addr.to_string(),
+                    "127.0.0.1:0",
                     &destination_listener.local_addr().unwrap().to_string(),
                 ),
                 InMemoryTelemetry::default(),
@@ -647,6 +644,12 @@ mod tests {
             .await
             .unwrap(),
         ));
+        let ingress_addr = proxy
+            .lock()
+            .await
+            .app()
+            .ingress_local_addr("udp_localhost_in")
+            .unwrap();
         let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
         let mut service = ControlService::spawn("127.0.0.1:0", controller)
             .await
@@ -700,14 +703,11 @@ mod tests {
     #[tokio::test]
     async fn control_service_can_isolate_routes_and_report_unknown_routes() {
         let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let ingress_addr = reserved.local_addr().unwrap();
-        drop(reserved);
 
         let proxy = Arc::new(Mutex::new(
             ManagedUdpProxy::start(
                 proxy_config(
-                    &ingress_addr.to_string(),
+                    "127.0.0.1:0",
                     &destination_listener.local_addr().unwrap().to_string(),
                 ),
                 InMemoryTelemetry::default(),
@@ -755,14 +755,11 @@ mod tests {
     #[tokio::test]
     async fn control_service_can_restore_all_isolated_routes() {
         let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let ingress_addr = reserved.local_addr().unwrap();
-        drop(reserved);
 
         let proxy = Arc::new(Mutex::new(
             ManagedUdpProxy::start(
                 proxy_config(
-                    &ingress_addr.to_string(),
+                    "127.0.0.1:0",
                     &destination_listener.local_addr().unwrap().to_string(),
                 ),
                 InMemoryTelemetry::default(),
@@ -774,6 +771,12 @@ mod tests {
             .await
             .unwrap(),
         ));
+        let ingress_addr = proxy
+            .lock()
+            .await
+            .app()
+            .ingress_local_addr("udp_localhost_in")
+            .unwrap();
         let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
         let mut service = ControlService::spawn("127.0.0.1:0", controller)
             .await
@@ -813,14 +816,11 @@ mod tests {
     async fn control_service_can_rehydrate_and_replay_to_sandbox() {
         let live_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         let sandbox_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let ingress_addr = reserved.local_addr().unwrap();
-        drop(reserved);
 
         let proxy = Arc::new(Mutex::new(
             ManagedUdpProxy::start(
                 replayable_proxy_config(
-                    &ingress_addr.to_string(),
+                    "127.0.0.1:0",
                     &live_listener.local_addr().unwrap().to_string(),
                     &sandbox_listener.local_addr().unwrap().to_string(),
                 ),
@@ -833,6 +833,12 @@ mod tests {
             .await
             .unwrap(),
         ));
+        let ingress_addr = proxy
+            .lock()
+            .await
+            .app()
+            .ingress_local_addr("udp_localhost_in")
+            .unwrap();
         let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
         let mut service = ControlService::spawn("127.0.0.1:0", controller)
             .await
@@ -904,16 +910,13 @@ mod tests {
     #[tokio::test]
     async fn control_service_decodes_percent_encoded_route_and_destination_ids() {
         let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let ingress_addr = reserved.local_addr().unwrap();
-        drop(reserved);
 
         let route_id = "camera/main?1";
         let destination_id = "udp/renderer?1";
         let proxy = Arc::new(Mutex::new(
             ManagedUdpProxy::start(
                 custom_id_proxy_config(
-                    &ingress_addr.to_string(),
+                    "127.0.0.1:0",
                     &destination_listener.local_addr().unwrap().to_string(),
                     destination_id,
                     route_id,
@@ -927,6 +930,12 @@ mod tests {
             .await
             .unwrap(),
         ));
+        let ingress_addr = proxy
+            .lock()
+            .await
+            .app()
+            .ingress_local_addr("udp_localhost_in")
+            .unwrap();
         let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
         let mut service = ControlService::spawn("127.0.0.1:0", controller)
             .await
@@ -983,14 +992,11 @@ mod tests {
     #[tokio::test]
     async fn control_service_rejects_invalid_percent_encoding() {
         let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let ingress_addr = reserved.local_addr().unwrap();
-        drop(reserved);
 
         let proxy = Arc::new(Mutex::new(
             ManagedUdpProxy::start(
                 proxy_config(
-                    &ingress_addr.to_string(),
+                    "127.0.0.1:0",
                     &destination_listener.local_addr().unwrap().to_string(),
                 ),
                 InMemoryTelemetry::default(),
