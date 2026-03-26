@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, ensure};
+use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 use serde::Serialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -140,6 +141,18 @@ struct ActionResponse {
 }
 
 #[derive(Serialize)]
+struct RecentOperatorActionsResponse {
+    ok: bool,
+    actions: Vec<RecentOperatorAction>,
+}
+
+#[derive(Serialize)]
+struct RecentConfigEventsResponse {
+    ok: bool,
+    events: Vec<RecentConfigEvent>,
+}
+
+#[derive(Serialize)]
 struct ErrorResponse {
     ok: bool,
     error: String,
@@ -190,7 +203,8 @@ async fn serve_control_connection(
 }
 
 async fn route_request(request: HttpRequest, control: Arc<dyn ProxyControlPlane>) -> HttpResponse {
-    match (request.method.as_str(), request.path.as_str()) {
+    let (path, query) = split_query(&request.path);
+    match (request.method.as_str(), path) {
         ("GET", "/status") => HttpResponse {
             status: "200 OK",
             body: ResponseBody::Status(StatusResponse {
@@ -198,6 +212,46 @@ async fn route_request(request: HttpRequest, control: Arc<dyn ProxyControlPlane>
                 status: control.status_snapshot().await,
             }),
         },
+        ("GET", "/history/operator-actions") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            let status = control.status_snapshot().await;
+            let actions = bounded_recent_history(
+                status
+                    .runtime
+                    .map(|runtime| runtime.recent_operator_actions)
+                    .unwrap_or_default(),
+                limit,
+            );
+            HttpResponse {
+                status: "200 OK",
+                body: ResponseBody::RecentOperatorActions(RecentOperatorActionsResponse {
+                    ok: true,
+                    actions,
+                }),
+            }
+        }
+        ("GET", "/history/config-events") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            let status = control.status_snapshot().await;
+            let events = bounded_recent_history(
+                status
+                    .runtime
+                    .map(|runtime| runtime.recent_config_events)
+                    .unwrap_or_default(),
+                limit,
+            );
+            HttpResponse {
+                status: "200 OK",
+                body: ResponseBody::RecentConfigEvents(RecentConfigEventsResponse {
+                    ok: true,
+                    events,
+                }),
+            }
+        }
         ("POST", "/freeze") => HttpResponse {
             status: "200 OK",
             body: ResponseBody::Action(action_response(
@@ -219,16 +273,17 @@ async fn route_request(request: HttpRequest, control: Arc<dyn ProxyControlPlane>
                 control.restore_all_routes().await,
             )),
         },
-        _ => route_nested_request(&request, control).await,
+        _ => route_nested_request(&request, path, query, control).await,
     }
 }
 
 async fn route_nested_request(
     request: &HttpRequest,
+    path: &str,
+    query: Option<&str>,
     control: Arc<dyn ProxyControlPlane>,
 ) -> HttpResponse {
-    if let Some(destination_id) = request
-        .path
+    if let Some(destination_id) = path
         .strip_prefix("/destinations/")
         .and_then(|path| path.strip_suffix("/rehydrate"))
     {
@@ -244,7 +299,7 @@ async fn route_nested_request(
         );
     }
 
-    let Some(route_path) = request.path.strip_prefix("/routes/") else {
+    let Some(route_path) = path.strip_prefix("/routes/") else {
         return HttpResponse {
             status: "404 Not Found",
             body: ResponseBody::Error(ErrorResponse {
@@ -253,7 +308,6 @@ async fn route_nested_request(
             }),
         };
     };
-    let (route_path, query) = split_query(route_path);
 
     if let Some(route_id) = route_path.strip_suffix("/isolate") {
         if request.method != "POST" || route_id.is_empty() {
@@ -366,12 +420,7 @@ fn split_query(path: &str) -> (&str, Option<&str>) {
 }
 
 fn replay_limit(query: Option<&str>) -> Result<usize, ()> {
-    let Some(value) = query.and_then(|query| {
-        query.split('&').find_map(|pair| {
-            let (key, value) = pair.split_once('=')?;
-            (key == "limit").then_some(value)
-        })
-    }) else {
+    let Some(value) = query_parameter(query, "limit") else {
         return Ok(100);
     };
 
@@ -381,6 +430,38 @@ fn replay_limit(query: Option<&str>) -> Result<usize, ()> {
     }
 
     Ok(limit)
+}
+
+fn history_limit(query: Option<&str>) -> Result<Option<usize>, ()> {
+    let Some(value) = query_parameter(query, "limit") else {
+        return Ok(None);
+    };
+
+    let limit = value.parse::<usize>().map_err(|_| ())?;
+    if limit == 0 {
+        return Err(());
+    }
+
+    Ok(Some(limit))
+}
+
+fn query_parameter<'a>(query: Option<&'a str>, key: &str) -> Option<&'a str> {
+    query.and_then(|query| {
+        query.split('&').find_map(|pair| {
+            let (parameter_key, value) = pair.split_once('=')?;
+            (parameter_key == key).then_some(value)
+        })
+    })
+}
+
+fn bounded_recent_history<T>(entries: Vec<T>, limit: Option<usize>) -> Vec<T> {
+    match limit {
+        Some(limit) if entries.len() > limit => {
+            let start = entries.len() - limit;
+            entries.into_iter().skip(start).collect()
+        }
+        _ => entries,
+    }
 }
 
 fn decode_uri_component(component: &str) -> Result<String, ()> {
@@ -526,6 +607,8 @@ async fn write_json_response(
 enum ResponseBody {
     Status(StatusResponse),
     Action(ActionResponse),
+    RecentOperatorActions(RecentOperatorActionsResponse),
+    RecentConfigEvents(RecentConfigEventsResponse),
     Error(ErrorResponse),
 }
 
@@ -539,6 +622,8 @@ impl ResponseBody {
         match self {
             Self::Status(body) => serde_json::to_vec(body),
             Self::Action(body) => serde_json::to_vec(body),
+            Self::RecentOperatorActions(body) => serde_json::to_vec(body),
+            Self::RecentConfigEvents(body) => serde_json::to_vec(body),
             Self::Error(body) => serde_json::to_vec(body),
         }
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
@@ -556,6 +641,7 @@ mod tests {
         OscArgument, OscMessage, ParsedOscPacket, TypeTagSource, encode_packet, parse_packet,
     };
     use rosc_telemetry::InMemoryTelemetry;
+    use serde_json::Value;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpStream, UdpSocket};
     use tokio::sync::Mutex;
@@ -735,6 +821,14 @@ mod tests {
         stream
     }
 
+    fn json_body(response: &str) -> Value {
+        let body = response
+            .split_once("\r\n\r\n")
+            .map(|(_, body)| body)
+            .expect("response body should exist");
+        serde_json::from_str(body).expect("response body should be valid JSON")
+    }
+
     #[tokio::test]
     async fn control_service_freezes_and_thaws_live_proxy() {
         let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -805,6 +899,106 @@ mod tests {
             panic!("expected OSC message after thaw");
         };
         assert_eq!(message.address, "/render/camera/fov");
+
+        service.shutdown().await.unwrap();
+        proxy.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn control_service_exposes_recent_operator_and_config_history() {
+        let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+
+        let proxy = Arc::new(Mutex::new(
+            ManagedUdpProxy::start(
+                proxy_config(
+                    "127.0.0.1:0",
+                    &destination_listener.local_addr().unwrap().to_string(),
+                ),
+                InMemoryTelemetry::default(),
+                32,
+                ProxyRuntimeSafetyPolicy::default(),
+                ProxyLaunchProfileMode::Normal,
+                ManagedProxyStartupOptions::default(),
+            )
+            .await
+            .unwrap(),
+        ));
+        let controller = Arc::new(ManagedUdpProxyController::new(Arc::clone(&proxy)));
+        let mut service = ControlService::spawn("127.0.0.1:0", controller)
+            .await
+            .unwrap();
+
+        let _ = request(
+            service.listen_addr(),
+            "POST /freeze HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        let _ = request(
+            service.listen_addr(),
+            "POST /thaw HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+
+        let operator_history = json_body(
+            &request(
+                service.listen_addr(),
+                "GET /history/operator-actions?limit=1 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            )
+            .await,
+        );
+        let actions = operator_history["actions"]
+            .as_array()
+            .expect("operator action history should be an array");
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0]["action"], "thaw_traffic");
+
+        let config_history = json_body(
+            &request(
+                service.listen_addr(),
+                "GET /history/config-events HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            )
+            .await,
+        );
+        let events = config_history["events"]
+            .as_array()
+            .expect("config history should be an array");
+        assert!(
+            events
+                .iter()
+                .any(|event| event["kind"] == "Applied" && event["revision"] == 1),
+            "expected initial ConfigApplied event in history: {events:?}"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|event| event["kind"] == "LaunchProfileChanged"
+                    && event["launch_profile_mode"] == "normal"),
+            "expected launch profile event in history: {events:?}"
+        );
+
+        let invalid_limit = request(
+            service.listen_addr(),
+            "GET /history/operator-actions?limit=0 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await;
+        assert!(invalid_limit.contains("HTTP/1.1 400 Bad Request"));
+        assert!(invalid_limit.contains("invalid query parameter `limit`"));
+
+        let status = json_body(
+            &request(
+                service.listen_addr(),
+                "GET /status HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            )
+            .await,
+        );
+        assert_eq!(
+            status["status"]["runtime"]["recent_operator_actions"][0]["action"],
+            "freeze_traffic"
+        );
+        assert_eq!(
+            status["status"]["runtime"]["recent_config_events"][0]["kind"],
+            "LaunchProfileChanged"
+        );
 
         service.shutdown().await.unwrap();
         proxy.lock().await.shutdown().await;

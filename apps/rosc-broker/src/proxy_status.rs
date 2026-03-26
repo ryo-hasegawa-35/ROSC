@@ -3,7 +3,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::Result;
 use rosc_config::{BrokerConfig, DropPolicyConfig};
 use rosc_route::{CachePolicy, CapturePolicy, TrafficClass, TransportSelector};
-use rosc_telemetry::{BreakerStateSnapshot, HealthSnapshot};
+use rosc_telemetry::{
+    BreakerStateSnapshot, HealthSnapshot, RecentConfigEvent, RecentOperatorAction,
+};
 use serde::Serialize;
 
 use crate::ProxyLaunchProfileStatus;
@@ -38,6 +40,8 @@ pub struct UdpProxyRuntimeStatus {
     pub traffic_frozen: bool,
     pub isolated_route_ids: Vec<String>,
     pub operator_actions_total: BTreeMap<String, u64>,
+    pub recent_operator_actions: Vec<RecentOperatorAction>,
+    pub recent_config_events: Vec<RecentConfigEvent>,
     pub config_revision: u64,
     pub config_rejections_total: u64,
     pub config_blocked_total: u64,
@@ -332,6 +336,8 @@ pub fn attach_runtime_status(
             .map(|(route_id, _)| route_id.clone())
             .collect(),
         operator_actions_total: snapshot.operator_actions_total.clone(),
+        recent_operator_actions: snapshot.recent_operator_actions.clone(),
+        recent_config_events: snapshot.recent_config_events.clone(),
         config_revision: snapshot.config_revision,
         config_rejections_total: snapshot.config_rejections_total,
         config_blocked_total: snapshot.config_blocked_total,

@@ -1,4 +1,6 @@
-use rosc_telemetry::{BreakerStateSnapshot, BrokerEvent, InMemoryTelemetry, TelemetrySink};
+use rosc_telemetry::{
+    BreakerStateSnapshot, BrokerEvent, InMemoryTelemetry, RecentConfigEventKind, TelemetrySink,
+};
 
 #[test]
 fn in_memory_telemetry_renders_prometheus_text() {
@@ -132,4 +134,43 @@ fn in_memory_telemetry_renders_prometheus_text() {
     assert!(text.contains("rosc_launch_profile_disabled_capture_routes 1"));
     assert!(text.contains("rosc_launch_profile_disabled_replay_routes 2"));
     assert!(text.contains("rosc_launch_profile_disabled_restart_rehydrate_routes 3"));
+
+    let snapshot = telemetry.snapshot();
+    assert_eq!(snapshot.recent_operator_actions.len(), 1);
+    assert_eq!(snapshot.recent_operator_actions[0].sequence, 1);
+    assert_eq!(snapshot.recent_operator_actions[0].action, "freeze_traffic");
+    assert_eq!(snapshot.recent_config_events.len(), 5);
+    assert_eq!(
+        snapshot.recent_config_events[0].kind,
+        RecentConfigEventKind::Applied
+    );
+    assert_eq!(snapshot.recent_config_events[0].revision, Some(4));
+    assert_eq!(snapshot.recent_config_events[0].changed_routes, 2);
+    assert_eq!(
+        snapshot.recent_config_events[4].kind,
+        RecentConfigEventKind::LaunchProfileChanged
+    );
+    assert_eq!(
+        snapshot.recent_config_events[4]
+            .launch_profile_mode
+            .as_deref(),
+        Some("safe_mode")
+    );
+}
+
+#[test]
+fn in_memory_telemetry_keeps_recent_history_bounded() {
+    let telemetry = InMemoryTelemetry::default();
+    for index in 0..40 {
+        telemetry.emit(BrokerEvent::OperatorAction {
+            action: format!("action_{index}"),
+        });
+    }
+
+    let snapshot = telemetry.snapshot();
+    assert_eq!(snapshot.recent_operator_actions.len(), 32);
+    assert_eq!(snapshot.recent_operator_actions[0].action, "action_8");
+    assert_eq!(snapshot.recent_operator_actions[31].action, "action_39");
+    assert_eq!(snapshot.recent_operator_actions[0].sequence, 9);
+    assert_eq!(snapshot.recent_operator_actions[31].sequence, 40);
 }

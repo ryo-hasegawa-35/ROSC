@@ -1,8 +1,15 @@
+mod recent_events;
+
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+
+pub use recent_events::{RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction};
+
+const RECENT_EVENT_LIMIT: usize = 32;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BreakerStateSnapshot {
@@ -158,6 +165,8 @@ pub struct HealthSnapshot {
     pub destination_breaker_state: BTreeMap<String, BreakerStateSnapshot>,
     pub route_isolated: BTreeMap<String, bool>,
     pub operator_actions_total: BTreeMap<String, u64>,
+    pub recent_operator_actions: Vec<RecentOperatorAction>,
+    pub recent_config_events: Vec<RecentConfigEvent>,
     pub traffic_frozen: bool,
     pub config_revision: u64,
     pub config_added_ingresses_total: u64,
@@ -176,6 +185,7 @@ pub struct HealthSnapshot {
     pub launch_profile_disabled_capture_routes: usize,
     pub launch_profile_disabled_replay_routes: usize,
     pub launch_profile_disabled_restart_rehydrate_routes: usize,
+    pub next_event_sequence: u64,
 }
 
 #[derive(Clone, Default)]
@@ -536,7 +546,16 @@ impl TelemetrySink for InMemoryTelemetry {
                 snapshot.route_isolated.insert(route_id, isolated);
             }
             BrokerEvent::OperatorAction { action } => {
-                *snapshot.operator_actions_total.entry(action).or_default() += 1;
+                *snapshot
+                    .operator_actions_total
+                    .entry(action.clone())
+                    .or_default() += 1;
+                let record = RecentOperatorAction {
+                    sequence: next_event_sequence(&mut snapshot),
+                    recorded_at_unix_ms: unix_time_ms(),
+                    action,
+                };
+                push_recent(&mut snapshot.recent_operator_actions, record);
             }
             BrokerEvent::TrafficFreezeChanged { frozen } => {
                 snapshot.traffic_frozen = frozen;
@@ -563,15 +582,95 @@ impl TelemetrySink for InMemoryTelemetry {
                 snapshot.config_added_routes_total += added_routes as u64;
                 snapshot.config_removed_routes_total += removed_routes as u64;
                 snapshot.config_changed_routes_total += changed_routes as u64;
+                let record = RecentConfigEvent {
+                    sequence: next_event_sequence(&mut snapshot),
+                    recorded_at_unix_ms: unix_time_ms(),
+                    kind: RecentConfigEventKind::Applied,
+                    revision: Some(revision),
+                    added_ingresses,
+                    removed_ingresses,
+                    changed_ingresses,
+                    added_destinations,
+                    removed_destinations,
+                    changed_destinations,
+                    added_routes,
+                    removed_routes,
+                    changed_routes,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                };
+                push_recent(&mut snapshot.recent_config_events, record);
             }
             BrokerEvent::ConfigRejected => {
                 snapshot.config_rejections_total += 1;
+                let record = RecentConfigEvent {
+                    sequence: next_event_sequence(&mut snapshot),
+                    recorded_at_unix_ms: unix_time_ms(),
+                    kind: RecentConfigEventKind::Rejected,
+                    revision: Some(snapshot.config_revision),
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 0,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 0,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                };
+                push_recent(&mut snapshot.recent_config_events, record);
             }
             BrokerEvent::ConfigBlocked => {
                 snapshot.config_blocked_total += 1;
+                let record = RecentConfigEvent {
+                    sequence: next_event_sequence(&mut snapshot),
+                    recorded_at_unix_ms: unix_time_ms(),
+                    kind: RecentConfigEventKind::Blocked,
+                    revision: Some(snapshot.config_revision),
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 0,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 0,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                };
+                push_recent(&mut snapshot.recent_config_events, record);
             }
             BrokerEvent::ConfigReloadFailed => {
                 snapshot.config_reload_failures_total += 1;
+                let record = RecentConfigEvent {
+                    sequence: next_event_sequence(&mut snapshot),
+                    recorded_at_unix_ms: unix_time_ms(),
+                    kind: RecentConfigEventKind::ReloadFailed,
+                    revision: Some(snapshot.config_revision),
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 0,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 0,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                };
+                push_recent(&mut snapshot.recent_config_events, record);
             }
             BrokerEvent::LaunchProfileChanged {
                 mode,
@@ -584,7 +683,46 @@ impl TelemetrySink for InMemoryTelemetry {
                 snapshot.launch_profile_disabled_replay_routes = disabled_replay_routes;
                 snapshot.launch_profile_disabled_restart_rehydrate_routes =
                     disabled_restart_rehydrate_routes;
+                let record = RecentConfigEvent {
+                    sequence: next_event_sequence(&mut snapshot),
+                    recorded_at_unix_ms: unix_time_ms(),
+                    kind: RecentConfigEventKind::LaunchProfileChanged,
+                    revision: Some(snapshot.config_revision),
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 0,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 0,
+                    launch_profile_mode: snapshot.launch_profile_mode.clone(),
+                    disabled_capture_routes,
+                    disabled_replay_routes,
+                    disabled_restart_rehydrate_routes,
+                };
+                push_recent(&mut snapshot.recent_config_events, record);
             }
         }
     }
+}
+
+fn push_recent<T>(entries: &mut Vec<T>, value: T) {
+    if entries.len() == RECENT_EVENT_LIMIT {
+        entries.remove(0);
+    }
+    entries.push(value);
+}
+
+fn next_event_sequence(snapshot: &mut HealthSnapshot) -> u64 {
+    snapshot.next_event_sequence += 1;
+    snapshot.next_event_sequence
+}
+
+fn unix_time_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
 }

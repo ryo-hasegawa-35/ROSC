@@ -49,6 +49,8 @@ curl -X POST http://127.0.0.1:19292/routes/restore-all
 curl -X POST http://127.0.0.1:19292/destinations/udp_renderer/rehydrate
 curl -X POST "http://127.0.0.1:19292/routes/camera/replay/sandbox_tap?limit=1"
 curl http://127.0.0.1:19292/status
+curl http://127.0.0.1:19292/history/operator-actions
+curl http://127.0.0.1:19292/history/config-events
 ```
 
 `--control-listen` is intentionally loopback-only. Bind it to `127.0.0.1`, `::1`, or another
@@ -89,6 +91,7 @@ Current Phase 01 runtime coverage:
 - optional co-hosted control endpoint for freeze/thaw, route isolation, and live status inspection while the proxy is running
 - control endpoint now also exposes destination rehydrate and sandbox replay actions for live operator workflows
 - control endpoint also supports bulk route restore plus percent-decoded resource ids for safer operator recovery flows
+- runtime status and control history endpoints now expose bounded recent operator actions and config transitions for post-incident tracing
 
 ## Documentation Entry Points
 

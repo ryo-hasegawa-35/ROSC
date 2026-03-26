@@ -168,6 +168,8 @@ async fn live_proxy_status_exposes_bound_local_addr_when_requested() {
     assert!(!runtime.traffic_frozen);
     assert!(runtime.isolated_route_ids.is_empty());
     assert!(runtime.operator_actions_total.is_empty());
+    assert!(runtime.recent_operator_actions.is_empty());
+    assert!(runtime.recent_config_events.is_empty());
     assert_eq!(runtime.config_revision, 0);
     assert_eq!(runtime.config_rejections_total, 0);
     assert_eq!(
