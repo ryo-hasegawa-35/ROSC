@@ -1,5 +1,7 @@
 mod config_supervisor;
 mod config_telemetry;
+mod control_plane;
+mod control_service;
 mod health_service;
 mod launch_profile;
 mod managed_proxy;
@@ -14,6 +16,11 @@ pub use config_supervisor::{ConfigFileSupervisor, ConfigReloadOutcome};
 pub use config_telemetry::{
     emit_applied_config, emit_config_transition, emit_initial_config_applied,
 };
+pub use control_plane::{
+    ControlPlaneActionResult, ControlPlaneError, ManagedProxyFileSupervisorController,
+    ManagedUdpProxyController, ProxyControlPlane,
+};
+pub use control_service::ControlService;
 pub use health_service::HealthService;
 pub use launch_profile::{
     PreparedLaunchConfig, ProxyLaunchProfileMode, ProxyLaunchProfileStatus, apply_launch_profile,

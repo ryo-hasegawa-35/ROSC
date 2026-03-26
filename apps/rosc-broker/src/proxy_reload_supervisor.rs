@@ -67,19 +67,23 @@ impl ManagedProxyFileSupervisor {
     }
 
     pub fn status_snapshot(&self) -> UdpProxyStatusSnapshot {
-        self.proxy.app().status_snapshot()
+        self.proxy.status_snapshot()
     }
 
     pub fn proxy(&self) -> &ManagedUdpProxy {
         &self.proxy
     }
 
-    pub fn freeze_traffic(&self) {
-        self.proxy.freeze_traffic();
+    pub fn freeze_traffic(&self) -> bool {
+        self.proxy.freeze_traffic()
     }
 
-    pub fn thaw_traffic(&self) {
-        self.proxy.thaw_traffic();
+    pub fn thaw_traffic(&self) -> bool {
+        self.proxy.thaw_traffic()
+    }
+
+    pub fn has_route(&self, route_id: &str) -> bool {
+        self.proxy.has_route(route_id)
     }
 
     pub fn isolate_route(&self, route_id: &str) -> bool {

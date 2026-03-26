@@ -39,10 +39,13 @@ cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml --safe-mode
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
-cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --fail-on-warnings --require-fallback-ready --safe-mode
+cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
-cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --health-listen 127.0.0.1:19191 --fail-on-warnings --require-fallback-ready --safe-mode
+cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
+curl -X POST http://127.0.0.1:19292/freeze
+curl -X POST http://127.0.0.1:19292/routes/camera/isolate
+curl http://127.0.0.1:19292/status
 ```
 
 Run the same workspace inside Docker:
@@ -77,6 +80,7 @@ Current Phase 01 runtime coverage:
 - clean proxy shutdown that releases ingress ports for controlled restart and future hot reload work
 - managed proxy reload supervision with rollback to the previous live config when a replacement runtime fails
 - optional co-hosted health and metrics endpoint while the live UDP proxy is running
+- optional co-hosted control endpoint for freeze/thaw, route isolation, and live status inspection while the proxy is running
 
 ## Documentation Entry Points
 

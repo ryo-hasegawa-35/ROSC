@@ -39,6 +39,8 @@ pub enum Command {
         #[arg(long)]
         health_listen: Option<String>,
         #[arg(long)]
+        control_listen: Option<String>,
+        #[arg(long)]
         fail_on_warnings: bool,
         #[arg(long)]
         require_fallback_ready: bool,
@@ -62,6 +64,8 @@ pub enum Command {
         ingress_queue_depth: usize,
         #[arg(long)]
         health_listen: Option<String>,
+        #[arg(long)]
+        control_listen: Option<String>,
         #[arg(long)]
         fail_on_warnings: bool,
         #[arg(long)]

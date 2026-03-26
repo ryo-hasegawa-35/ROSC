@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use rosc_config::BrokerConfig;
 use rosc_telemetry::{InMemoryTelemetry, TelemetrySink};
 
+use crate::UdpProxyStatusSnapshot;
 use crate::{
     ProxyLaunchProfileMode, ProxyRuntimeSafetyPolicy, UdpProxyApp, apply_launch_profile,
     emit_config_transition,
@@ -69,12 +70,20 @@ impl ManagedUdpProxy {
         &self.config
     }
 
-    pub fn freeze_traffic(&self) {
-        self.app.freeze_traffic();
+    pub fn status_snapshot(&self) -> UdpProxyStatusSnapshot {
+        self.app.status_snapshot()
     }
 
-    pub fn thaw_traffic(&self) {
-        self.app.thaw_traffic();
+    pub fn freeze_traffic(&self) -> bool {
+        self.app.freeze_traffic()
+    }
+
+    pub fn thaw_traffic(&self) -> bool {
+        self.app.thaw_traffic()
+    }
+
+    pub fn has_route(&self, route_id: &str) -> bool {
+        self.app.has_route(route_id)
     }
 
     pub fn isolate_route(&self, route_id: &str) -> bool {
@@ -214,8 +223,12 @@ async fn start_ingress_tasks(
 ) -> Result<()> {
     match startup_options.frozen_behavior {
         FrozenStartupBehavior::Normal => {}
-        FrozenStartupBehavior::OperatorRequested => app.freeze_traffic(),
-        FrozenStartupBehavior::Restored => app.restore_frozen_traffic(),
+        FrozenStartupBehavior::OperatorRequested => {
+            let _ = app.freeze_traffic();
+        }
+        FrozenStartupBehavior::Restored => {
+            let _ = app.restore_frozen_traffic();
+        }
     }
     for route_id in &startup_options.isolated_route_ids {
         app.restore_route_isolation(route_id);

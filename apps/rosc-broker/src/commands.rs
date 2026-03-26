@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use rosc_telemetry::InMemoryTelemetry;
+use tokio::sync::Mutex;
 
 use crate::cli::Command;
 
@@ -34,6 +35,7 @@ pub async fn run(command: Command) -> Result<()> {
             poll_ms,
             ingress_queue_depth,
             health_listen,
+            control_listen,
             fail_on_warnings,
             require_fallback_ready,
             safe_mode,
@@ -44,6 +46,7 @@ pub async fn run(command: Command) -> Result<()> {
                 poll_ms,
                 ingress_queue_depth,
                 health_listen.as_deref(),
+                control_listen.as_deref(),
                 ProxyCommandOptions {
                     fail_on_warnings,
                     require_fallback_ready,
@@ -59,6 +62,7 @@ pub async fn run(command: Command) -> Result<()> {
             config,
             ingress_queue_depth,
             health_listen,
+            control_listen,
             fail_on_warnings,
             require_fallback_ready,
             safe_mode,
@@ -68,6 +72,7 @@ pub async fn run(command: Command) -> Result<()> {
                 &config,
                 ingress_queue_depth,
                 health_listen.as_deref(),
+                control_listen.as_deref(),
                 ProxyCommandOptions {
                     fail_on_warnings,
                     require_fallback_ready,
@@ -184,6 +189,7 @@ async fn watch_udp_proxy(
     poll_ms: u64,
     ingress_queue_depth: usize,
     health_listen: Option<&str>,
+    control_listen: Option<&str>,
     options: ProxyCommandOptions,
 ) -> Result<()> {
     let safety_policy = rosc_broker::ProxyRuntimeSafetyPolicy {
@@ -196,62 +202,84 @@ async fn watch_udp_proxy(
     } else {
         rosc_broker::ProxyLaunchProfileMode::Normal
     };
-    let mut supervisor = rosc_broker::ManagedProxyFileSupervisor::start(
-        path,
-        telemetry.clone(),
-        ingress_queue_depth,
-        safety_policy,
-        launch_profile_mode,
-        rosc_broker::ManagedProxyStartupOptions {
-            frozen_behavior: if options.start_frozen {
-                rosc_broker::FrozenStartupBehavior::OperatorRequested
-            } else {
-                rosc_broker::FrozenStartupBehavior::Normal
+    let supervisor = Arc::new(Mutex::new(
+        rosc_broker::ManagedProxyFileSupervisor::start(
+            path,
+            telemetry.clone(),
+            ingress_queue_depth,
+            safety_policy,
+            launch_profile_mode,
+            rosc_broker::ManagedProxyStartupOptions {
+                frozen_behavior: if options.start_frozen {
+                    rosc_broker::FrozenStartupBehavior::OperatorRequested
+                } else {
+                    rosc_broker::FrozenStartupBehavior::Normal
+                },
+                ..rosc_broker::ManagedProxyStartupOptions::default()
             },
-            ..rosc_broker::ManagedProxyStartupOptions::default()
-        },
-    )
-    .await?;
+        )
+        .await?,
+    ));
     let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
-    print_proxy_report(&supervisor.status_snapshot());
+    let control_plane: Arc<dyn rosc_broker::ProxyControlPlane> = Arc::new(
+        rosc_broker::ManagedProxyFileSupervisorController::new(Arc::clone(&supervisor)),
+    );
+    let mut control_service = spawn_optional_control_service(control_listen, control_plane).await?;
+    let initial_status = supervisor.lock().await.status_snapshot();
+    print_proxy_report(&initial_status);
     println!(
         "managed udp proxy loaded revision={}",
-        supervisor.current_revision().unwrap_or_default()
+        supervisor
+            .lock()
+            .await
+            .current_revision()
+            .unwrap_or_default()
     );
 
     let mut interval = tokio::time::interval(std::time::Duration::from_millis(poll_ms));
     loop {
         tokio::select! {
             _ = interval.tick() => {
-                match supervisor.poll_once().await? {
+                let outcome = {
+                    let mut supervisor = supervisor.lock().await;
+                    supervisor.poll_once().await?
+                };
+                match outcome {
                     rosc_broker::ProxyReloadOutcome::Unchanged => {}
                     rosc_broker::ProxyReloadOutcome::Applied(applied) => {
                         print_applied_config(&applied);
-                        print_proxy_report(&supervisor.status_snapshot());
+                        let status = supervisor.lock().await.status_snapshot();
+                        print_proxy_report(&status);
                     }
                     rosc_broker::ProxyReloadOutcome::Blocked(reasons) => {
+                        let revision = supervisor.lock().await.current_revision().unwrap_or_default();
                         println!(
                             "blocked proxy reload; keeping revision={} reasons={}",
-                            supervisor.current_revision().unwrap_or_default(),
+                            revision,
                             reasons.join(" | ")
                         );
-                        print_proxy_report(&supervisor.status_snapshot());
+                        let status = supervisor.lock().await.status_snapshot();
+                        print_proxy_report(&status);
                     }
                     rosc_broker::ProxyReloadOutcome::Rejected(error) => {
+                        let revision = supervisor.lock().await.current_revision().unwrap_or_default();
                         println!(
                             "rejected proxy reload; keeping revision={} reason={}",
-                            supervisor.current_revision().unwrap_or_default(),
+                            revision,
                             error
                         );
-                        print_proxy_report(&supervisor.status_snapshot());
+                        let status = supervisor.lock().await.status_snapshot();
+                        print_proxy_report(&status);
                     }
                     rosc_broker::ProxyReloadOutcome::ReloadFailed(error) => {
+                        let revision = supervisor.lock().await.current_revision().unwrap_or_default();
                         println!(
                             "failed proxy reload; keeping revision={} reason={}",
-                            supervisor.current_revision().unwrap_or_default(),
+                            revision,
                             error
                         );
-                        print_proxy_report(&supervisor.status_snapshot());
+                        let status = supervisor.lock().await.status_snapshot();
+                        print_proxy_report(&status);
                     }
                 }
             }
@@ -262,8 +290,9 @@ async fn watch_udp_proxy(
         }
     }
 
+    shutdown_optional_control_service(&mut control_service).await?;
     shutdown_optional_health_service(&mut health_service).await?;
-    supervisor.shutdown().await;
+    supervisor.lock().await.shutdown().await;
     println!("managed udp proxy stopped");
     Ok(())
 }
@@ -325,6 +354,7 @@ async fn run_udp_proxy(
     path: &Path,
     ingress_queue_depth: usize,
     health_listen: Option<&str>,
+    control_listen: Option<&str>,
     options: ProxyCommandOptions,
 ) -> Result<()> {
     let content = fs::read_to_string(path)
@@ -341,30 +371,38 @@ async fn run_udp_proxy(
         require_fallback_ready: options.require_fallback_ready,
     };
     let telemetry = InMemoryTelemetry::default();
-    let mut proxy = rosc_broker::ManagedUdpProxy::start(
-        config,
-        telemetry.clone(),
-        ingress_queue_depth,
-        safety_policy,
-        launch_profile_mode,
-        rosc_broker::ManagedProxyStartupOptions {
-            frozen_behavior: if options.start_frozen {
-                rosc_broker::FrozenStartupBehavior::OperatorRequested
-            } else {
-                rosc_broker::FrozenStartupBehavior::Normal
+    let proxy = Arc::new(Mutex::new(
+        rosc_broker::ManagedUdpProxy::start(
+            config,
+            telemetry.clone(),
+            ingress_queue_depth,
+            safety_policy,
+            launch_profile_mode,
+            rosc_broker::ManagedProxyStartupOptions {
+                frozen_behavior: if options.start_frozen {
+                    rosc_broker::FrozenStartupBehavior::OperatorRequested
+                } else {
+                    rosc_broker::FrozenStartupBehavior::Normal
+                },
+                ..rosc_broker::ManagedProxyStartupOptions::default()
             },
-            ..rosc_broker::ManagedProxyStartupOptions::default()
-        },
-    )
-    .await?;
+        )
+        .await?,
+    ));
     let mut health_service = spawn_optional_health_service(health_listen, telemetry).await?;
-    print_proxy_report(&proxy.app().status_snapshot());
+    let control_plane: Arc<dyn rosc_broker::ProxyControlPlane> = Arc::new(
+        rosc_broker::ManagedUdpProxyController::new(Arc::clone(&proxy)),
+    );
+    let mut control_service = spawn_optional_control_service(control_listen, control_plane).await?;
+    let status = proxy.lock().await.status_snapshot();
+    print_proxy_report(&status);
     println!("udp proxy running; press Ctrl-C to stop");
     tokio::signal::ctrl_c()
         .await
         .context("failed to listen for ctrl-c")?;
+    shutdown_optional_control_service(&mut control_service).await?;
     shutdown_optional_health_service(&mut health_service).await?;
-    proxy.shutdown().await;
+    proxy.lock().await.shutdown().await;
     println!("udp proxy stopped");
     Ok(())
 }
@@ -411,6 +449,30 @@ async fn shutdown_optional_health_service(
     if let Some(service) = service.as_mut() {
         service.shutdown().await?;
         println!("health endpoint stopped");
+    }
+    Ok(())
+}
+
+async fn spawn_optional_control_service(
+    control_listen: Option<&str>,
+    control_plane: Arc<dyn rosc_broker::ProxyControlPlane>,
+) -> Result<Option<rosc_broker::ControlService>> {
+    match control_listen {
+        Some(listen) => {
+            let service = rosc_broker::ControlService::spawn(listen, control_plane).await?;
+            println!("control endpoint listening on {}", service.listen_addr());
+            Ok(Some(service))
+        }
+        None => Ok(None),
+    }
+}
+
+async fn shutdown_optional_control_service(
+    service: &mut Option<rosc_broker::ControlService>,
+) -> Result<()> {
+    if let Some(service) = service.as_mut() {
+        service.shutdown().await?;
+        println!("control endpoint stopped");
     }
     Ok(())
 }

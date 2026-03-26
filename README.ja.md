@@ -37,10 +37,13 @@ cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml --safe-mode
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
-cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --fail-on-warnings --require-fallback-ready --safe-mode
+cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
-cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --health-listen 127.0.0.1:19191 --fail-on-warnings --require-fallback-ready --safe-mode
+cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
+curl -X POST http://127.0.0.1:19292/freeze
+curl -X POST http://127.0.0.1:19292/routes/camera/isolate
+curl http://127.0.0.1:19292/status
 ```
 
 Docker 経由で同じ確認を行う場合:
@@ -75,6 +78,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - controlled restart と将来の hot reload に向けて ingress port をきれいに返す clean shutdown
 - 新しい runtime が立ち上がらなかった場合に直前の live config へ戻せる managed proxy reload supervision
 - live UDP proxy と同時に health / metrics endpoint を公開できる optional な co-hosted health service
+- freeze/thaw、route isolation、live status 取得を外から行える optional な control endpoint
 
 ## ドキュメント入口
 

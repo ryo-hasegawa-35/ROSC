@@ -131,38 +131,51 @@ impl UdpProxyApp {
         self.runtime.telemetry.snapshot()
     }
 
-    pub fn freeze_traffic(&self) {
+    pub fn freeze_traffic(&self) -> bool {
         self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
             action: "freeze_traffic".to_owned(),
         });
+        let changed = !self.traffic_control.is_frozen();
         self.traffic_control.freeze();
-        self.runtime
-            .telemetry
-            .emit(BrokerEvent::TrafficFreezeChanged { frozen: true });
+        if changed {
+            self.runtime
+                .telemetry
+                .emit(BrokerEvent::TrafficFreezeChanged { frozen: true });
+        }
+        changed
     }
 
-    pub fn thaw_traffic(&self) {
+    pub fn thaw_traffic(&self) -> bool {
         self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
             action: "thaw_traffic".to_owned(),
         });
+        let changed = self.traffic_control.is_frozen();
         self.traffic_control.thaw();
-        self.runtime
-            .telemetry
-            .emit(BrokerEvent::TrafficFreezeChanged { frozen: false });
+        if changed {
+            self.runtime
+                .telemetry
+                .emit(BrokerEvent::TrafficFreezeChanged { frozen: false });
+        }
+        changed
     }
 
-    pub fn restore_frozen_traffic(&self) {
+    pub fn restore_frozen_traffic(&self) -> bool {
         if self.traffic_control.is_frozen() {
-            return;
+            return false;
         }
         self.traffic_control.freeze();
         self.runtime
             .telemetry
             .emit(BrokerEvent::TrafficFreezeChanged { frozen: true });
+        true
     }
 
     pub fn is_traffic_frozen(&self) -> bool {
         self.traffic_control.is_frozen()
+    }
+
+    pub fn has_route(&self, route_id: &str) -> bool {
+        self.status.routes.iter().any(|route| route.id == route_id)
     }
 
     pub fn isolate_route(&self, route_id: &str) -> bool {
