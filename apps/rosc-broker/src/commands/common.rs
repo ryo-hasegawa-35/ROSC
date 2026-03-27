@@ -3,6 +3,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use rosc_telemetry::InMemoryTelemetry;
+use serde::Serialize;
 
 use super::ProxyCommandOptions;
 
@@ -106,40 +107,7 @@ pub(crate) fn print_proxy_overview_summary(overview: &rosc_broker::ProxyOperator
     );
 }
 
-pub(crate) fn print_proxy_diagnostics_summary(diagnostics: &rosc_broker::ProxyOperatorDiagnostics) {
-    let overview = &diagnostics.overview;
-    println!(
-        "proxy diagnostics: state={} blockers={} warnings={} problematic_routes={} problematic_destinations={} recent_operator_actions={} recent_config_events={} traffic_frozen={} isolated_routes={} backlog_destinations={} open_breakers={}",
-        match overview.report.state {
-            rosc_broker::ProxyOperatorState::Healthy => "healthy",
-            rosc_broker::ProxyOperatorState::Warning => "warning",
-            rosc_broker::ProxyOperatorState::Blocked => "blocked",
-        },
-        overview.report.blockers.len(),
-        overview.report.warnings.len(),
-        overview.problematic_signals.route_signals.len(),
-        overview.problematic_signals.destination_signals.len(),
-        diagnostics.recent_operator_actions.len(),
-        diagnostics.recent_config_events.len(),
-        overview.runtime_summary.traffic_frozen,
-        overview.runtime_summary.isolated_route_count,
-        overview.runtime_summary.destinations_with_backlog,
-        overview.runtime_summary.destinations_with_open_breakers,
-    );
-}
-
-pub(crate) fn print_proxy_attention_summary(attention: &rosc_broker::ProxyOperatorAttention) {
-    println!(
-        "proxy attention: state={} blockers={} warnings={} traffic_frozen={} isolated_routes={} problematic_routes={} problematic_destinations={} backlog_destinations={} open_breakers={} half_open_breakers={}",
-        attention.state.as_str(),
-        attention.blockers.len(),
-        attention.warnings.len(),
-        attention.traffic_frozen,
-        attention.isolated_route_ids.len(),
-        attention.problematic_route_ids.len(),
-        attention.problematic_destination_ids.len(),
-        attention.destinations_with_backlog.len(),
-        attention.destinations_with_open_breakers.len(),
-        attention.destinations_with_half_open_breakers.len(),
-    );
+pub(crate) fn print_json_pretty<T: Serialize>(value: &T) -> Result<()> {
+    println!("{}", serde_json::to_string_pretty(value)?);
+    Ok(())
 }

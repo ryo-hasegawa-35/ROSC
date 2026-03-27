@@ -7,8 +7,7 @@ use rosc_telemetry::InMemoryTelemetry;
 
 use super::ProxyCommandOptions;
 use super::common::{
-    launch_profile_mode, load_config, print_applied_config, print_proxy_attention_summary,
-    print_proxy_diagnostics_summary, print_proxy_overview_summary, safety_policy,
+    launch_profile_mode, load_config, print_applied_config, print_json_pretty, safety_policy,
     status_from_config,
 };
 
@@ -39,7 +38,7 @@ pub(crate) async fn proxy_status(
         }),
     )
     .await?;
-    println!("{}", serde_json::to_string_pretty(&status)?);
+    print_json_pretty(&status)?;
     Ok(())
 }
 
@@ -52,8 +51,7 @@ pub(crate) async fn proxy_overview(
     let status =
         status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
     let overview = rosc_broker::proxy_operator_overview(&status, safety_policy(options));
-    print_proxy_overview_summary(&overview);
-    println!("{}", serde_json::to_string_pretty(&overview)?);
+    print_json_pretty(&overview)?;
     Ok(())
 }
 
@@ -68,8 +66,7 @@ pub(crate) async fn proxy_diagnostics(
         status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
     let diagnostics =
         rosc_broker::proxy_operator_diagnostics(&status, safety_policy(options), history_limit);
-    print_proxy_diagnostics_summary(&diagnostics);
-    println!("{}", serde_json::to_string_pretty(&diagnostics)?);
+    print_json_pretty(&diagnostics)?;
     Ok(())
 }
 
@@ -83,8 +80,7 @@ pub(crate) async fn proxy_attention(
         status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
     let report = rosc_broker::proxy_operator_report(&status, safety_policy(options));
     let attention = rosc_broker::proxy_operator_attention(&report);
-    print_proxy_attention_summary(&attention);
-    println!("{}", serde_json::to_string_pretty(&attention)?);
+    print_json_pretty(&attention)?;
     Ok(())
 }
 

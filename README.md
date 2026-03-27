@@ -67,6 +67,10 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` is intentionally loopback-only. Bind it to `127.0.0.1`, `::1`, or another
 local-only alias such as `localhost`; wildcard or externally reachable addresses are rejected.
 
+`proxy-status`, `proxy-overview`, `proxy-diagnostics`, and `proxy-attention` intentionally write
+JSON only to stdout so they can be piped directly into tools such as `jq` without stripping
+summary lines first.
+
 Run the same workspace inside Docker:
 
 ```bash

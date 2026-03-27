@@ -65,6 +65,9 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` は意図的に loopback 専用です。`127.0.0.1`、`::1`、`localhost` のような
 ローカル専用アドレスだけを使い、wildcard や外部から到達できる bind は拒否されます。
 
+`proxy-status`、`proxy-overview`、`proxy-diagnostics`、`proxy-attention` は、`jq` などへ
+そのまま流せるように stdout へ JSON だけを出す契約にそろえています。
+
 Docker 経由で同じ確認を行う場合:
 
 ```bash
