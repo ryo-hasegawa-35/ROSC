@@ -191,13 +191,7 @@ impl ProxyControlPlane for ManagedUdpProxyController {
 
     async fn restore_all_routes(&self) -> ControlPlaneActionResult {
         let proxy = self.inner.lock().await;
-        let isolated_route_ids = proxy.isolated_routes();
-        let mut restored = 0usize;
-        for route_id in &isolated_route_ids {
-            if proxy.restore_route(route_id) {
-                restored += 1;
-            }
-        }
+        let restored = proxy.restore_all_routes();
         let status = proxy.status_snapshot();
         ControlPlaneActionResult {
             applied: restored > 0,
@@ -335,13 +329,7 @@ impl ProxyControlPlane for ManagedProxyFileSupervisorController {
 
     async fn restore_all_routes(&self) -> ControlPlaneActionResult {
         let supervisor = self.inner.lock().await;
-        let isolated_route_ids = supervisor.isolated_routes();
-        let mut restored = 0usize;
-        for route_id in &isolated_route_ids {
-            if supervisor.restore_route(route_id) {
-                restored += 1;
-            }
-        }
+        let restored = supervisor.restore_all_routes();
         let status = supervisor.status_snapshot();
         ControlPlaneActionResult {
             applied: restored > 0,

@@ -235,6 +235,33 @@ impl UdpProxyApp {
         changed
     }
 
+    pub fn restore_all_routes(&self) -> usize {
+        let isolated_route_ids = self.route_control.snapshot();
+        let mut restored_route_ids = Vec::new();
+        for route_id in isolated_route_ids {
+            if self.route_control.restore(&route_id) {
+                self.runtime
+                    .telemetry
+                    .emit(BrokerEvent::RouteIsolationChanged {
+                        route_id: route_id.clone(),
+                        isolated: false,
+                    });
+                restored_route_ids.push(route_id);
+            }
+        }
+
+        self.runtime.telemetry.emit(BrokerEvent::OperatorAction {
+            action: "restore_all_routes".to_owned(),
+            details: vec![
+                format!("restored_count={}", restored_route_ids.len()),
+                format!("route_ids={}", restored_route_ids.join(",")),
+                format!("applied={}", !restored_route_ids.is_empty()),
+            ],
+        });
+
+        restored_route_ids.len()
+    }
+
     pub fn restore_route_isolation(&self, route_id: &str) -> bool {
         if !self.status.routes.iter().any(|route| route.id == route_id) {
             return false;

@@ -107,6 +107,10 @@ impl ManagedUdpProxy {
         self.app.restore_route(route_id)
     }
 
+    pub fn restore_all_routes(&self) -> usize {
+        self.app.restore_all_routes()
+    }
+
     pub async fn rehydrate_destination(&self, destination_id: &str) -> Result<usize> {
         self.app.rehydrate_destination(destination_id).await
     }

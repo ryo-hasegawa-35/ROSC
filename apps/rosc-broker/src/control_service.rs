@@ -1233,6 +1233,22 @@ mod tests {
         assert!(restore_response.contains("\"dispatch_count\":1"));
         assert!(restore_response.contains("\"isolated_route_ids\":[]"));
 
+        let operator_history = json_body(
+            &request(
+                service.listen_addr(),
+                "GET /history/operator-actions HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            )
+            .await,
+        );
+        let actions = operator_history["actions"]
+            .as_array()
+            .expect("operator action history should be an array");
+        assert!(actions.iter().any(|action| {
+            action["action"] == "restore_all_routes"
+                && action["details"]
+                    == serde_json::json!(["restored_count=1", "route_ids=camera", "applied=true"])
+        }));
+
         send_packet(ingress_addr).await;
         let mut buffer = [0u8; 2048];
         let _ = tokio::time::timeout(

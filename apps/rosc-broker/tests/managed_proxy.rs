@@ -438,6 +438,57 @@ async fn managed_proxy_can_isolate_and_restore_routes() {
 }
 
 #[tokio::test]
+async fn managed_proxy_restore_all_routes_records_aggregate_action() {
+    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let ingress_addr = reserved.local_addr().unwrap();
+    drop(reserved);
+
+    let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let mut proxy = ManagedUdpProxy::start(
+        proxy_config(
+            &ingress_addr.to_string(),
+            &listener.local_addr().unwrap().to_string(),
+            "/render/restore-all",
+        ),
+        InMemoryTelemetry::default(),
+        32,
+        ProxyRuntimeSafetyPolicy::default(),
+        ProxyLaunchProfileMode::Normal,
+        ManagedProxyStartupOptions::default(),
+    )
+    .await
+    .unwrap();
+
+    assert!(proxy.isolate_route("camera"));
+    assert_eq!(proxy.restore_all_routes(), 1);
+
+    let runtime = proxy
+        .app()
+        .status_snapshot()
+        .runtime
+        .expect("runtime snapshot should exist");
+    assert!(runtime.isolated_route_ids.is_empty());
+    assert_eq!(
+        runtime
+            .operator_actions_total
+            .get("restore_all_routes")
+            .copied(),
+        Some(1)
+    );
+    assert!(runtime.recent_operator_actions.iter().any(|action| {
+        action.action == "restore_all_routes"
+            && action.details
+                == vec![
+                    "restored_count=1".to_owned(),
+                    "route_ids=camera".to_owned(),
+                    "applied=true".to_owned(),
+                ]
+    }));
+
+    proxy.shutdown().await;
+}
+
+#[tokio::test]
 async fn managed_proxy_preserves_frozen_state_across_reload() {
     let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let ingress_addr = reserved.local_addr().unwrap();
