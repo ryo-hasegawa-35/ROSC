@@ -5,7 +5,7 @@ use rosc_broker::{
     ProxyOperatorSignalScope, ProxyOperatorState, ProxyRuntimeSafetyPolicy, attach_runtime_status,
     proxy_operator_attention, proxy_operator_diagnostics, proxy_operator_incidents_from_histories,
     proxy_operator_overview, proxy_operator_readiness, proxy_operator_report,
-    proxy_operator_signals_view, proxy_status_from_config,
+    proxy_operator_signals_view, proxy_operator_snapshot, proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -263,6 +263,56 @@ fn operator_readiness_distinguishes_ready_and_degraded_states() {
     );
     assert!(degraded.counts.problematic_destinations > 0);
     assert!(degraded.counts.problematic_routes > 0);
+}
+
+#[test]
+fn operator_snapshot_bundles_readiness_diagnostics_attention_and_incidents() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            recent_operator_actions: vec![RecentOperatorAction {
+                sequence: 9,
+                recorded_at_unix_ms: 900,
+                action: "freeze_traffic".to_owned(),
+                details: vec!["applied=true".to_owned()],
+            }],
+            recent_config_events: vec![RecentConfigEvent {
+                sequence: 10,
+                recorded_at_unix_ms: 1000,
+                kind: RecentConfigEventKind::Blocked,
+                revision: Some(4),
+                details: vec!["unsafe wildcard route".to_owned()],
+                added_ingresses: 0,
+                removed_ingresses: 0,
+                changed_ingresses: 0,
+                added_destinations: 0,
+                removed_destinations: 0,
+                changed_destinations: 0,
+                added_routes: 0,
+                removed_routes: 0,
+                changed_routes: 1,
+                launch_profile_mode: None,
+                disabled_capture_routes: 0,
+                disabled_replay_routes: 0,
+                disabled_restart_rehydrate_routes: 0,
+            }],
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let snapshot = proxy_operator_snapshot(&status, ProxyRuntimeSafetyPolicy::default(), Some(1));
+
+    assert_eq!(
+        snapshot.readiness.level,
+        rosc_broker::ProxyOperatorReadinessLevel::Degraded
+    );
+    assert_eq!(snapshot.diagnostics.recent_operator_actions.len(), 1);
+    assert_eq!(snapshot.attention.state, ProxyOperatorState::Warning);
+    assert_eq!(snapshot.incidents.recent_config_issues.len(), 1);
+    assert_eq!(snapshot.overview.report.state, ProxyOperatorState::Warning);
 }
 
 #[test]

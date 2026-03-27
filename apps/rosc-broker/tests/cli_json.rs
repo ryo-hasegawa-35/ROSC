@@ -46,6 +46,24 @@ fn proxy_readiness_stdout_is_json_only() {
 }
 
 #[test]
+fn proxy_snapshot_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-snapshot",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+    ]);
+
+    assert!(value.get("overview").is_some());
+    assert!(value.get("readiness").is_some());
+    assert!(value.get("diagnostics").is_some());
+    assert!(value.get("attention").is_some());
+    assert!(value.get("incidents").is_some());
+}
+
+#[test]
 fn proxy_diagnostics_stdout_is_json_only() {
     let value = json_stdout_for(&[
         "proxy-diagnostics",

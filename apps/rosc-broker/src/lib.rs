@@ -14,6 +14,7 @@ mod operator_overview;
 mod operator_policy;
 mod operator_readiness;
 mod operator_runtime_summary;
+mod operator_snapshot;
 mod proxy_app;
 mod proxy_reload_supervisor;
 mod proxy_status;
@@ -35,7 +36,9 @@ pub use launch_profile::{
 };
 pub use managed_proxy::{FrozenStartupBehavior, ManagedProxyStartupOptions, ManagedUdpProxy};
 pub use operator_attention::{ProxyOperatorAttention, proxy_operator_attention};
-pub use operator_diagnostics::{ProxyOperatorDiagnostics, proxy_operator_diagnostics};
+pub use operator_diagnostics::{
+    ProxyOperatorDiagnostics, proxy_operator_diagnostics, proxy_operator_diagnostics_from_overview,
+};
 pub use operator_incidents::{
     ProxyOperatorIncidents, proxy_operator_incidents, proxy_operator_incidents_from_histories,
 };
@@ -52,6 +55,9 @@ pub use operator_readiness::{
     ProxyOperatorReadinessLevel, proxy_operator_readiness, proxy_operator_readiness_from_overview,
 };
 pub use operator_runtime_summary::{ProxyOperatorRuntimeSummary, proxy_operator_runtime_summary};
+pub use operator_snapshot::{
+    ProxyOperatorSnapshot, proxy_operator_snapshot, proxy_operator_snapshot_from_overview,
+};
 pub use proxy_app::UdpProxyApp;
 pub use proxy_reload_supervisor::{ManagedProxyFileSupervisor, ProxyReloadOutcome};
 pub use proxy_status::{

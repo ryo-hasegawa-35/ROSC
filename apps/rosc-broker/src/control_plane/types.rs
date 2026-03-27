@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::{
     ProxyOperatorDiagnostics, ProxyOperatorIncidents, ProxyOperatorOverview, ProxyOperatorReport,
-    UdpProxyStatusSnapshot,
+    ProxyOperatorSnapshot, UdpProxyStatusSnapshot,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -39,6 +39,7 @@ pub trait ProxyControlPlane: Send + Sync + 'static {
     async fn status_snapshot(&self) -> UdpProxyStatusSnapshot;
     async fn operator_report(&self) -> ProxyOperatorReport;
     async fn operator_overview(&self) -> ProxyOperatorOverview;
+    async fn operator_snapshot(&self, history_limit: Option<usize>) -> ProxyOperatorSnapshot;
     async fn operator_diagnostics(&self, history_limit: Option<usize>) -> ProxyOperatorDiagnostics;
     async fn operator_incidents(&self, history_limit: Option<usize>) -> ProxyOperatorIncidents;
     async fn freeze_traffic(&self) -> ControlPlaneActionResult;

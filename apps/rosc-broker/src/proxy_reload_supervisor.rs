@@ -92,6 +92,10 @@ impl ManagedProxyFileSupervisor {
         self.proxy.operator_incidents(history_limit)
     }
 
+    pub fn operator_snapshot(&self, history_limit: Option<usize>) -> crate::ProxyOperatorSnapshot {
+        self.proxy.operator_snapshot(history_limit)
+    }
+
     pub fn proxy(&self) -> &ManagedUdpProxy {
         &self.proxy
     }

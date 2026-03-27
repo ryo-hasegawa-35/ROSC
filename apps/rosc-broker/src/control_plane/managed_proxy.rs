@@ -5,7 +5,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     ManagedUdpProxy, ProxyOperatorDiagnostics, ProxyOperatorIncidents, ProxyOperatorOverview,
-    ProxyOperatorReport, UdpProxyStatusSnapshot,
+    ProxyOperatorReport, ProxyOperatorSnapshot, UdpProxyStatusSnapshot,
 };
 
 use super::shared::{
@@ -36,6 +36,10 @@ impl ProxyControlPlane for ManagedUdpProxyController {
 
     async fn operator_overview(&self) -> ProxyOperatorOverview {
         self.inner.lock().await.operator_overview()
+    }
+
+    async fn operator_snapshot(&self, history_limit: Option<usize>) -> ProxyOperatorSnapshot {
+        self.inner.lock().await.operator_snapshot(history_limit)
     }
 
     async fn operator_diagnostics(&self, history_limit: Option<usize>) -> ProxyOperatorDiagnostics {

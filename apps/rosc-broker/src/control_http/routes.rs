@@ -10,7 +10,8 @@ use super::response::{
     HttpResponse, blockers_response, config_events_response, diagnostics_response,
     incidents_response, invalid_component_error, invalid_query_error, map_action_result,
     operator_actions_response, operator_signals_response, overrides_response, overview_response,
-    readiness_response, report_response, status_response, unsupported_route_error,
+    readiness_response, report_response, snapshot_response, status_response,
+    unsupported_route_error,
 };
 
 pub(crate) async fn route_request(
@@ -25,6 +26,12 @@ pub(crate) async fn route_request(
         ("GET", "/readiness") => {
             let overview = control.operator_overview().await;
             readiness_response(crate::proxy_operator_readiness_from_overview(overview))
+        }
+        ("GET", "/snapshot") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            snapshot_response(control.operator_snapshot(limit).await)
         }
         ("GET", "/diagnostics") => {
             let Ok(limit) = history_limit(query) else {

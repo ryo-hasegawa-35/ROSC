@@ -10,7 +10,8 @@ use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError, ProxyCon
 use crate::{
     ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorIncidents,
     ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
-    ProxyOperatorSignalScope, ProxyOperatorSignalsView, UdpProxyStatusSnapshot,
+    ProxyOperatorSignalScope, ProxyOperatorSignalsView, ProxyOperatorSnapshot,
+    UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -56,6 +57,12 @@ pub(crate) struct OperatorOverviewResponse {
 pub(crate) struct OperatorReadinessResponse {
     ok: bool,
     readiness: ProxyOperatorReadiness,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorSnapshotResponse {
+    ok: bool,
+    snapshot: Box<ProxyOperatorSnapshot>,
 }
 
 #[derive(Serialize)]
@@ -109,6 +116,7 @@ pub(crate) enum ResponseBody {
     OperatorReport(OperatorReportResponse),
     OperatorOverview(Box<OperatorOverviewResponse>),
     OperatorReadiness(Box<OperatorReadinessResponse>),
+    OperatorSnapshot(Box<OperatorSnapshotResponse>),
     OperatorDiagnostics(Box<OperatorDiagnosticsResponse>),
     OperatorAttention(OperatorAttentionResponse),
     OperatorIncidents(OperatorIncidentsResponse),
@@ -137,6 +145,7 @@ impl ResponseBody {
             Self::OperatorReport(body) => serde_json::to_vec(body),
             Self::OperatorOverview(body) => serde_json::to_vec(body),
             Self::OperatorReadiness(body) => serde_json::to_vec(body),
+            Self::OperatorSnapshot(body) => serde_json::to_vec(body),
             Self::OperatorDiagnostics(body) => serde_json::to_vec(body),
             Self::OperatorAttention(body) => serde_json::to_vec(body),
             Self::OperatorIncidents(body) => serde_json::to_vec(body),
@@ -206,6 +215,16 @@ pub(crate) fn readiness_response(readiness: ProxyOperatorReadiness) -> HttpRespo
         body: ResponseBody::OperatorReadiness(Box::new(OperatorReadinessResponse {
             ok: true,
             readiness,
+        })),
+    }
+}
+
+pub(crate) fn snapshot_response(snapshot: ProxyOperatorSnapshot) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorSnapshot(Box::new(OperatorSnapshotResponse {
+            ok: true,
+            snapshot: Box::new(snapshot),
         })),
     }
 }

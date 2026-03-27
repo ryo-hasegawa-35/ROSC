@@ -260,6 +260,28 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|reason| reason == "traffic is currently frozen by operator override")
     );
 
+    let snapshot = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /snapshot?limit=1 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(snapshot["ok"], true);
+    assert_eq!(snapshot["snapshot"]["readiness"]["level"], "degraded");
+    assert_eq!(snapshot["snapshot"]["attention"]["state"], "warning");
+    assert_eq!(
+        snapshot["snapshot"]["incidents"]["recent_operator_actions"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        snapshot["snapshot"]["diagnostics"]["overview"]["report"]["state"],
+        "warning"
+    );
+
     let blockers = json_body(
         &request(
             service.listen_addr(),
