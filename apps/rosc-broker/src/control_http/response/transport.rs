@@ -24,9 +24,17 @@ pub(crate) async fn write_json_response(
     status: &str,
     body: &ResponseBody,
 ) -> io::Result<()> {
-    let payload = body.to_json()?;
+    write_response(stream, status, body).await
+}
+
+pub(crate) async fn write_response(
+    stream: &mut TcpStream,
+    status: &str,
+    body: &ResponseBody,
+) -> io::Result<()> {
+    let (content_type, payload) = body.to_http_payload()?;
     let headers = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         payload.len()
     );
     stream.write_all(headers.as_bytes()).await?;

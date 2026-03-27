@@ -50,6 +50,7 @@ cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
+start http://127.0.0.1:19292/dashboard
 curl -X POST http://127.0.0.1:19292/freeze
 curl -X POST http://127.0.0.1:19292/routes/camera/isolate
 curl -X POST http://127.0.0.1:19292/routes/restore-all
@@ -125,6 +126,7 @@ Current Phase 01 runtime coverage:
 - `proxy-diagnostics` and control-plane `/diagnostics` now expose the same operator snapshot bundled with bounded recent operator/config history for incident triage
 - `proxy-attention` and control-plane `/attention` now expose a compact triage view with active overrides, latest incident highlights, and only the route/destination ids that currently need attention
 - `proxy-incidents` and control-plane `/incidents` now expose an incident-focused bundle with open blockers/warnings, filtered recent issue history, and the full problematic route/destination entries needed for recovery work
+- control-plane `/dashboard` now serves a lightweight operator console that layers overview/readiness/diagnostics/incident views and safe live actions over the existing localhost API
 - `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
 - config rejection / block / reload-failure history now retains reason details instead of only counters
 

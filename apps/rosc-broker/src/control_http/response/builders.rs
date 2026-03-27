@@ -1,3 +1,4 @@
+use crate::control_http::dashboard::{DASHBOARD_CSS, DASHBOARD_HTML, DASHBOARD_JS};
 use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError};
 use crate::{
     ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorIncidents,
@@ -18,6 +19,36 @@ pub(crate) fn status_response(status: UdpProxyStatusSnapshot) -> HttpResponse {
     HttpResponse {
         status: "200 OK",
         body: ResponseBody::Status(StatusResponse { ok: true, status }),
+    }
+}
+
+pub(crate) fn dashboard_html_response() -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::StaticAsset {
+            content_type: "text/html; charset=utf-8",
+            body: DASHBOARD_HTML,
+        },
+    }
+}
+
+pub(crate) fn dashboard_css_response() -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::StaticAsset {
+            content_type: "text/css; charset=utf-8",
+            body: DASHBOARD_CSS,
+        },
+    }
+}
+
+pub(crate) fn dashboard_js_response() -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::StaticAsset {
+            content_type: "application/javascript; charset=utf-8",
+            body: DASHBOARD_JS,
+        },
     }
 }
 

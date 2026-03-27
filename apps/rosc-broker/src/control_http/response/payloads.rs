@@ -120,6 +120,10 @@ pub(crate) enum ResponseBody {
     Blockers(BlockersResponse),
     RecentOperatorActions(RecentOperatorActionsResponse),
     RecentConfigEvents(RecentConfigEventsResponse),
+    StaticAsset {
+        content_type: &'static str,
+        body: &'static str,
+    },
     Error(ErrorResponse),
 }
 
@@ -133,24 +137,32 @@ impl ResponseBody {
         Self::Error(ErrorResponse { ok: false, error })
     }
 
-    pub(crate) fn to_json(&self) -> io::Result<Vec<u8>> {
+    pub(crate) fn to_http_payload(&self) -> io::Result<(&'static str, Vec<u8>)> {
         match self {
-            Self::Status(body) => serde_json::to_vec(body),
-            Self::Action(body) => serde_json::to_vec(body),
-            Self::OperatorReport(body) => serde_json::to_vec(body),
-            Self::OperatorOverview(body) => serde_json::to_vec(body),
-            Self::OperatorReadiness(body) => serde_json::to_vec(body),
-            Self::OperatorSnapshot(body) => serde_json::to_vec(body),
-            Self::OperatorDiagnostics(body) => serde_json::to_vec(body),
-            Self::OperatorAttention(body) => serde_json::to_vec(body),
-            Self::OperatorIncidents(body) => serde_json::to_vec(body),
-            Self::OperatorOverrides(body) => serde_json::to_vec(body),
-            Self::OperatorSignals(body) => serde_json::to_vec(body),
-            Self::Blockers(body) => serde_json::to_vec(body),
-            Self::RecentOperatorActions(body) => serde_json::to_vec(body),
-            Self::RecentConfigEvents(body) => serde_json::to_vec(body),
-            Self::Error(body) => serde_json::to_vec(body),
+            Self::Status(body) => json_payload(body),
+            Self::Action(body) => json_payload(body),
+            Self::OperatorReport(body) => json_payload(body),
+            Self::OperatorOverview(body) => json_payload(body),
+            Self::OperatorReadiness(body) => json_payload(body),
+            Self::OperatorSnapshot(body) => json_payload(body),
+            Self::OperatorDiagnostics(body) => json_payload(body),
+            Self::OperatorAttention(body) => json_payload(body),
+            Self::OperatorIncidents(body) => json_payload(body),
+            Self::OperatorOverrides(body) => json_payload(body),
+            Self::OperatorSignals(body) => json_payload(body),
+            Self::Blockers(body) => json_payload(body),
+            Self::RecentOperatorActions(body) => json_payload(body),
+            Self::RecentConfigEvents(body) => json_payload(body),
+            Self::StaticAsset { content_type, body } => {
+                Ok((content_type, body.as_bytes().to_vec()))
+            }
+            Self::Error(body) => json_payload(body),
         }
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
     }
+}
+
+fn json_payload<T: Serialize>(value: &T) -> io::Result<(&'static str, Vec<u8>)> {
+    serde_json::to_vec(value)
+        .map(|payload| ("application/json", payload))
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
 }

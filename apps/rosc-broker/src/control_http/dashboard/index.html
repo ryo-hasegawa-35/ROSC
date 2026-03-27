@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ROSC Operator Console</title>
+    <link rel="stylesheet" href="/dashboard/app.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <p class="eyebrow">ROSC</p>
+          <h1>Operator Console</h1>
+          <p class="subcopy">Phase 02 dashboard shell</p>
+        </div>
+        <nav class="primary-nav" aria-label="Dashboard sections">
+          <a href="#overview" data-section-link="overview">Overview</a>
+          <a href="#topology" data-section-link="topology">Topology</a>
+          <a href="#routes" data-section-link="routes">Routes</a>
+          <a href="#destinations" data-section-link="destinations">Destinations</a>
+          <a href="#recovery" data-section-link="recovery">Recovery</a>
+          <a href="#incidents" data-section-link="incidents">Incidents</a>
+        </nav>
+        <section class="sidebar-panel">
+          <p class="panel-label">Connection</p>
+          <div class="connection-status" id="connection-status">Connecting…</div>
+          <button class="ghost-button" id="refresh-button" type="button">Refresh now</button>
+        </section>
+        <section class="sidebar-panel">
+          <p class="panel-label">Operator actions</p>
+          <div class="action-stack">
+            <button class="action-button" data-action="freeze">Freeze traffic</button>
+            <button class="action-button" data-action="thaw">Thaw traffic</button>
+            <button class="action-button" data-action="restore-all">Restore all routes</button>
+          </div>
+          <p class="panel-note">
+            High-impact actions always ask for confirmation and immediately reload the dashboard.
+          </p>
+        </section>
+      </aside>
+
+      <main class="content">
+        <header class="hero">
+          <div>
+            <p class="eyebrow">Embedded browser dashboard</p>
+            <h2 id="hero-title">Broker state unknown</h2>
+            <p id="hero-subtitle">
+              Waiting for the control plane to return the first snapshot.
+            </p>
+          </div>
+          <div class="hero-status">
+            <span class="state-pill" id="hero-state">Loading</span>
+            <dl class="hero-metrics">
+              <div>
+                <dt>Refresh</dt>
+                <dd id="hero-refresh">--</dd>
+              </div>
+              <div>
+                <dt>Runtime</dt>
+                <dd id="hero-runtime">--</dd>
+              </div>
+            </dl>
+          </div>
+        </header>
+
+        <section class="overview-grid" id="overview">
+          <article class="panel panel-wide">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Overview</p>
+                <h3>Global health</h3>
+              </div>
+              <span class="inline-state" id="overview-state">--</span>
+            </div>
+            <div class="stat-grid" id="overview-stats"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Attention</p>
+                <h3>Top incident</h3>
+              </div>
+            </div>
+            <ul class="callout-list" id="attention-list"></ul>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Readiness</p>
+                <h3>Deployment gate</h3>
+              </div>
+            </div>
+            <div class="readiness-block" id="readiness-block"></div>
+          </article>
+        </section>
+
+        <section class="panel" id="topology">
+          <div class="panel-header">
+            <div>
+              <p class="panel-label">Topology</p>
+              <h3>Ingress to route to destination</h3>
+            </div>
+          </div>
+          <div class="topology-grid">
+            <div>
+              <h4>Ingresses</h4>
+              <div class="entity-column" id="topology-ingresses"></div>
+            </div>
+            <div>
+              <h4>Routes</h4>
+              <div class="entity-column" id="topology-routes"></div>
+            </div>
+            <div>
+              <h4>Destinations</h4>
+              <div class="entity-column" id="topology-destinations"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="two-column">
+          <article class="panel" id="routes">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Routes</p>
+                <h3>Route health and policy</h3>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Route</th>
+                    <th>State</th>
+                    <th>Mode</th>
+                    <th>Class</th>
+                    <th>Warnings</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="routes-table"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel" id="destinations">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Destinations</p>
+                <h3>Queue, breaker, send health</h3>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Destination</th>
+                    <th>Target</th>
+                    <th>Queue</th>
+                    <th>Breaker</th>
+                    <th>Send failures</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="destinations-table"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="two-column">
+          <article class="panel" id="recovery">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Recovery</p>
+                <h3>Cache, overrides, recent actions</h3>
+              </div>
+            </div>
+            <div class="recovery-grid">
+              <div>
+                <h4>Overrides</h4>
+                <ul class="callout-list" id="overrides-list"></ul>
+              </div>
+              <div>
+                <h4>Recent operator actions</h4>
+                <ol class="timeline" id="operator-history"></ol>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel" id="incidents">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Incidents</p>
+                <h3>Recent config and runtime issues</h3>
+              </div>
+            </div>
+            <div class="recovery-grid">
+              <div>
+                <h4>Recent config events</h4>
+                <ol class="timeline" id="config-history"></ol>
+              </div>
+              <div>
+                <h4>Problematic entities</h4>
+                <ul class="callout-list" id="problematic-entities"></ul>
+              </div>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <template id="empty-state-template">
+      <li class="empty-state">No items right now.</li>
+    </template>
+
+    <script type="module" src="/dashboard/app.js"></script>
+  </body>
+</html>

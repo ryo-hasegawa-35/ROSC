@@ -167,6 +167,51 @@ async fn control_service_exposes_recent_operator_and_config_history() {
 }
 
 #[tokio::test]
+async fn control_service_serves_dashboard_assets() {
+    let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let proxy = start_proxy(
+        proxy_config(
+            "127.0.0.1:0",
+            &destination_listener.local_addr().unwrap().to_string(),
+        ),
+        32,
+    )
+    .await;
+    let mut service = start_service(&proxy, "127.0.0.1:0").await;
+
+    let dashboard = request(
+        service.listen_addr(),
+        "GET /dashboard HTTP/1.1\r\nHost: localhost\r\n\r\n",
+    )
+    .await;
+    assert!(dashboard.contains("HTTP/1.1 200 OK"));
+    assert!(dashboard.contains("Content-Type: text/html; charset=utf-8"));
+    assert!(dashboard.contains("ROSC Operator Console"));
+    assert!(dashboard.contains("/dashboard/app.js"));
+
+    let css = request(
+        service.listen_addr(),
+        "GET /dashboard/app.css HTTP/1.1\r\nHost: localhost\r\n\r\n",
+    )
+    .await;
+    assert!(css.contains("HTTP/1.1 200 OK"));
+    assert!(css.contains("Content-Type: text/css; charset=utf-8"));
+    assert!(css.contains(":root"));
+
+    let js = request(
+        service.listen_addr(),
+        "GET /dashboard/app.js HTTP/1.1\r\nHost: localhost\r\n\r\n",
+    )
+    .await;
+    assert!(js.contains("HTTP/1.1 200 OK"));
+    assert!(js.contains("Content-Type: application/javascript; charset=utf-8"));
+    assert!(js.contains("REFRESH_INTERVAL_MS"));
+
+    service.shutdown().await.unwrap();
+    proxy.lock().await.shutdown().await;
+}
+
+#[tokio::test]
 async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     let destination_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let proxy = start_proxy_with_policy(

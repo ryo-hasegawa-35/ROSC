@@ -48,6 +48,7 @@ cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
 cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
+start http://127.0.0.1:19292/dashboard
 curl -X POST http://127.0.0.1:19292/freeze
 curl -X POST http://127.0.0.1:19292/routes/camera/isolate
 curl -X POST http://127.0.0.1:19292/routes/restore-all
@@ -122,6 +123,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - `proxy-diagnostics` と control-plane の `/diagnostics` で、その 1-shot snapshot に bounded な recent operator/config history も束ねて返せるようにし、インシデント一次切り分けをやりやすくした
 - `proxy-attention` と control-plane の `/attention` で、active override・最新の incident highlight・いま本当に注意すべき route/destination id だけを返す compact な一次判断ビューも追加した
 - `proxy-incidents` と control-plane の `/incidents` で、open blocker/warning、filtered な recent issue history、復旧に必要な problematic route/destination の詳細をまとめて返す incident-focused view も追加した
+- control-plane の `/dashboard` から、overview / readiness / diagnostics / incidents と安全な live action を束ねた lightweight operator console を localhost 上で開けるようにした
 - `/signals?scope=problematic` で、operator が今見るべき route / destination signal だけに payload を絞れるようにした
 - config の reject / block / reload failure も counters だけでなく reason 付きの recent history として残るようになった
 

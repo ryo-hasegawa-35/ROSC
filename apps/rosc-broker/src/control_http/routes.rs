@@ -8,11 +8,11 @@ use super::request::{
     replay_limit, split_query,
 };
 use super::response::{
-    HttpResponse, blockers_response, config_events_response, diagnostics_response,
-    incidents_response, invalid_component_error, invalid_query_error, map_action_result,
-    operator_actions_response, operator_signals_response, overrides_response, overview_response,
-    readiness_response, report_response, snapshot_response, status_response,
-    unsupported_route_error,
+    HttpResponse, blockers_response, config_events_response, dashboard_css_response,
+    dashboard_html_response, dashboard_js_response, diagnostics_response, incidents_response,
+    invalid_component_error, invalid_query_error, map_action_result, operator_actions_response,
+    operator_signals_response, overrides_response, overview_response, readiness_response,
+    report_response, snapshot_response, status_response, unsupported_route_error,
 };
 
 pub(crate) async fn route_request(
@@ -21,6 +21,9 @@ pub(crate) async fn route_request(
 ) -> HttpResponse {
     let (path, query) = split_query(&request.path);
     match (request.method.as_str(), path) {
+        ("GET", "/dashboard") | ("GET", "/dashboard/") => dashboard_html_response(),
+        ("GET", "/dashboard/app.css") => dashboard_css_response(),
+        ("GET", "/dashboard/app.js") => dashboard_js_response(),
         ("GET", "/status") => status_response(control.status_snapshot().await),
         ("GET", "/report") => report_response(control.operator_report().await),
         ("GET", "/overview") => overview_response(control.operator_overview().await),
