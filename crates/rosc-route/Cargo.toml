@@ -1,0 +1,16 @@
+[package]
+name = "rosc-route"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+regex.workspace = true
+rosc-osc = { path = "../rosc-osc" }
+rosc-packet = { path = "../rosc-packet" }
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+rosc-osc = { path = "../rosc-osc" }

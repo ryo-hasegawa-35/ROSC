@@ -1,0 +1,213 @@
+use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError};
+use crate::{
+    ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorIncidents,
+    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
+    ProxyOperatorSignalsView, ProxyOperatorSnapshot, UdpProxyStatusSnapshot,
+};
+use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
+
+use super::payloads::{
+    ActionResponse, BlockersResponse, HttpResponse, OperatorAttentionResponse,
+    OperatorDiagnosticsResponse, OperatorIncidentsResponse, OperatorOverridesResponse,
+    OperatorOverviewResponse, OperatorReadinessResponse, OperatorReportResponse,
+    OperatorSignalsResponse, OperatorSnapshotResponse, RecentConfigEventsResponse,
+    RecentOperatorActionsResponse, ResponseBody, StatusResponse,
+};
+
+pub(crate) fn status_response(status: UdpProxyStatusSnapshot) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::Status(StatusResponse { ok: true, status }),
+    }
+}
+
+pub(crate) fn report_response(report: ProxyOperatorReport) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorReport(OperatorReportResponse { ok: true, report }),
+    }
+}
+
+pub(crate) fn overview_response(overview: ProxyOperatorOverview) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorOverview(Box::new(OperatorOverviewResponse {
+            ok: true,
+            overview,
+        })),
+    }
+}
+
+pub(crate) fn readiness_response(readiness: ProxyOperatorReadiness) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorReadiness(Box::new(OperatorReadinessResponse {
+            ok: true,
+            readiness,
+        })),
+    }
+}
+
+pub(crate) fn readyz_response(
+    readiness: ProxyOperatorReadiness,
+    allow_degraded: bool,
+) -> HttpResponse {
+    HttpResponse {
+        status: if readiness.is_acceptable(allow_degraded) {
+            "200 OK"
+        } else {
+            "503 Service Unavailable"
+        },
+        body: ResponseBody::OperatorReadiness(Box::new(OperatorReadinessResponse {
+            ok: true,
+            readiness,
+        })),
+    }
+}
+
+pub(crate) fn snapshot_response(snapshot: ProxyOperatorSnapshot) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorSnapshot(Box::new(OperatorSnapshotResponse {
+            ok: true,
+            snapshot: Box::new(snapshot),
+        })),
+    }
+}
+
+pub(crate) fn diagnostics_response(diagnostics: ProxyOperatorDiagnostics) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorDiagnostics(Box::new(OperatorDiagnosticsResponse {
+            ok: true,
+            diagnostics: Box::new(diagnostics),
+        })),
+    }
+}
+
+pub(crate) fn attention_response(attention: ProxyOperatorAttention) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorAttention(OperatorAttentionResponse {
+            ok: true,
+            attention,
+        }),
+    }
+}
+
+pub(crate) fn incidents_response(incidents: ProxyOperatorIncidents) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorIncidents(OperatorIncidentsResponse {
+            ok: true,
+            incidents,
+        }),
+    }
+}
+
+pub(crate) fn overrides_response(overrides: ProxyOperatorOverrides) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorOverrides(OperatorOverridesResponse {
+            ok: true,
+            overrides,
+        }),
+    }
+}
+
+pub(crate) fn blockers_response(blockers: Vec<String>) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::Blockers(BlockersResponse { ok: true, blockers }),
+    }
+}
+
+pub(crate) fn operator_actions_response(actions: Vec<RecentOperatorAction>) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::RecentOperatorActions(RecentOperatorActionsResponse {
+            ok: true,
+            actions,
+        }),
+    }
+}
+
+pub(crate) fn config_events_response(events: Vec<RecentConfigEvent>) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::RecentConfigEvents(RecentConfigEventsResponse { ok: true, events }),
+    }
+}
+
+pub(crate) fn action_response(
+    action: &'static str,
+    result: ControlPlaneActionResult,
+) -> ResponseBody {
+    ResponseBody::Action(ActionResponse {
+        ok: true,
+        action,
+        applied: result.applied,
+        dispatch_count: result.dispatch_count,
+        status: result.status,
+    })
+}
+
+pub(crate) fn map_action_result(
+    action: &'static str,
+    result: Result<ControlPlaneActionResult, ControlPlaneError>,
+) -> HttpResponse {
+    match result {
+        Ok(result) => HttpResponse {
+            status: "200 OK",
+            body: action_response(action, result),
+        },
+        Err(ControlPlaneError::UnknownRoute(route_id)) => {
+            not_found_error(format!("unknown route `{route_id}`"))
+        }
+        Err(ControlPlaneError::UnknownDestination(destination_id)) => {
+            not_found_error(format!("unknown destination `{destination_id}`"))
+        }
+        Err(ControlPlaneError::ActionFailed(message)) => HttpResponse {
+            status: "422 Unprocessable Entity",
+            body: ResponseBody::error(message),
+        },
+    }
+}
+
+pub(crate) fn operator_signals_response(signals: ProxyOperatorSignalsView) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorSignals(OperatorSignalsResponse {
+            ok: true,
+            scope: signals.scope,
+            runtime_signals: signals.runtime_signals,
+            route_signals: signals.route_signals,
+            destination_signals: signals.destination_signals,
+        }),
+    }
+}
+
+pub(crate) fn invalid_component_error(label: &str) -> HttpResponse {
+    HttpResponse {
+        status: "400 Bad Request",
+        body: ResponseBody::error(format!("invalid percent-encoding in {label}")),
+    }
+}
+
+pub(crate) fn invalid_query_error(label: &str) -> HttpResponse {
+    HttpResponse {
+        status: "400 Bad Request",
+        body: ResponseBody::error(format!("invalid query parameter `{label}`")),
+    }
+}
+
+pub(crate) fn unsupported_route_error(path: &str) -> HttpResponse {
+    not_found_error(format!("unsupported control route {path}"))
+}
+
+pub(crate) fn not_found_error(error: String) -> HttpResponse {
+    HttpResponse {
+        status: "404 Not Found",
+        body: ResponseBody::error(error),
+    }
+}

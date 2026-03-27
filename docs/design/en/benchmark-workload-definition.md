@@ -163,6 +163,56 @@ Measure:
 - rehydrate correctness
 - stale cache handling
 
+### Workload G: Wasm Transform Boundary
+
+Intent:
+
+- quantify host/Wasm overhead on packet transforms
+
+Traffic:
+
+- repeated scalar control packets
+- mixed route classes with Wasm disabled vs enabled
+
+Measure:
+
+- added per-packet latency
+- jitter increase on the hot path
+- copy count or allocation evidence where available
+
+### Workload H: Schema Validation Depth
+
+Intent:
+
+- compare validation depth against control-plane safety gains
+
+Traffic:
+
+- same namespace under `off`, `shape_only`, `typed`, and `strict`
+
+Measure:
+
+- throughput cost
+- p95 and p99 latency delta
+- impact on bursty sensor traffic
+
+### Workload I: Security Overlay Jitter
+
+Intent:
+
+- validate whether secure ingress stays inside the route jitter budget
+
+Traffic:
+
+- synchronized control traffic in plain mode and secure mode
+
+Measure:
+
+- added verification cost
+- jitter spread increase
+- whether secure mode changes tail latency enough to threaten sync-sensitive
+  workloads
+
 ## Feature Toggle Matrix
 
 Each workload should run under at least these modes:

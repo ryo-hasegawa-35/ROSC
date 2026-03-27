@@ -7,7 +7,7 @@ workflows even under heavy real-time pressure.
 
 ## Current Status
 
-The repository is currently in the pre-implementation phase.
+The repository has entered the first implementation phase.
 
 What exists now:
 
@@ -18,13 +18,115 @@ What exists now:
 - an initial ADR set in English and Japanese
 - pre-implementation conformance and benchmark fixture inventories
 - cross-platform repository-sanity CI scaffolding
+- a Rust workspace bootstrap for the Phase 01 core crates
+- an initial OSC parser/encoder core with conformance tests
+- initial route, config, and bounded-queue primitives for the broker core
 
 What does not exist yet:
 
-- production Rust crates
+- production-ready runtime behavior
 - protocol adapters
 - benchmark harness implementation
 - native integrations
+
+## Getting Started
+
+Run the current workspace locally:
+
+```bash
+cargo test --workspace
+cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
+cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
+cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml --safe-mode
+cargo run -p rosc-broker -- proxy-overview examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
+cargo run -p rosc-broker -- proxy-readiness examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
+cargo run -p rosc-broker -- proxy-assert-ready examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
+cargo run -p rosc-broker -- proxy-snapshot examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
+cargo run -p rosc-broker -- proxy-diagnostics examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
+cargo run -p rosc-broker -- proxy-attention examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
+cargo run -p rosc-broker -- proxy-incidents examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
+cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
+cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
+cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
+cargo run -p rosc-broker -- serve-health 127.0.0.1:19191 --config examples/phase-01-basic.toml
+cargo run -p rosc-broker -- run-udp-proxy examples/phase-01-basic.toml --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
+curl -X POST http://127.0.0.1:19292/freeze
+curl -X POST http://127.0.0.1:19292/routes/camera/isolate
+curl -X POST http://127.0.0.1:19292/routes/restore-all
+curl -X POST http://127.0.0.1:19292/destinations/udp_renderer/rehydrate
+curl -X POST "http://127.0.0.1:19292/routes/camera/replay/sandbox_tap?limit=1"
+curl http://127.0.0.1:19292/status
+curl http://127.0.0.1:19292/report
+curl http://127.0.0.1:19292/overview
+curl http://127.0.0.1:19292/readiness
+curl -i http://127.0.0.1:19292/readyz
+curl -i "http://127.0.0.1:19292/readyz?allow_degraded=true"
+curl http://127.0.0.1:19292/snapshot?limit=10
+curl http://127.0.0.1:19292/diagnostics?limit=10
+curl http://127.0.0.1:19292/attention
+curl http://127.0.0.1:19292/incidents?limit=10
+curl http://127.0.0.1:19292/overrides
+curl http://127.0.0.1:19292/signals
+curl http://127.0.0.1:19292/signals?scope=problematic
+curl http://127.0.0.1:19292/blockers
+curl http://127.0.0.1:19292/history/operator-actions
+curl http://127.0.0.1:19292/history/config-events
+```
+
+`--control-listen` is intentionally loopback-only. Bind it to `127.0.0.1`, `::1`, or another
+local-only alias such as `localhost`; wildcard or externally reachable addresses are rejected.
+
+`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-assert-ready`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, and `proxy-incidents`
+intentionally write JSON only to stdout so they can be piped directly into tools such as `jq`
+without stripping summary lines first.
+
+Run the same workspace inside Docker:
+
+```bash
+docker compose run --rm rosc-dev cargo test --workspace
+```
+
+Development container entry points:
+
+- [Docker Compose](./compose.yaml)
+- [Devcontainer](./.devcontainer/devcontainer.json)
+
+Current Phase 01 runtime coverage:
+
+- OSC parser/encoder for strict, legacy-tolerant, and extended modes
+- route matching with static address rename transforms
+- bounded ingress queue and UDP ingress binding
+- bounded per-destination egress workers with breaker-based isolation
+- in-memory health/metrics export rendered in Prometheus text format
+- minimal HTTP `/healthz` and `/metrics` endpoint for early local troubleshooting
+- safe config diffing and last-known-good config apply semantics
+- top-level UDP ingress / destination config with end-to-end localhost proxy relay coverage
+- first safe late-joiner recovery path with route-level cache policy and bounded rehydrate
+- bounded capture, sandbox replay, and recovery audit primitives kept distinct from live routing
+- configurable per-destination queue, drop, and breaker policy from TOML
+- polling-based safe config watch flow that preserves the last-known-good revision
+- startup-time proxy loop prevention for UDP destinations that point back into a bound ingress
+- JSON proxy-status output that summarizes ingresses, destinations, routes, direct UDP fallback hints, and runtime queue health
+- startup and reload safety gates that can block proxy activation when operator warnings or fallback gaps are present
+- a minimal safe-mode launch profile that disables optional capture / replay / restart-rehydrate surfaces while keeping core UDP routing active
+- clean proxy shutdown that releases ingress ports for controlled restart and future hot reload work
+- managed proxy reload supervision with rollback to the previous live config when a replacement runtime fails
+- optional co-hosted health and metrics endpoint while the live UDP proxy is running
+- optional co-hosted control endpoint for freeze/thaw, route isolation, and live status inspection while the proxy is running
+- control endpoint now also exposes destination rehydrate and sandbox replay actions for live operator workflows
+- control endpoint also supports bulk route restore plus percent-decoded resource ids for safer operator recovery flows
+- runtime status and control history endpoints now expose bounded recent operator actions and config transitions for post-incident tracing
+- CLI reports and control-plane `/report` / `/blockers` now share the same structured operator safety evaluation
+- control-plane `/report` now also exposes structured override/runtime-signal/route-signal/destination-signal sections, with `/overrides` and `/signals` endpoints for direct consumption
+- `proxy-overview` and control-plane `/overview` now expose a one-shot operator snapshot with report + current status + problematic signal view for dashboard/bootstrap workflows
+- `proxy-readiness` and control-plane `/readiness` now expose a machine-readable readiness contract with `ready/degraded/blocked` level, operator-action reasons, and route/destination counts for automation and deployment gates
+- `proxy-assert-ready` and control-plane `/readyz` now expose gate-style readiness checks that return non-zero / HTTP 503 when the current proxy state is not acceptable for startup or deployment automation
+- `proxy-snapshot` and control-plane `/snapshot` now expose a full one-shot operator bundle with overview, readiness, diagnostics, attention, and incidents in one payload for dashboard/bootstrap and incident tooling
+- `proxy-diagnostics` and control-plane `/diagnostics` now expose the same operator snapshot bundled with bounded recent operator/config history for incident triage
+- `proxy-attention` and control-plane `/attention` now expose a compact triage view with active overrides, latest incident highlights, and only the route/destination ids that currently need attention
+- `proxy-incidents` and control-plane `/incidents` now expose an incident-focused bundle with open blockers/warnings, filtered recent issue history, and the full problematic route/destination entries needed for recovery work
+- `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
+- config rejection / block / reload-failure history now retains reason details instead of only counters
 
 ## Documentation Entry Points
 

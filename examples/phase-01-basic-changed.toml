@@ -1,0 +1,59 @@
+[[udp_ingresses]]
+id = "udp_localhost_in"
+bind = "127.0.0.1:9000"
+mode = "osc1_0_strict"
+
+[[udp_destinations]]
+id = "udp_renderer"
+bind = "0.0.0.0:0"
+target = "127.0.0.1:9001"
+
+[udp_destinations.policy]
+queue_depth = 8
+drop_policy = "drop_oldest"
+
+[udp_destinations.policy.breaker]
+open_after_consecutive_failures = 2
+open_after_consecutive_queue_overflows = 3
+cooldown_ms = 500
+
+[[routes]]
+id = "ue5_camera_fov"
+enabled = true
+mode = "osc1_0_strict"
+class = "StatefulControl"
+
+[routes.match]
+ingress_ids = ["udp_localhost_in"]
+address_patterns = ["/ue5/camera/fov"]
+protocols = ["osc_udp"]
+
+[routes.transform]
+rename_address = "/render/camera/fov"
+
+[routes.cache]
+policy = "last_value_per_address"
+ttl_ms = 10000
+persist = "warm"
+
+[routes.recovery]
+late_joiner = "latest"
+rehydrate_on_connect = true
+
+[[routes.destinations]]
+target = "udp_renderer"
+transport = "osc_udp"
+
+[[routes]]
+id = "td_tracking"
+enabled = true
+mode = "osc1_1_extended"
+class = "SensorStream"
+
+[routes.match]
+address_patterns = ["//tracking"]
+protocols = ["osc_udp"]
+
+[[routes.destinations]]
+target = "debug_tap"
+transport = "internal"

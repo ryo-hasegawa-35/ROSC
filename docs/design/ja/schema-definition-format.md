@@ -194,6 +194,28 @@ schema tool が少なくとも持つべきもの:
 - strict validation
 - migration guidance
 
+## Validation Cost Policy
+
+schema validation は、すべての route に同じ深さで掛ける前提にすべきでは
+ありません。
+
+推奨 validation depth:
+
+- `off`: data plane では schema validation を行わない
+- `shape_only`: arity と大まかな型ファミリだけを安価に確認する
+- `typed`: schema どおりの argument type を確認する
+- `strict`: 型に加えて range、enum、semantic constraint まで確認する
+
+推奨 default:
+
+- critical control route は `typed` または `strict`
+- moderate-rate な stateful route は `typed`
+- high-rate sensor / telemetry route は、明示的に許可しない限り `off` または
+  `shape_only`
+
+この tradeoff は routing plan、benchmark plan、operator UI のすべてで
+見えるようにすべきです。
+
 ## 非交渉の不変条件
 
 - schema は optional のまま保つ

@@ -1,0 +1,24 @@
+[package]
+name = "rosc-broker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+clap.workspace = true
+rosc-config = { path = "../../crates/rosc-config" }
+rosc-osc = { path = "../../crates/rosc-osc" }
+rosc-packet = { path = "../../crates/rosc-packet" }
+rosc-recovery = { path = "../../crates/rosc-recovery" }
+rosc-route = { path = "../../crates/rosc-route" }
+rosc-runtime = { path = "../../crates/rosc-runtime" }
+rosc-telemetry = { path = "../../crates/rosc-telemetry" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+assert_cmd = "2.0.17"

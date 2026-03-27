@@ -140,6 +140,22 @@ Useful controls:
 - force safe mode
 - audit config changes
 
+## Jitter Budget Requirement
+
+Security features are allowed to increase cost, but they are not allowed to
+hide their jitter impact.
+
+Implications:
+
+- secure mode must be benchmarked separately from plain compatibility mode
+- results must include p95 and p99 latency plus jitter spread, not just median
+  cost
+- routes that carry frame-accurate AV sync may need a stricter security profile
+  than bulk telemetry or operator traffic
+- if verification or envelope handling cannot stay within the route's jitter
+  budget, the broker should surface that mismatch as an explicit deployment
+  warning rather than silently assuming security is free
+
 ## Non-Negotiable Invariants
 
 - raw OSC payloads for legacy peers must not be polluted with mandatory security

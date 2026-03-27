@@ -1,0 +1,15 @@
+[package]
+name = "rosc-recovery"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+rosc-packet = { path = "../rosc-packet" }
+rosc-route = { path = "../rosc-route" }
+rosc-telemetry = { path = "../rosc-telemetry" }
+thiserror.workspace = true
+
+[dev-dependencies]
+rosc-osc = { path = "../rosc-osc" }
