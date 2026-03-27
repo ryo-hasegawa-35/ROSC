@@ -9,8 +9,8 @@ use tokio::net::TcpStream;
 use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError, ProxyControlPlane};
 use crate::{
     ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorIncidents,
-    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReport, ProxyOperatorSignalScope,
-    ProxyOperatorSignalsView, UdpProxyStatusSnapshot,
+    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
+    ProxyOperatorSignalScope, ProxyOperatorSignalsView, UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -50,6 +50,12 @@ pub(crate) struct OperatorReportResponse {
 pub(crate) struct OperatorOverviewResponse {
     ok: bool,
     overview: ProxyOperatorOverview,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorReadinessResponse {
+    ok: bool,
+    readiness: ProxyOperatorReadiness,
 }
 
 #[derive(Serialize)]
@@ -102,6 +108,7 @@ pub(crate) enum ResponseBody {
     Action(ActionResponse),
     OperatorReport(OperatorReportResponse),
     OperatorOverview(Box<OperatorOverviewResponse>),
+    OperatorReadiness(Box<OperatorReadinessResponse>),
     OperatorDiagnostics(Box<OperatorDiagnosticsResponse>),
     OperatorAttention(OperatorAttentionResponse),
     OperatorIncidents(OperatorIncidentsResponse),
@@ -129,6 +136,7 @@ impl ResponseBody {
             Self::Action(body) => serde_json::to_vec(body),
             Self::OperatorReport(body) => serde_json::to_vec(body),
             Self::OperatorOverview(body) => serde_json::to_vec(body),
+            Self::OperatorReadiness(body) => serde_json::to_vec(body),
             Self::OperatorDiagnostics(body) => serde_json::to_vec(body),
             Self::OperatorAttention(body) => serde_json::to_vec(body),
             Self::OperatorIncidents(body) => serde_json::to_vec(body),
@@ -188,6 +196,16 @@ pub(crate) fn overview_response(overview: ProxyOperatorOverview) -> HttpResponse
         body: ResponseBody::OperatorOverview(Box::new(OperatorOverviewResponse {
             ok: true,
             overview,
+        })),
+    }
+}
+
+pub(crate) fn readiness_response(readiness: ProxyOperatorReadiness) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorReadiness(Box::new(OperatorReadinessResponse {
+            ok: true,
+            readiness,
         })),
     }
 }

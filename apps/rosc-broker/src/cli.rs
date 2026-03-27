@@ -32,6 +32,17 @@ pub enum Command {
         #[arg(long)]
         require_fallback_ready: bool,
     },
+    ProxyReadiness {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+    },
     ProxyDiagnostics {
         config: PathBuf,
         #[arg(long)]

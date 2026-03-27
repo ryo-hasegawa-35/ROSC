@@ -37,6 +37,7 @@ cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml --safe-mode
 cargo run -p rosc-broker -- proxy-overview examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
+cargo run -p rosc-broker -- proxy-readiness examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
 cargo run -p rosc-broker -- proxy-diagnostics examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- proxy-attention examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
 cargo run -p rosc-broker -- proxy-incidents examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
@@ -53,6 +54,7 @@ curl -X POST "http://127.0.0.1:19292/routes/camera/replay/sandbox_tap?limit=1"
 curl http://127.0.0.1:19292/status
 curl http://127.0.0.1:19292/report
 curl http://127.0.0.1:19292/overview
+curl http://127.0.0.1:19292/readiness
 curl http://127.0.0.1:19292/diagnostics?limit=10
 curl http://127.0.0.1:19292/attention
 curl http://127.0.0.1:19292/incidents?limit=10
@@ -67,7 +69,7 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` は意図的に loopback 専用です。`127.0.0.1`、`::1`、`localhost` のような
 ローカル専用アドレスだけを使い、wildcard や外部から到達できる bind は拒否されます。
 
-`proxy-status`、`proxy-overview`、`proxy-diagnostics`、`proxy-attention`、`proxy-incidents`
+`proxy-status`、`proxy-overview`、`proxy-readiness`、`proxy-diagnostics`、`proxy-attention`、`proxy-incidents`
 は、`jq` などへそのまま流せるように stdout へ JSON だけを出す契約にそろえています。
 
 Docker 経由で同じ確認を行う場合:
@@ -109,6 +111,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - CLI の report 表示と control-plane の `/report` `/blockers` が同じ safety evaluation を共有するようになり、運用判断のズレを減らした
 - control-plane の `/report` から structured な override / runtime signal / route signal / destination signal を読めるようにし、`/overrides` `/signals` から個別取得もできるようにした
 - `proxy-overview` と control-plane の `/overview` で、report・current status・problematic signal view をまとめた operator 向け 1-shot snapshot を取得できるようにした
+- `proxy-readiness` と control-plane の `/readiness` で、`ready / degraded / blocked` と理由、route/destination 集計をまとめた機械可読な readiness contract を取得できるようにした
 - `proxy-diagnostics` と control-plane の `/diagnostics` で、その 1-shot snapshot に bounded な recent operator/config history も束ねて返せるようにし、インシデント一次切り分けをやりやすくした
 - `proxy-attention` と control-plane の `/attention` で、active override・最新の incident highlight・いま本当に注意すべき route/destination id だけを返す compact な一次判断ビューも追加した
 - `proxy-incidents` と control-plane の `/incidents` で、open blocker/warning、filtered な recent issue history、復旧に必要な problematic route/destination の詳細をまとめて返す incident-focused view も追加した

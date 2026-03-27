@@ -4,8 +4,8 @@ use common::broad_scope_config;
 use rosc_broker::{
     ProxyOperatorSignalScope, ProxyOperatorState, ProxyRuntimeSafetyPolicy, attach_runtime_status,
     proxy_operator_attention, proxy_operator_diagnostics, proxy_operator_incidents_from_histories,
-    proxy_operator_overview, proxy_operator_report, proxy_operator_signals_view,
-    proxy_status_from_config,
+    proxy_operator_overview, proxy_operator_readiness, proxy_operator_report,
+    proxy_operator_signals_view, proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -175,6 +175,94 @@ fn operator_overview_embeds_problematic_signals() {
     assert!(overview.runtime_summary.has_runtime_status);
     assert!(overview.runtime_summary.traffic_frozen);
     assert_eq!(overview.runtime_summary.isolated_route_count, 1);
+}
+
+#[test]
+fn operator_readiness_distinguishes_ready_and_degraded_states() {
+    let ready_config = rosc_config::BrokerConfig::from_toml_str(
+        r#"
+        [[udp_ingresses]]
+        id = "udp_localhost_in"
+        bind = "127.0.0.1:0"
+        mode = "osc1_0_strict"
+
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "127.0.0.1:0"
+        target = "127.0.0.1:9001"
+
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+
+        [routes.match]
+        ingress_ids = ["udp_localhost_in"]
+        address_patterns = ["/ue5/camera/fov"]
+        protocols = ["osc_udp"]
+
+        [routes.fallback]
+        direct_udp_target = "127.0.0.1:9002"
+
+        [[routes.destinations]]
+        target = "udp_renderer"
+        transport = "osc_udp"
+        "#,
+    )
+    .expect("config should parse");
+    let ready_status = proxy_status_from_config(&ready_config).expect("status should build");
+    let ready = proxy_operator_readiness(&ready_status, ProxyRuntimeSafetyPolicy::default());
+
+    assert_eq!(ready.level, rosc_broker::ProxyOperatorReadinessLevel::Ready);
+    assert!(ready.ready);
+    assert!(ready.flags.control_plane_ready);
+    assert!(ready.flags.traffic_flow_ready);
+    assert!(ready.flags.fallback_complete);
+    assert_eq!(
+        ready.reasons,
+        vec!["no active readiness blockers or warnings"]
+    );
+
+    let degraded_config = broad_scope_config();
+    let degraded_status = attach_runtime_status(
+        proxy_status_from_config(&degraded_config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            destination_drops_total: [(
+                ("udp_renderer".to_owned(), "queue_overflow".to_owned()),
+                4,
+            )]
+            .into_iter()
+            .collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+    let degraded = proxy_operator_readiness(&degraded_status, ProxyRuntimeSafetyPolicy::default());
+
+    assert_eq!(
+        degraded.level,
+        rosc_broker::ProxyOperatorReadinessLevel::Degraded
+    );
+    assert!(!degraded.ready);
+    assert!(degraded.flags.control_plane_ready);
+    assert!(!degraded.flags.traffic_flow_ready);
+    assert!(degraded.flags.operator_intervention_required);
+    assert!(
+        degraded
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("traffic is currently frozen"))
+    );
+    assert!(
+        degraded
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("currently isolated"))
+    );
+    assert!(degraded.counts.problematic_destinations > 0);
+    assert!(degraded.counts.problematic_routes > 0);
 }
 
 #[test]

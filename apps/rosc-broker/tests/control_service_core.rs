@@ -236,6 +236,30 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|route| route["route_id"] == "camera" && route["isolated"] == true)
     );
 
+    let readiness = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /readiness HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(readiness["ok"], true);
+    assert_eq!(readiness["readiness"]["level"], "degraded");
+    assert_eq!(readiness["readiness"]["ready"], false);
+    assert_eq!(readiness["readiness"]["flags"]["traffic_flow_ready"], false);
+    assert_eq!(readiness["readiness"]["counts"]["problematic_routes"], 1);
+    assert_eq!(
+        readiness["readiness"]["counts"]["problematic_destinations"],
+        0
+    );
+    assert!(
+        readiness["readiness"]["reasons"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|reason| reason == "traffic is currently frozen by operator override")
+    );
+
     let blockers = json_body(
         &request(
             service.listen_addr(),

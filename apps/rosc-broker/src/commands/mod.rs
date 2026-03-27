@@ -41,6 +41,25 @@ pub async fn run(command: Command) -> Result<()> {
             )
             .await
         }
+        Command::ProxyReadiness {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+        } => {
+            config::proxy_readiness(
+                &config,
+                resolve_bindings,
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
         Command::ProxyDiagnostics {
             config,
             resolve_bindings,

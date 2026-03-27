@@ -12,6 +12,7 @@ mod operator_history;
 mod operator_incidents;
 mod operator_overview;
 mod operator_policy;
+mod operator_readiness;
 mod operator_runtime_summary;
 mod proxy_app;
 mod proxy_reload_supervisor;
@@ -45,6 +46,10 @@ pub use operator_policy::{
     ProxyOperatorSignalScope, ProxyOperatorSignalsView, ProxyOperatorState,
     ProxyRuntimeSafetyPolicy, evaluate_proxy_runtime_policy, proxy_operator_report,
     proxy_operator_signals_view, proxy_startup_report_lines,
+};
+pub use operator_readiness::{
+    ProxyOperatorReadiness, ProxyOperatorReadinessCounts, ProxyOperatorReadinessFlags,
+    ProxyOperatorReadinessLevel, proxy_operator_readiness, proxy_operator_readiness_from_overview,
 };
 pub use operator_runtime_summary::{ProxyOperatorRuntimeSummary, proxy_operator_runtime_summary};
 pub use proxy_app::UdpProxyApp;

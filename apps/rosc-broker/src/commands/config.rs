@@ -55,6 +55,19 @@ pub(crate) async fn proxy_overview(
     Ok(())
 }
 
+pub(crate) async fn proxy_readiness(
+    path: &Path,
+    resolve_bindings: bool,
+    options: ProxyCommandOptions,
+) -> Result<()> {
+    let config = load_config(path)?;
+    let status =
+        status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
+    let readiness = rosc_broker::proxy_operator_readiness(&status, safety_policy(options));
+    print_json_pretty(&readiness)?;
+    Ok(())
+}
+
 pub(crate) async fn proxy_diagnostics(
     path: &Path,
     resolve_bindings: bool,

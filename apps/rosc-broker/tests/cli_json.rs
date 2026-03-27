@@ -32,6 +32,20 @@ fn proxy_overview_stdout_is_json_only() {
 }
 
 #[test]
+fn proxy_readiness_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-readiness",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+    ]);
+
+    assert!(value.get("level").is_some());
+    assert!(value.get("flags").is_some());
+    assert!(value.get("counts").is_some());
+}
+
+#[test]
 fn proxy_diagnostics_stdout_is_json_only() {
     let value = json_stdout_for(&[
         "proxy-diagnostics",
