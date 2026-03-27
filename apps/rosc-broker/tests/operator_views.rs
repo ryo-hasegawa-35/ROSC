@@ -314,6 +314,20 @@ fn operator_snapshot_bundles_readiness_diagnostics_attention_and_incidents() {
     assert_eq!(snapshot.attention.state, ProxyOperatorState::Warning);
     assert_eq!(snapshot.incidents.recent_config_issues.len(), 1);
     assert_eq!(snapshot.overview.report.state, ProxyOperatorState::Warning);
+    assert!(
+        snapshot
+            .worklist
+            .items
+            .iter()
+            .any(|item| item.id == "traffic-frozen")
+    );
+    assert!(
+        snapshot
+            .worklist
+            .items
+            .iter()
+            .any(|item| item.id == "route:camera:restore")
+    );
 }
 
 #[test]
@@ -521,6 +535,15 @@ fn operator_dashboard_bundles_snapshot_traffic_and_timeline() {
         .expect("renderer detail should exist");
     assert_eq!(renderer_detail.send_failures_total, 5);
     assert_eq!(renderer_detail.drops_total, 4);
+    assert!(dashboard.snapshot.worklist.immediate_actions >= 1);
+    assert!(
+        dashboard
+            .snapshot
+            .worklist
+            .items
+            .iter()
+            .any(|item| item.id == "destination:udp_renderer:rehydrate")
+    );
     assert_eq!(dashboard.timeline.len(), 2);
     assert_eq!(
         dashboard.timeline[0].category,

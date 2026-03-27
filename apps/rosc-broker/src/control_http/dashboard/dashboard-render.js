@@ -16,6 +16,8 @@ export function collectDashboardElements() {
     topologyDestinations: document.getElementById("topology-destinations"),
     trafficStats: document.getElementById("traffic-stats"),
     trafficHotspots: document.getElementById("traffic-hotspots"),
+    worklistSummary: document.getElementById("worklist-summary"),
+    worklistItems: document.getElementById("worklist-items"),
     routeFocusSelect: document.getElementById("route-focus-select"),
     routeFocusDetail: document.getElementById("route-focus-detail"),
     destinationFocusSelect: document.getElementById("destination-focus-select"),
@@ -56,6 +58,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderReadiness(elements, readiness);
   renderTopology(elements, status);
   renderTraffic(elements, dashboard.traffic, context.trafficPulse, snapshot);
+  renderWorklist(elements, snapshot.worklist);
   renderFocus(elements, dashboard, context.focusState);
   renderRoutes(elements, status, diagnostics);
   renderDestinations(elements, dashboard.destination_details);
@@ -224,6 +227,49 @@ function renderTraffic(elements, traffic, trafficPulse, snapshot) {
     hotspots.push(`Routes with transform failures: ${signals.routes_with_transform_failures.join(", ")}`);
   }
   fillList(elements, elements.trafficHotspots, hotspots);
+}
+
+function renderWorklist(elements, worklist) {
+  const summary = [
+    ["State", humanizeState(worklist.state), `${worklist.items.length} items`],
+    ["Immediate actions", worklist.immediate_actions, "mutating actions"],
+    ["Recovery queue", worklist.recovery_actions, "worklist size"],
+  ];
+  elements.worklistSummary.replaceChildren(
+    ...summary.map(([label, value, context]) => statCard(label, value, context)),
+  );
+
+  elements.worklistItems.replaceChildren(
+    ...emptyAware(
+      elements,
+      (worklist.items || []).map((item) => {
+        const entry = document.createElement("article");
+        entry.className = "worklist-item";
+        entry.dataset.level = item.level;
+        entry.innerHTML = `
+          <div class="panel-header">
+            <div>
+              <p class="panel-label">Operator work item</p>
+              <h4>${escapeHtml(item.title)}</h4>
+            </div>
+            <span class="entity-state" data-level="${escapeHtml(item.level)}">${escapeHtml(humanizeState(item.level))}</span>
+          </div>
+          <p class="summary">${escapeHtml(item.summary)}</p>
+        `;
+        const reasons = document.createElement("ul");
+        reasons.className = "detail-list";
+        reasons.replaceChildren(...emptyListItems(item.reasons || []));
+        entry.appendChild(reasons);
+        if (item.action) {
+          const actions = document.createElement("div");
+          actions.className = "detail-actions";
+          actions.appendChild(worklistActionButton(item.action));
+          entry.appendChild(actions);
+        }
+        return entry;
+      }),
+    ),
+  );
 }
 
 function renderFocus(elements, dashboard, focusState) {
@@ -644,11 +690,45 @@ function detailListBlock(title, items) {
 }
 
 function emptyListItems(items) {
+  if (!items || items.length === 0) {
+    return [listItem("No items right now.")];
+  }
   return items.map((item) => {
     const entry = document.createElement("li");
     entry.textContent = item;
     return entry;
   });
+}
+
+function worklistActionButton(action) {
+  const button = document.createElement("button");
+  button.className = "mini-button";
+  button.textContent = action.label;
+  switch (action.kind) {
+    case "thaw_traffic":
+      button.dataset.action = "thaw";
+      break;
+    case "restore_route":
+      button.dataset.routeAction = "toggle-isolation";
+      button.dataset.routeId = action.route_id;
+      break;
+    case "rehydrate_destination":
+      button.dataset.action = "rehydrate-destination";
+      button.dataset.destinationId = action.destination_id;
+      break;
+    case "focus_route":
+      button.classList.add("is-secondary");
+      button.dataset.focusRouteId = action.route_id;
+      break;
+    case "focus_destination":
+      button.classList.add("is-secondary");
+      button.dataset.focusDestinationId = action.destination_id;
+      break;
+    default:
+      button.disabled = true;
+      break;
+  }
+  return button;
 }
 
 function describeHero(readiness, attention) {

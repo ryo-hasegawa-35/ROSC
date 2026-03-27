@@ -128,6 +128,7 @@ Current Phase 01 runtime coverage:
 - `proxy-incidents` and control-plane `/incidents` now expose an incident-focused bundle with open blockers/warnings, filtered recent issue history, and the full problematic route/destination entries needed for recovery work
 - control-plane `/dashboard` now serves a lightweight operator console that layers overview/readiness/traffic/config/timeline views and safe live actions over a single `/dashboard/data` localhost payload
 - `/dashboard/data` now also includes route/destination drill-down detail models so the embedded dashboard can jump from incident lists into route/destination-specific recovery context without stitching extra requests
+- snapshot and dashboard payloads now include a machine-readable operator worklist with recommended next actions such as thaw, restore-route, rehydrate-destination, and focus-only investigation jumps
 - `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
 - config rejection / block / reload-failure history now retains reason details instead of only counters
 

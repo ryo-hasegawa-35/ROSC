@@ -16,6 +16,7 @@ mod operator_policy;
 mod operator_readiness;
 mod operator_runtime_summary;
 mod operator_snapshot;
+mod operator_worklist;
 mod proxy_app;
 mod proxy_reload_supervisor;
 mod proxy_status;
@@ -64,6 +65,10 @@ pub use operator_readiness::{
 pub use operator_runtime_summary::{ProxyOperatorRuntimeSummary, proxy_operator_runtime_summary};
 pub use operator_snapshot::{
     ProxyOperatorSnapshot, proxy_operator_snapshot, proxy_operator_snapshot_from_overview,
+};
+pub use operator_worklist::{
+    ProxyOperatorSuggestedAction, ProxyOperatorSuggestedActionKind, ProxyOperatorWorkItem,
+    ProxyOperatorWorkItemLevel, ProxyOperatorWorklist, proxy_operator_worklist,
 };
 pub use proxy_app::UdpProxyApp;
 pub use proxy_reload_supervisor::{ManagedProxyFileSupervisor, ProxyReloadOutcome};

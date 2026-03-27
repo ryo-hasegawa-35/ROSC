@@ -2,10 +2,10 @@ use serde::Serialize;
 
 use crate::{
     ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorIncidents,
-    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyRuntimeSafetyPolicy,
+    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorWorklist, ProxyRuntimeSafetyPolicy,
     UdpProxyStatusSnapshot, proxy_operator_attention, proxy_operator_diagnostics_from_overview,
     proxy_operator_incidents_from_histories, proxy_operator_overview,
-    proxy_operator_readiness_from_overview,
+    proxy_operator_readiness_from_overview, proxy_operator_worklist,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -15,6 +15,7 @@ pub struct ProxyOperatorSnapshot {
     pub diagnostics: ProxyOperatorDiagnostics,
     pub attention: ProxyOperatorAttention,
     pub incidents: ProxyOperatorIncidents,
+    pub worklist: ProxyOperatorWorklist,
 }
 
 pub fn proxy_operator_snapshot(
@@ -57,12 +58,18 @@ pub fn proxy_operator_snapshot_from_overview(
         recent_config_events,
         history_limit,
     );
-
-    ProxyOperatorSnapshot {
+    let provisional_snapshot = ProxyOperatorSnapshot {
         overview,
         readiness,
         diagnostics,
         attention,
         incidents,
+        worklist: ProxyOperatorWorklist::default(),
+    };
+    let worklist = proxy_operator_worklist(&provisional_snapshot);
+
+    ProxyOperatorSnapshot {
+        worklist,
+        ..provisional_snapshot
     }
 }

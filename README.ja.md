@@ -125,6 +125,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - `proxy-incidents` と control-plane の `/incidents` で、open blocker/warning、filtered な recent issue history、復旧に必要な problematic route/destination の詳細をまとめて返す incident-focused view も追加した
 - control-plane の `/dashboard` から、overview / readiness / traffic / config / timeline と安全な live action を束ねた lightweight operator console を、単一の `/dashboard/data` localhost payload を使って開けるようにした
 - `/dashboard/data` に route / destination の drill-down detail model も含め、incident 一覧から追加リクエストなしで個別の復旧コンテキストへ降りられるようにした
+- snapshot と dashboard payload に machine-readable な operator worklist を追加し、thaw / restore-route / rehydrate-destination / focus-only investigation の次アクション候補をそのまま扱えるようにした
 - `/signals?scope=problematic` で、operator が今見るべき route / destination signal だけに payload を絞れるようにした
 - config の reject / block / reload failure も counters だけでなく reason 付きの recent history として残るようになった
 

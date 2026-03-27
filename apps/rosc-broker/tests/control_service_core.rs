@@ -250,6 +250,11 @@ async fn control_service_serves_dashboard_assets() {
         dashboard_data["dashboard"]["destination_details"][0]["destination_id"],
         "udp_renderer"
     );
+    assert!(
+        dashboard_data["dashboard"]["snapshot"]["worklist"]["items"]
+            .as_array()
+            .is_some()
+    );
     assert_eq!(
         dashboard_data["dashboard"]["timeline"]
             .as_array()

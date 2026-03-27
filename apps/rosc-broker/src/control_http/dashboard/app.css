@@ -533,6 +533,36 @@ td code {
   gap: 10px;
 }
 
+.worklist-stack {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.worklist-item {
+  border-radius: 18px;
+  padding: 18px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+}
+
+.worklist-item[data-level="blocked"] {
+  border-color: rgba(165, 59, 42, 0.28);
+}
+
+.worklist-item[data-level="degraded"] {
+  border-color: rgba(194, 107, 30, 0.28);
+}
+
+.worklist-item p {
+  margin: 0;
+}
+
+.worklist-item .summary {
+  color: var(--muted);
+  margin: 8px 0 0;
+}
+
 .recovery-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
