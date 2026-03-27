@@ -1,7 +1,8 @@
 use rosc_broker::{
     ProxyLaunchProfileMode, ProxyOperatorSignalScope, ProxyOperatorState, ProxyRuntimeSafetyPolicy,
-    attach_runtime_status, evaluate_proxy_runtime_policy, proxy_operator_report,
-    proxy_operator_signals_view, proxy_startup_report_lines, proxy_status_from_config,
+    attach_runtime_status, evaluate_proxy_runtime_policy, proxy_operator_overview,
+    proxy_operator_report, proxy_operator_signals_view, proxy_startup_report_lines,
+    proxy_status_from_config,
 };
 use rosc_config::BrokerConfig;
 use rosc_telemetry::{
@@ -436,6 +437,35 @@ fn operator_signals_view_can_filter_to_problematic_entries() {
             .destination_signals
             .iter()
             .any(|signal| signal.destination_id == "udp_renderer" && signal.drops_total == 4)
+    );
+}
+
+#[test]
+fn operator_overview_embeds_problematic_signals() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let overview = proxy_operator_overview(&status, ProxyRuntimeSafetyPolicy::default());
+
+    assert_eq!(overview.status, status);
+    assert_eq!(overview.report.state, ProxyOperatorState::Warning);
+    assert_eq!(
+        overview.problematic_signals.scope,
+        ProxyOperatorSignalScope::Problematic
+    );
+    assert!(
+        overview
+            .problematic_signals
+            .route_signals
+            .iter()
+            .any(|signal| signal.route_id == "camera" && signal.isolated)
     );
 }
 

@@ -21,6 +21,17 @@ pub enum Command {
         #[arg(long)]
         safe_mode: bool,
     },
+    ProxyOverview {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+    },
     WatchConfig {
         path: PathBuf,
         #[arg(long, default_value_t = 1000)]

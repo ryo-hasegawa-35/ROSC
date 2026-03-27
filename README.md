@@ -38,6 +38,7 @@ cargo test --workspace
 cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml --safe-mode
+cargo run -p rosc-broker -- proxy-overview examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
@@ -50,6 +51,7 @@ curl -X POST http://127.0.0.1:19292/destinations/udp_renderer/rehydrate
 curl -X POST "http://127.0.0.1:19292/routes/camera/replay/sandbox_tap?limit=1"
 curl http://127.0.0.1:19292/status
 curl http://127.0.0.1:19292/report
+curl http://127.0.0.1:19292/overview
 curl http://127.0.0.1:19292/overrides
 curl http://127.0.0.1:19292/signals
 curl http://127.0.0.1:19292/signals?scope=problematic
@@ -99,6 +101,7 @@ Current Phase 01 runtime coverage:
 - runtime status and control history endpoints now expose bounded recent operator actions and config transitions for post-incident tracing
 - CLI reports and control-plane `/report` / `/blockers` now share the same structured operator safety evaluation
 - control-plane `/report` now also exposes structured override/runtime-signal/route-signal/destination-signal sections, with `/overrides` and `/signals` endpoints for direct consumption
+- `proxy-overview` and control-plane `/overview` now expose a one-shot operator snapshot with report + current status + problematic signal view for dashboard/bootstrap workflows
 - `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
 - config rejection / block / reload-failure history now retains reason details instead of only counters
 

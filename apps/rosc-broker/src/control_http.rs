@@ -10,7 +10,7 @@ use tokio::net::TcpStream;
 
 use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError, ProxyControlPlane};
 use crate::{
-    ProxyOperatorOverrides, ProxyOperatorReport, ProxyOperatorSignalScope,
+    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReport, ProxyOperatorSignalScope,
     ProxyOperatorSignalsView, UdpProxyStatusSnapshot, proxy_operator_signals_view,
 };
 
@@ -59,6 +59,12 @@ struct OperatorReportResponse {
 }
 
 #[derive(Serialize)]
+struct OperatorOverviewResponse {
+    ok: bool,
+    overview: ProxyOperatorOverview,
+}
+
+#[derive(Serialize)]
 struct OperatorOverridesResponse {
     ok: bool,
     overrides: ProxyOperatorOverrides,
@@ -89,6 +95,7 @@ enum ResponseBody {
     Status(StatusResponse),
     Action(ActionResponse),
     OperatorReport(OperatorReportResponse),
+    OperatorOverview(Box<OperatorOverviewResponse>),
     OperatorOverrides(OperatorOverridesResponse),
     OperatorSignals(OperatorSignalsResponse),
     Blockers(BlockersResponse),
@@ -162,6 +169,13 @@ async fn route_request(request: HttpRequest, control: Arc<dyn ProxyControlPlane>
                 ok: true,
                 report: control.operator_report().await,
             }),
+        },
+        ("GET", "/overview") => HttpResponse {
+            status: "200 OK",
+            body: ResponseBody::OperatorOverview(Box::new(OperatorOverviewResponse {
+                ok: true,
+                overview: control.operator_overview().await,
+            })),
         },
         ("GET", "/overrides") => {
             let report = control.operator_report().await;
@@ -609,6 +623,7 @@ impl ResponseBody {
             Self::Status(body) => serde_json::to_vec(body),
             Self::Action(body) => serde_json::to_vec(body),
             Self::OperatorReport(body) => serde_json::to_vec(body),
+            Self::OperatorOverview(body) => serde_json::to_vec(body),
             Self::OperatorOverrides(body) => serde_json::to_vec(body),
             Self::OperatorSignals(body) => serde_json::to_vec(body),
             Self::Blockers(body) => serde_json::to_vec(body),

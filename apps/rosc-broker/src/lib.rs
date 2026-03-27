@@ -6,6 +6,7 @@ mod control_service;
 mod health_service;
 mod launch_profile;
 mod managed_proxy;
+mod operator_overview;
 mod operator_policy;
 mod proxy_app;
 mod proxy_reload_supervisor;
@@ -27,6 +28,7 @@ pub use launch_profile::{
     PreparedLaunchConfig, ProxyLaunchProfileMode, ProxyLaunchProfileStatus, apply_launch_profile,
 };
 pub use managed_proxy::{FrozenStartupBehavior, ManagedProxyStartupOptions, ManagedUdpProxy};
+pub use operator_overview::{ProxyOperatorOverview, proxy_operator_overview};
 pub use operator_policy::{
     ProxyOperatorDestinationSignal, ProxyOperatorHighlights, ProxyOperatorOverrides,
     ProxyOperatorReport, ProxyOperatorRouteSignal, ProxyOperatorRuntimeSignals,

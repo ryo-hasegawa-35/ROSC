@@ -430,6 +430,27 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
         "isolate_route"
     );
 
+    let overview = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /overview HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(overview["ok"], true);
+    assert_eq!(overview["overview"]["report"]["state"], "warning");
+    assert_eq!(
+        overview["overview"]["problematic_signals"]["scope"],
+        "problematic"
+    );
+    assert!(
+        overview["overview"]["problematic_signals"]["route_signals"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|route| route["route_id"] == "camera" && route["isolated"] == true)
+    );
+
     let blockers = json_body(
         &request(
             service.listen_addr(),
