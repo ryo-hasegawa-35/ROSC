@@ -504,6 +504,27 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
         "isolate_route"
     );
 
+    let incidents = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /incidents?limit=1 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(incidents["ok"], true);
+    assert_eq!(incidents["incidents"]["state"], "warning");
+    assert_eq!(
+        incidents["incidents"]["problematic_routes"][0]["route_id"],
+        "camera"
+    );
+    assert_eq!(
+        incidents["incidents"]["recent_operator_actions"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
     let overrides = json_body(
         &request(
             service.listen_addr(),

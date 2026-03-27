@@ -8,9 +8,9 @@ use tokio::net::TcpStream;
 
 use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError, ProxyControlPlane};
 use crate::{
-    ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorOverrides,
-    ProxyOperatorOverview, ProxyOperatorReport, ProxyOperatorSignalScope, ProxyOperatorSignalsView,
-    UdpProxyStatusSnapshot,
+    ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorIncidents,
+    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReport, ProxyOperatorSignalScope,
+    ProxyOperatorSignalsView, UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -65,6 +65,12 @@ pub(crate) struct OperatorAttentionResponse {
 }
 
 #[derive(Serialize)]
+pub(crate) struct OperatorIncidentsResponse {
+    ok: bool,
+    incidents: ProxyOperatorIncidents,
+}
+
+#[derive(Serialize)]
 pub(crate) struct OperatorOverridesResponse {
     ok: bool,
     overrides: ProxyOperatorOverrides,
@@ -98,6 +104,7 @@ pub(crate) enum ResponseBody {
     OperatorOverview(Box<OperatorOverviewResponse>),
     OperatorDiagnostics(Box<OperatorDiagnosticsResponse>),
     OperatorAttention(OperatorAttentionResponse),
+    OperatorIncidents(OperatorIncidentsResponse),
     OperatorOverrides(OperatorOverridesResponse),
     OperatorSignals(OperatorSignalsResponse),
     Blockers(BlockersResponse),
@@ -124,6 +131,7 @@ impl ResponseBody {
             Self::OperatorOverview(body) => serde_json::to_vec(body),
             Self::OperatorDiagnostics(body) => serde_json::to_vec(body),
             Self::OperatorAttention(body) => serde_json::to_vec(body),
+            Self::OperatorIncidents(body) => serde_json::to_vec(body),
             Self::OperatorOverrides(body) => serde_json::to_vec(body),
             Self::OperatorSignals(body) => serde_json::to_vec(body),
             Self::Blockers(body) => serde_json::to_vec(body),
@@ -200,6 +208,16 @@ pub(crate) fn attention_response(attention: ProxyOperatorAttention) -> HttpRespo
         body: ResponseBody::OperatorAttention(OperatorAttentionResponse {
             ok: true,
             attention,
+        }),
+    }
+}
+
+pub(crate) fn incidents_response(incidents: ProxyOperatorIncidents) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorIncidents(OperatorIncidentsResponse {
+            ok: true,
+            incidents,
         }),
     }
 }

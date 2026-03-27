@@ -8,9 +8,9 @@ use super::request::{
 };
 use super::response::{
     HttpResponse, blockers_response, config_events_response, diagnostics_response,
-    invalid_component_error, invalid_query_error, map_action_result, operator_actions_response,
-    operator_signals_response, overrides_response, overview_response, report_response,
-    status_response, unsupported_route_error,
+    incidents_response, invalid_component_error, invalid_query_error, map_action_result,
+    operator_actions_response, operator_signals_response, overrides_response, overview_response,
+    report_response, status_response, unsupported_route_error,
 };
 
 pub(crate) async fn route_request(
@@ -31,6 +31,12 @@ pub(crate) async fn route_request(
         ("GET", "/attention") => {
             let report = control.operator_report().await;
             super::response::attention_response(proxy_operator_attention(&report))
+        }
+        ("GET", "/incidents") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            incidents_response(control.operator_incidents(limit).await)
         }
         ("GET", "/overrides") => {
             let report = control.operator_report().await;

@@ -60,3 +60,20 @@ fn proxy_attention_stdout_is_json_only() {
     assert!(value.get("problematic_route_ids").is_some());
     assert!(value.get("problematic_destination_ids").is_some());
 }
+
+#[test]
+fn proxy_incidents_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-incidents",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("open_blockers").is_some());
+    assert!(value.get("recent_operator_actions").is_some());
+    assert!(value.get("recent_config_issues").is_some());
+}

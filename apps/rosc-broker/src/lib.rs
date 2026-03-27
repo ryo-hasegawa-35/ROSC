@@ -8,6 +8,7 @@ mod launch_profile;
 mod managed_proxy;
 mod operator_attention;
 mod operator_diagnostics;
+mod operator_incidents;
 mod operator_overview;
 mod operator_policy;
 mod operator_runtime_summary;
@@ -33,6 +34,9 @@ pub use launch_profile::{
 pub use managed_proxy::{FrozenStartupBehavior, ManagedProxyStartupOptions, ManagedUdpProxy};
 pub use operator_attention::{ProxyOperatorAttention, proxy_operator_attention};
 pub use operator_diagnostics::{ProxyOperatorDiagnostics, proxy_operator_diagnostics};
+pub use operator_incidents::{
+    ProxyOperatorIncidents, proxy_operator_incidents, proxy_operator_incidents_from_histories,
+};
 pub use operator_overview::{ProxyOperatorOverview, proxy_operator_overview};
 pub use operator_policy::{
     ProxyOperatorDestinationSignal, ProxyOperatorHighlights, ProxyOperatorOverrides,

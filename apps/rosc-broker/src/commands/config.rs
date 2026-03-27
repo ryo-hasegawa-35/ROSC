@@ -84,6 +84,36 @@ pub(crate) async fn proxy_attention(
     Ok(())
 }
 
+pub(crate) async fn proxy_incidents(
+    path: &Path,
+    resolve_bindings: bool,
+    history_limit: Option<usize>,
+    options: ProxyCommandOptions,
+) -> Result<()> {
+    let config = load_config(path)?;
+    let status =
+        status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
+    let report = rosc_broker::proxy_operator_report(&status, safety_policy(options));
+    let (recent_operator_actions, recent_config_events) = status
+        .runtime
+        .as_ref()
+        .map(|runtime| {
+            (
+                runtime.recent_operator_actions.clone(),
+                runtime.recent_config_events.clone(),
+            )
+        })
+        .unwrap_or_default();
+    let incidents = rosc_broker::proxy_operator_incidents_from_histories(
+        &report,
+        recent_operator_actions,
+        recent_config_events,
+        history_limit,
+    );
+    print_json_pretty(&incidents)?;
+    Ok(())
+}
+
 pub(crate) async fn watch_config(
     path: &Path,
     poll_ms: u64,

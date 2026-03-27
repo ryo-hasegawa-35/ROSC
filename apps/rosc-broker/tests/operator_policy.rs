@@ -1,8 +1,9 @@
 use rosc_broker::{
     ProxyLaunchProfileMode, ProxyOperatorSignalScope, ProxyOperatorState, ProxyRuntimeSafetyPolicy,
     attach_runtime_status, evaluate_proxy_runtime_policy, proxy_operator_attention,
-    proxy_operator_diagnostics, proxy_operator_overview, proxy_operator_report,
-    proxy_operator_signals_view, proxy_startup_report_lines, proxy_status_from_config,
+    proxy_operator_diagnostics, proxy_operator_incidents_from_histories, proxy_operator_overview,
+    proxy_operator_report, proxy_operator_signals_view, proxy_startup_report_lines,
+    proxy_status_from_config,
 };
 use rosc_config::BrokerConfig;
 use rosc_telemetry::{
@@ -641,6 +642,111 @@ fn operator_attention_focuses_problematic_routes_destinations_and_overrides() {
             .as_ref()
             .map(|event| &event.kind),
         Some(&RecentConfigEventKind::Blocked)
+    );
+}
+
+#[test]
+fn operator_incidents_filter_recent_issue_history_and_problematic_entities() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            recent_operator_actions: vec![
+                RecentOperatorAction {
+                    sequence: 1,
+                    recorded_at_unix_ms: 100,
+                    action: "freeze_traffic".to_owned(),
+                    details: vec!["applied=true".to_owned()],
+                },
+                RecentOperatorAction {
+                    sequence: 2,
+                    recorded_at_unix_ms: 200,
+                    action: "isolate_route".to_owned(),
+                    details: vec!["route_id=camera".to_owned()],
+                },
+            ],
+            recent_config_events: vec![
+                RecentConfigEvent {
+                    sequence: 3,
+                    recorded_at_unix_ms: 300,
+                    kind: RecentConfigEventKind::Applied,
+                    revision: Some(1),
+                    details: Vec::new(),
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 0,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 0,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                },
+                RecentConfigEvent {
+                    sequence: 4,
+                    recorded_at_unix_ms: 400,
+                    kind: RecentConfigEventKind::Blocked,
+                    revision: Some(2),
+                    details: vec!["unsafe wildcard route".to_owned()],
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 0,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 1,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                },
+            ],
+            destination_drops_total: [(
+                ("udp_renderer".to_owned(), "queue_overflow".to_owned()),
+                4,
+            )]
+            .into_iter()
+            .collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let report = proxy_operator_report(&status, ProxyRuntimeSafetyPolicy::default());
+    let runtime = status.runtime.as_ref().unwrap();
+    let incidents = proxy_operator_incidents_from_histories(
+        &report,
+        runtime.recent_operator_actions.clone(),
+        runtime.recent_config_events.clone(),
+        Some(1),
+    );
+
+    assert_eq!(incidents.state, ProxyOperatorState::Warning);
+    assert_eq!(incidents.recent_operator_actions.len(), 1);
+    assert_eq!(incidents.recent_operator_actions[0].action, "isolate_route");
+    assert_eq!(incidents.recent_config_issues.len(), 1);
+    assert_eq!(
+        incidents.recent_config_issues[0].kind,
+        RecentConfigEventKind::Blocked
+    );
+    assert!(
+        incidents
+            .problematic_routes
+            .iter()
+            .any(|route| route.route_id == "camera")
+    );
+    assert!(
+        incidents
+            .problematic_destinations
+            .iter()
+            .any(|destination| destination.destination_id == "udp_renderer")
     );
 }
 
