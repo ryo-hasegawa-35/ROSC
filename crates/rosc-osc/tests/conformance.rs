@@ -1,12 +1,64 @@
 use std::fs;
 use std::path::PathBuf;
 
-use rosc_osc::{CompatibilityMode, OscArgument, ParsedOscPacket, encode_packet, parse_packet};
+use rosc_osc::{
+    CompatibilityMode, OscArgument, OscMessage, OscMessageView, ParsedOscPacket,
+    ParsedOscPacketView, TypeTagSource, encode_packet, parse_packet, parse_packet_view,
+};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 struct Catalog {
     vectors: Vec<Vector>,
+}
+
+#[test]
+fn borrowed_parser_keeps_string_and_blob_data_in_source_buffer() {
+    let fixture = encode_packet(&ParsedOscPacket::Message(OscMessage {
+        address: "/blob".to_owned(),
+        type_tag_source: TypeTagSource::Explicit,
+        arguments: vec![
+            OscArgument::String("ok".to_owned()),
+            OscArgument::Blob(vec![1, 2, 3, 4]),
+        ],
+    }))
+    .unwrap();
+
+    let parsed = parse_packet_view(&fixture, CompatibilityMode::Osc1_0Strict)
+        .expect("borrowed parser should parse fixture");
+    let ParsedOscPacketView::Message(OscMessageView {
+        address, arguments, ..
+    }) = parsed
+    else {
+        panic!("expected borrowed OSC message");
+    };
+
+    assert!(is_borrowed_from(
+        address.as_ptr() as usize,
+        address.len(),
+        &fixture
+    ));
+    assert_eq!(arguments.len(), 2);
+    match &arguments[0] {
+        rosc_osc::OscArgumentView::String(value) => {
+            assert!(is_borrowed_from(
+                value.as_ptr() as usize,
+                value.len(),
+                &fixture
+            ));
+        }
+        other => panic!("expected borrowed string argument, got {other:?}"),
+    }
+    match &arguments[1] {
+        rosc_osc::OscArgumentView::Blob(value) => {
+            assert!(is_borrowed_from(
+                value.as_ptr() as usize,
+                value.len(),
+                &fixture
+            ));
+        }
+        other => panic!("expected borrowed blob argument, got {other:?}"),
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -147,4 +199,10 @@ fn repo_root() -> PathBuf {
         .parent()
         .expect("workspace dir has parent")
         .to_path_buf()
+}
+
+fn is_borrowed_from(ptr: usize, len: usize, source: &[u8]) -> bool {
+    let start = source.as_ptr() as usize;
+    let end = start + source.len();
+    ptr >= start && ptr + len <= end
 }

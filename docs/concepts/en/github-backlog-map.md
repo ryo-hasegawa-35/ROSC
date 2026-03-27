@@ -105,6 +105,8 @@ Remaining nuance:
 
 - [Issue #11](https://github.com/ryo-hasegawa-35/ROSC/issues/11)
   `Implement the OSC compatibility parser and encoder core`
+- [Issue #59](https://github.com/ryo-hasegawa-35/ROSC/issues/59)
+  `Adopt end-to-end zero-copy OSC packet inspection`
 - [Issue #10](https://github.com/ryo-hasegawa-35/ROSC/issues/10)
   `Implement ingress transport bindings and bounded intake queues`
 - [Issue #9](https://github.com/ryo-hasegawa-35/ROSC/issues/9)
@@ -113,6 +115,8 @@ Remaining nuance:
   `Implement destination workers, circuit breakers, and fault isolation`
 - [Issue #14](https://github.com/ryo-hasegawa-35/ROSC/issues/14)
   `Implement configuration loading, semantic validation, and safe hot reload`
+- [Issue #58](https://github.com/ryo-hasegawa-35/ROSC/issues/58)
+  `Eliminate reload blackout with staged runtime swaps`
 - [Issue #13](https://github.com/ryo-hasegawa-35/ROSC/issues/13)
   `Implement the minimal metrics endpoint and health-reporting surface`
 
@@ -120,6 +124,8 @@ Remaining nuance:
 
 - [Issue #15](https://github.com/ryo-hasegawa-35/ROSC/issues/15)
   `Implement the operations dashboard shell and core runtime pages`
+- [Issue #57](https://github.com/ryo-hasegawa-35/ROSC/issues/57)
+  `Decouple hot-path telemetry from operator snapshot locking`
 - [Issue #33](https://github.com/ryo-hasegawa-35/ROSC/issues/33)
   `Implement cache classes and the late-joiner rehydrate engine`
 - [Issue #16](https://github.com/ryo-hasegawa-35/ROSC/issues/16)
