@@ -297,6 +297,11 @@ async fn control_service_serves_dashboard_assets() {
             .is_some()
     );
     assert!(
+        dashboard_data["dashboard"]["snapshot"]["casebook"]["route_casebooks"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
         dashboard_data["dashboard"]["snapshot"]["worklist"]["items"]
             .as_array()
             .is_some()
@@ -619,6 +624,22 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|step| step.as_str().unwrap().contains("Thaw traffic"))
     );
 
+    let casebook = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /casebook?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(casebook["ok"], true);
+    assert!(
+        casebook["casebook"]["route_casebooks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["route_id"] == "camera")
+    );
+
     let timeline = json_body(
         &request(
             service.listen_addr(),
@@ -661,6 +682,19 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
         "camera"
     );
 
+    let route_casebook = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/casebook?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_casebook["ok"], true);
+    assert_eq!(
+        route_casebook["casebook"]["route_casebooks"][0]["route_id"],
+        "camera"
+    );
+
     let route_timeline = json_body(
         &request(
             service.listen_addr(),
@@ -697,6 +731,19 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert_eq!(destination_triage["ok"], true);
     assert_eq!(
         destination_triage["triage"]["destination_triage"][0]["destination_id"],
+        "udp_renderer"
+    );
+
+    let destination_casebook = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/casebook?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_casebook["ok"], true);
+    assert_eq!(
+        destination_casebook["casebook"]["destination_casebooks"][0]["destination_id"],
         "udp_renderer"
     );
 

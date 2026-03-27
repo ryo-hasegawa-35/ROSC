@@ -4,11 +4,11 @@ use common::broad_scope_config;
 use rosc_broker::{
     ProxyOperatorSignalScope, ProxyOperatorState, ProxyOperatorTimelineCategory,
     ProxyRuntimeSafetyPolicy, attach_runtime_status, proxy_operator_attention,
-    proxy_operator_dashboard, proxy_operator_diagnostics, proxy_operator_handoff,
-    proxy_operator_incidents_from_histories, proxy_operator_overview, proxy_operator_readiness,
-    proxy_operator_recovery, proxy_operator_report, proxy_operator_signals_view,
-    proxy_operator_snapshot, proxy_operator_timeline, proxy_operator_trace,
-    proxy_status_from_config,
+    proxy_operator_casebook, proxy_operator_dashboard, proxy_operator_diagnostics,
+    proxy_operator_handoff, proxy_operator_incidents_from_histories, proxy_operator_overview,
+    proxy_operator_readiness, proxy_operator_recovery, proxy_operator_report,
+    proxy_operator_signals_view, proxy_operator_snapshot, proxy_operator_timeline,
+    proxy_operator_trace, proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -346,6 +346,13 @@ fn operator_snapshot_bundles_readiness_diagnostics_attention_and_incidents() {
             .next_steps
             .iter()
             .any(|step| step.contains("Thaw traffic"))
+    );
+    assert!(
+        snapshot
+            .casebook
+            .route_casebooks
+            .iter()
+            .any(|casebook| casebook.route_id == "camera")
     );
 }
 
@@ -1007,6 +1014,72 @@ fn operator_triage_combines_global_actions_with_focused_history() {
             .next_steps
             .iter()
             .any(|step| step.contains("Thaw traffic"))
+    );
+}
+
+#[test]
+fn operator_casebook_bundles_incident_recovery_and_handoff_context() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            queue_depth: [("udp_renderer".to_owned(), 4)].into_iter().collect(),
+            recent_operator_actions: vec![RecentOperatorAction {
+                sequence: 7,
+                recorded_at_unix_ms: 700,
+                action: "freeze_traffic".to_owned(),
+                details: vec!["applied=true".to_owned()],
+            }],
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let snapshot = proxy_operator_snapshot(&status, ProxyRuntimeSafetyPolicy::default(), Some(3));
+    let casebook = proxy_operator_casebook(&snapshot);
+
+    let route_casebook = casebook
+        .route_casebooks
+        .iter()
+        .find(|entry| entry.route_id == "camera")
+        .expect("camera casebook should exist");
+    assert!(
+        route_casebook
+            .next_steps
+            .iter()
+            .any(|step| step.contains("Thaw traffic"))
+    );
+    assert!(
+        route_casebook
+            .incident_titles
+            .iter()
+            .any(|title| title.contains("Traffic frozen"))
+    );
+    assert_eq!(route_casebook.linked_destination_ids, vec!["udp_renderer"]);
+    assert!(
+        route_casebook
+            .recommended_actions
+            .iter()
+            .any(|action| action.route_id.as_deref() == Some("camera"))
+    );
+
+    let destination_casebook = casebook
+        .destination_casebooks
+        .iter()
+        .find(|entry| entry.destination_id == "udp_renderer")
+        .expect("destination casebook should exist");
+    assert!(
+        destination_casebook
+            .recovery_surface
+            .iter()
+            .any(|entry| entry.contains("queue_depth=4"))
+    );
+    assert!(
+        destination_casebook
+            .recent_events
+            .iter()
+            .any(|event| event.title.contains("Traffic override"))
     );
 }
 

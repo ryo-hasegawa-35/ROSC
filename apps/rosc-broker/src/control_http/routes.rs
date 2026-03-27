@@ -11,14 +11,14 @@ use super::request::{
     replay_limit, split_query,
 };
 use super::response::{
-    HttpResponse, blockers_response, config_events_response, dashboard_css_response,
-    dashboard_data_response, dashboard_html_response, dashboard_js_response,
-    dashboard_render_js_response, dashboard_state_js_response, destination_trace_response,
-    diagnostics_response, handoff_response, incidents_response, invalid_component_error,
-    invalid_query_error, map_action_result, operator_actions_response, operator_signals_response,
-    overrides_response, overview_response, readiness_response, report_response,
-    route_trace_response, snapshot_response, status_response, timeline_response, trace_response,
-    triage_response, unsupported_route_error,
+    HttpResponse, blockers_response, casebook_response, config_events_response,
+    dashboard_css_response, dashboard_data_response, dashboard_html_response,
+    dashboard_js_response, dashboard_render_js_response, dashboard_state_js_response,
+    destination_trace_response, diagnostics_response, handoff_response, incidents_response,
+    invalid_component_error, invalid_query_error, map_action_result, operator_actions_response,
+    operator_signals_response, overrides_response, overview_response, readiness_response,
+    report_response, route_trace_response, snapshot_response, status_response, timeline_response,
+    trace_response, triage_response, unsupported_route_error,
 };
 
 pub(crate) async fn route_request(
@@ -91,6 +91,13 @@ pub(crate) async fn route_request(
             let snapshot = control.operator_snapshot(limit).await;
             triage_response(snapshot.triage)
         }
+        ("GET", "/casebook") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            let snapshot = control.operator_snapshot(limit).await;
+            casebook_response(snapshot.casebook)
+        }
         ("GET", "/timeline") => {
             let Ok(limit) = history_limit(query) else {
                 return invalid_query_error("limit");
@@ -151,6 +158,35 @@ async fn route_nested_request(
     query: Option<&str>,
     control: Arc<dyn ProxyControlPlane>,
 ) -> HttpResponse {
+    if let Some(destination_id) = path
+        .strip_prefix("/destinations/")
+        .and_then(|path| path.strip_suffix("/casebook"))
+    {
+        if request.method != "GET" || destination_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(destination_id) = decode_uri_component(destination_id) else {
+            return invalid_component_error("destination id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let snapshot = control.operator_snapshot(limit).await;
+        let Some(destination_casebook) = snapshot
+            .casebook
+            .destination_casebooks
+            .into_iter()
+            .find(|casebook| casebook.destination_id == destination_id)
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        return casebook_response(crate::ProxyOperatorCasebookCatalog {
+            state: snapshot.casebook.state,
+            route_casebooks: Vec::new(),
+            destination_casebooks: vec![destination_casebook],
+        });
+    }
+
     if let Some(destination_id) = path
         .strip_prefix("/destinations/")
         .and_then(|path| path.strip_suffix("/triage"))
@@ -308,6 +344,32 @@ async fn route_nested_request(
             state: snapshot.handoff.state,
             route_handoffs: vec![route_handoff],
             destination_handoffs: Vec::new(),
+        });
+    }
+
+    if let Some(route_id) = route_path.strip_suffix("/casebook") {
+        if request.method != "GET" || route_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let snapshot = control.operator_snapshot(limit).await;
+        let Some(route_casebook) = snapshot
+            .casebook
+            .route_casebooks
+            .into_iter()
+            .find(|casebook| casebook.route_id == route_id)
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        return casebook_response(crate::ProxyOperatorCasebookCatalog {
+            state: snapshot.casebook.state,
+            route_casebooks: vec![route_casebook],
+            destination_casebooks: Vec::new(),
         });
     }
 

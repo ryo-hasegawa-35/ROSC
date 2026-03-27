@@ -269,3 +269,50 @@ pub(crate) async fn proxy_triage(
     print_json_pretty(&triage)?;
     Ok(())
 }
+
+pub(crate) async fn proxy_casebook(
+    path: &Path,
+    resolve_bindings: bool,
+    history_limit: Option<usize>,
+    route_id: Option<&str>,
+    destination_id: Option<&str>,
+    options: ProxyCommandOptions,
+) -> Result<()> {
+    if route_id.is_some() && destination_id.is_some() {
+        bail!("proxy-casebook accepts only one of --route-id or --destination-id");
+    }
+
+    let config = load_config(path)?;
+    let status =
+        status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
+    let snapshot =
+        rosc_broker::proxy_operator_snapshot(&status, safety_policy(options), history_limit);
+    let mut casebook = snapshot.casebook;
+
+    if let Some(route_id) = route_id {
+        let Some(route_casebook) = casebook
+            .route_casebooks
+            .iter()
+            .find(|casebook| casebook.route_id == route_id)
+            .cloned()
+        else {
+            bail!("unknown route casebook `{route_id}`");
+        };
+        casebook.route_casebooks = vec![route_casebook];
+        casebook.destination_casebooks.clear();
+    } else if let Some(destination_id) = destination_id {
+        let Some(destination_casebook) = casebook
+            .destination_casebooks
+            .iter()
+            .find(|casebook| casebook.destination_id == destination_id)
+            .cloned()
+        else {
+            bail!("unknown destination casebook `{destination_id}`");
+        };
+        casebook.route_casebooks.clear();
+        casebook.destination_casebooks = vec![destination_casebook];
+    }
+
+    print_json_pretty(&casebook)?;
+    Ok(())
+}

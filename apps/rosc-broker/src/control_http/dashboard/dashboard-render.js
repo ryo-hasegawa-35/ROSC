@@ -31,12 +31,14 @@ export function collectDashboardElements() {
     routeHandoffDetail: document.getElementById("route-handoff-detail"),
     triageGlobalDetail: document.getElementById("triage-global-detail"),
     routeTriageDetail: document.getElementById("route-triage-detail"),
+    routeCasebookDetail: document.getElementById("route-casebook-detail"),
     destinationFocusSelect: document.getElementById("destination-focus-select"),
     destinationFocusDetail: document.getElementById("destination-focus-detail"),
     destinationTraceDetail: document.getElementById("destination-trace-detail"),
     destinationTimelineDetail: document.getElementById("destination-timeline-detail"),
     destinationHandoffDetail: document.getElementById("destination-handoff-detail"),
     destinationTriageDetail: document.getElementById("destination-triage-detail"),
+    destinationCasebookDetail: document.getElementById("destination-casebook-detail"),
     routesTable: document.getElementById("routes-table"),
     destinationsTable: document.getElementById("destinations-table"),
     overridesList: document.getElementById("overrides-list"),
@@ -81,6 +83,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderFocusedTimeline(elements, dashboard.timeline_catalog, context.focusState);
   renderHandoff(elements, snapshot.handoff, context.focusState);
   renderTriage(elements, snapshot.triage, context.focusState);
+  renderCasebook(elements, snapshot.casebook, context.focusState);
   renderRoutes(elements, status, diagnostics);
   renderDestinations(elements, dashboard.destination_details);
   renderRecovery(elements, snapshot);
@@ -414,6 +417,17 @@ function renderTriage(elements, triage, focusState) {
   );
   renderRouteTriage(elements, routeTriage);
   renderDestinationTriage(elements, destinationTriage);
+}
+
+function renderCasebook(elements, casebook, focusState) {
+  const routeCasebook = (casebook?.route_casebooks || []).find(
+    (entry) => entry.route_id === focusState?.routeId,
+  );
+  const destinationCasebook = (casebook?.destination_casebooks || []).find(
+    (entry) => entry.destination_id === focusState?.destinationId,
+  );
+  renderRouteCasebook(elements, routeCasebook);
+  renderDestinationCasebook(elements, destinationCasebook);
 }
 
 function renderFocusedTimeline(elements, timelineCatalog, focusState) {
@@ -1045,6 +1059,88 @@ function renderDestinationTriage(elements, triage) {
   wrapper.appendChild(traceEventsBlock(triage.recent_events, "Recent related events"));
   wrapper.appendChild(timelineEntriesBlock(triage.timeline, "Recorded timeline"));
   elements.destinationTriageDetail.replaceChildren(wrapper);
+}
+
+function renderRouteCasebook(elements, casebook) {
+  if (!casebook) {
+    fillList(elements, elements.routeCasebookDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused route casebook</p>
+        <h4>${escapeHtml(casebook.route_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(String(casebook.level).toLowerCase())}">${escapeHtml(humanizeState(casebook.level))}</span>
+    </div>
+    <p class="summary">${escapeHtml(casebook.summary)}</p>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Linked destinations", casebook.linked_destination_ids.length],
+      ["Incident clusters", casebook.incident_titles.length],
+      ["Next steps", casebook.next_steps.length],
+      ["Recovery signals", casebook.recovery_surface.length],
+    ]),
+  );
+  wrapper.appendChild(traceSummaryBlock("Incident digest", casebook.incident_titles));
+  wrapper.appendChild(traceSummaryBlock("Next steps", casebook.next_steps));
+  wrapper.appendChild(traceSummaryBlock("Recovery surface", casebook.recovery_surface));
+  if (casebook.recommended_actions?.length > 0) {
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    actions.replaceChildren(
+      ...casebook.recommended_actions.map((action) => worklistActionButton(action)),
+    );
+    wrapper.appendChild(actions);
+  }
+  wrapper.appendChild(traceEventsBlock(casebook.recent_events, "Recent related events"));
+  wrapper.appendChild(timelineEntriesBlock(casebook.timeline, "Recorded timeline"));
+  elements.routeCasebookDetail.replaceChildren(wrapper);
+}
+
+function renderDestinationCasebook(elements, casebook) {
+  if (!casebook) {
+    fillList(elements, elements.destinationCasebookDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused destination casebook</p>
+        <h4>${escapeHtml(casebook.destination_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(String(casebook.level).toLowerCase())}">${escapeHtml(humanizeState(casebook.level))}</span>
+    </div>
+    <p class="summary">${escapeHtml(casebook.summary)}</p>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Linked routes", casebook.linked_route_ids.length],
+      ["Incident clusters", casebook.incident_titles.length],
+      ["Next steps", casebook.next_steps.length],
+      ["Recovery signals", casebook.recovery_surface.length],
+    ]),
+  );
+  wrapper.appendChild(traceSummaryBlock("Incident digest", casebook.incident_titles));
+  wrapper.appendChild(traceSummaryBlock("Next steps", casebook.next_steps));
+  wrapper.appendChild(traceSummaryBlock("Recovery surface", casebook.recovery_surface));
+  if (casebook.recommended_actions?.length > 0) {
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    actions.replaceChildren(
+      ...casebook.recommended_actions.map((action) => worklistActionButton(action)),
+    );
+    wrapper.appendChild(actions);
+  }
+  wrapper.appendChild(traceEventsBlock(casebook.recent_events, "Recent related events"));
+  wrapper.appendChild(timelineEntriesBlock(casebook.timeline, "Recorded timeline"));
+  elements.destinationCasebookDetail.replaceChildren(wrapper);
 }
 
 function traceSummaryBlock(title, reasons) {
