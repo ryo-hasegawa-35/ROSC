@@ -576,10 +576,7 @@ fn parse_blob_view<'a>(bytes: &'a [u8], cursor: &mut usize) -> Result<&'a [u8], 
     Ok(blob)
 }
 
-fn parse_osc_string_view<'a>(
-    bytes: &'a [u8],
-    cursor: usize,
-) -> Result<(&'a str, usize), ParseError> {
+fn parse_osc_string_view(bytes: &[u8], cursor: usize) -> Result<(&str, usize), ParseError> {
     let Some(relative_end) = bytes[cursor..].iter().position(|byte| *byte == 0) else {
         return Err(ParseError::UnexpectedEof);
     };
