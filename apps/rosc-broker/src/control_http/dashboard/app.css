@@ -558,6 +558,10 @@ td code {
   margin: 0;
 }
 
+.worklist-item h4 {
+  margin: 0;
+}
+
 .worklist-item .summary {
   color: var(--muted);
   margin: 8px 0 0;

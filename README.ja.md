@@ -127,6 +127,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - `/dashboard/data` に route / destination の drill-down detail model も含め、incident 一覧から追加リクエストなしで個別の復旧コンテキストへ降りられるようにした
 - snapshot と dashboard payload に machine-readable な operator worklist を追加し、thaw / restore-route / rehydrate-destination / focus-only investigation の次アクション候補をそのまま扱えるようにした
 - 埋め込み dashboard は一時的な control-plane 断でも polling を継続し、最後の成功 snapshot を stale な operator context として保持しつつ、isolated route を runtime table 上でも isolated と明示するようにした
+- snapshot と dashboard payload に incident digest と structured recovery candidate も追加し、grouped incident card から route / destination ごとの具体的な recovery action へそのまま進めるようにした
 - `/signals?scope=problematic` で、operator が今見るべき route / destination signal だけに payload を絞れるようにした
 - config の reject / block / reload failure も counters だけでなく reason 付きの recent history として残るようになった
 

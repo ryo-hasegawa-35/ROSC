@@ -258,6 +258,16 @@ async fn control_service_serves_dashboard_assets() {
             .as_array()
             .is_some()
     );
+    assert!(
+        dashboard_data["dashboard"]["snapshot"]["incident_digest"]["clusters"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["snapshot"]["recovery"]["route_candidates"]
+            .as_array()
+            .is_some()
+    );
     assert_eq!(
         dashboard_data["dashboard"]["timeline"]
             .as_array()

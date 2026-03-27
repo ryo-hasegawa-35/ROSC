@@ -19,6 +19,11 @@ export function collectDashboardElements() {
     trafficHotspots: document.getElementById("traffic-hotspots"),
     worklistSummary: document.getElementById("worklist-summary"),
     worklistItems: document.getElementById("worklist-items"),
+    incidentDigestSummary: document.getElementById("incident-digest-summary"),
+    incidentDigestItems: document.getElementById("incident-digest-items"),
+    recoverySummary: document.getElementById("recovery-summary"),
+    recoveryRouteCandidates: document.getElementById("recovery-route-candidates"),
+    recoveryDestinationCandidates: document.getElementById("recovery-destination-candidates"),
     routeFocusSelect: document.getElementById("route-focus-select"),
     routeFocusDetail: document.getElementById("route-focus-detail"),
     destinationFocusSelect: document.getElementById("destination-focus-select"),
@@ -60,6 +65,8 @@ export function renderDashboard(elements, dashboard, context) {
   renderTopology(elements, status);
   renderTraffic(elements, dashboard.traffic, context.trafficPulse, snapshot);
   renderWorklist(elements, snapshot.worklist);
+  renderIncidentDigest(elements, snapshot.incident_digest);
+  renderRecoveryCandidates(elements, snapshot.recovery);
   renderFocus(elements, dashboard, context.focusState);
   renderRoutes(elements, status, diagnostics);
   renderDestinations(elements, dashboard.destination_details);
@@ -243,32 +250,97 @@ function renderWorklist(elements, worklist) {
   elements.worklistItems.replaceChildren(
     ...emptyAware(
       elements,
-      (worklist.items || []).map((item) => {
-        const entry = document.createElement("article");
-        entry.className = "worklist-item";
-        entry.dataset.level = item.level;
-        entry.innerHTML = `
-          <div class="panel-header">
-            <div>
-              <p class="panel-label">Operator work item</p>
-              <h4>${escapeHtml(item.title)}</h4>
-            </div>
-            <span class="entity-state" data-level="${escapeHtml(item.level)}">${escapeHtml(humanizeState(item.level))}</span>
-          </div>
-          <p class="summary">${escapeHtml(item.summary)}</p>
-        `;
-        const reasons = document.createElement("ul");
-        reasons.className = "detail-list";
-        reasons.replaceChildren(...emptyListItems(item.reasons || []));
-        entry.appendChild(reasons);
-        if (item.action) {
-          const actions = document.createElement("div");
-          actions.className = "detail-actions";
-          actions.appendChild(worklistActionButton(item.action));
-          entry.appendChild(actions);
-        }
-        return entry;
-      }),
+      (worklist.items || []).map((item) =>
+        operatorCard(item, {
+          label: "Operator work item",
+        }),
+      ),
+    ),
+  );
+}
+
+function renderIncidentDigest(elements, digest) {
+  const summary = [
+    ["State", humanizeState(digest.state), `${digest.clusters.length} clusters`],
+    ["Blocked", digest.blocked_count, "requires fix"],
+    ["Degraded", digest.degraded_count, "monitor or recover"],
+  ];
+  elements.incidentDigestSummary.replaceChildren(
+    ...summary.map(([label, value, context]) => statCard(label, value, context)),
+  );
+  elements.incidentDigestItems.replaceChildren(
+    ...emptyAware(
+      elements,
+      (digest.clusters || []).map((cluster) =>
+        operatorCard(cluster, {
+          label: `${humanizeScope(cluster.scope)} incident`,
+        }),
+      ),
+    ),
+  );
+}
+
+function renderRecoveryCandidates(elements, recovery) {
+  const summary = [
+    ["Cached routes", recovery.cached_routes, "rehydrate-capable"],
+    ["Replayable routes", recovery.replayable_routes, "sandbox-ready"],
+    ["Destination recovery", recovery.rehydrate_ready_destinations, "rehydrate targets"],
+  ];
+  elements.recoverySummary.replaceChildren(
+    ...summary.map(([label, value, context]) => statCard(label, value, context)),
+  );
+
+  elements.recoveryRouteCandidates.replaceChildren(
+    ...emptyAware(
+      elements,
+      (recovery.route_candidates || []).map((route) =>
+        operatorCard(
+          {
+            level: route.isolated ? "degraded" : "healthy",
+            title: route.route_id,
+            summary: `cache=${route.cache_policy} replay=${route.replay_allowed} fallback_ready=${route.fallback_ready}`,
+            reasons: [
+              `capture policy: ${route.capture_policy}`,
+              `rehydrate on connect: ${route.rehydrate_on_connect}`,
+              `destinations: ${route.destination_ids.join(", ") || "none"}`,
+            ],
+            action: route.action,
+          },
+          {
+            label: "Route recovery",
+          },
+        ),
+      ),
+    ),
+  );
+
+  elements.recoveryDestinationCandidates.replaceChildren(
+    ...emptyAware(
+      elements,
+      (recovery.destination_candidates || []).map((destination) =>
+        operatorCard(
+          {
+            level:
+              destination.breaker_state === "Open"
+                ? "blocked"
+                : destination.queue_depth > 0 ||
+                    destination.send_failures_total > 0 ||
+                    destination.drops_total > 0
+                  ? "degraded"
+                  : "healthy",
+            title: destination.destination_id,
+            summary: `queue=${destination.queue_depth} failures=${destination.send_failures_total} drops=${destination.drops_total}`,
+            reasons: [
+              `routes: ${destination.route_ids.join(", ") || "none"}`,
+              `breaker: ${destination.breaker_state}`,
+            ],
+            action: destination.action,
+          },
+          {
+            label: "Destination recovery",
+          },
+        ),
+      ),
     ),
   );
 }
@@ -736,6 +808,33 @@ function worklistActionButton(action) {
   return button;
 }
 
+function operatorCard(item, options = {}) {
+  const entry = document.createElement("article");
+  entry.className = "worklist-item";
+  entry.dataset.level = item.level;
+  entry.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">${escapeHtml(options.label || "Operator item")}</p>
+        <h4>${escapeHtml(item.title)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(item.level)}">${escapeHtml(humanizeState(item.level))}</span>
+    </div>
+    <p class="summary">${escapeHtml(item.summary)}</p>
+  `;
+  const reasons = document.createElement("ul");
+  reasons.className = "detail-list";
+  reasons.replaceChildren(...emptyListItems(item.reasons || []));
+  entry.appendChild(reasons);
+  if (item.action) {
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    actions.appendChild(worklistActionButton(item.action));
+    entry.appendChild(actions);
+  }
+  return entry;
+}
+
 function describeHero(readiness, attention) {
   if (readiness.reasons.length > 0) {
     return readiness.reasons[0];
@@ -869,6 +968,22 @@ function humanizeState(value) {
     case "safemode":
     case "safe_mode":
       return "SafeMode";
+    default:
+      return value || "Unknown";
+  }
+}
+
+function humanizeScope(value) {
+  const normalized = String(value || "").toLowerCase();
+  switch (normalized) {
+    case "global":
+      return "Global";
+    case "config":
+      return "Config";
+    case "route":
+      return "Route";
+    case "destination":
+      return "Destination";
     default:
       return value || "Unknown";
   }

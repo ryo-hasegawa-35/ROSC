@@ -314,6 +314,15 @@ fn operator_snapshot_bundles_readiness_diagnostics_attention_and_incidents() {
     assert_eq!(snapshot.attention.state, ProxyOperatorState::Warning);
     assert_eq!(snapshot.incidents.recent_config_issues.len(), 1);
     assert_eq!(snapshot.overview.report.state, ProxyOperatorState::Warning);
+    assert_eq!(snapshot.incident_digest.state, "warning");
+    assert!(
+        snapshot
+            .incident_digest
+            .clusters
+            .iter()
+            .any(|cluster| cluster.id == "traffic-frozen")
+    );
+    assert_eq!(snapshot.recovery.cached_routes, 0);
     assert!(
         snapshot
             .worklist
@@ -535,6 +544,24 @@ fn operator_dashboard_bundles_snapshot_traffic_and_timeline() {
         .expect("renderer detail should exist");
     assert_eq!(renderer_detail.send_failures_total, 5);
     assert_eq!(renderer_detail.drops_total, 4);
+    assert!(
+        dashboard
+            .snapshot
+            .incident_digest
+            .clusters
+            .iter()
+            .any(|cluster| cluster.id == "route:camera")
+    );
+    assert!(
+        dashboard
+            .snapshot
+            .incident_digest
+            .clusters
+            .iter()
+            .any(|cluster| cluster.id == "destination:udp_renderer")
+    );
+    assert_eq!(dashboard.snapshot.recovery.cached_routes, 0);
+    assert_eq!(dashboard.snapshot.recovery.rehydrate_ready_destinations, 1);
     assert!(dashboard.snapshot.worklist.immediate_actions >= 1);
     assert!(
         dashboard

@@ -130,6 +130,7 @@ Current Phase 01 runtime coverage:
 - `/dashboard/data` now also includes route/destination drill-down detail models so the embedded dashboard can jump from incident lists into route/destination-specific recovery context without stitching extra requests
 - snapshot and dashboard payloads now include a machine-readable operator worklist with recommended next actions such as thaw, restore-route, rehydrate-destination, and focus-only investigation jumps
 - the embedded dashboard now keeps polling through transient control-plane failures, preserves the last successful snapshot as stale operator context, and marks isolated routes as isolated in the runtime table instead of silently healthy
+- snapshot and dashboard payloads now also include an incident digest plus structured recovery candidates, so operators can move from grouped incident cards into concrete route/destination recovery actions without stitching extra control-plane calls
 - `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
 - config rejection / block / reload-failure history now retains reason details instead of only counters
 

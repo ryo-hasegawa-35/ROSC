@@ -10,10 +10,12 @@ mod operator_attention;
 mod operator_dashboard;
 mod operator_diagnostics;
 mod operator_history;
+mod operator_incident_digest;
 mod operator_incidents;
 mod operator_overview;
 mod operator_policy;
 mod operator_readiness;
+mod operator_recovery;
 mod operator_runtime_summary;
 mod operator_snapshot;
 mod operator_worklist;
@@ -47,6 +49,10 @@ pub use operator_dashboard::{
 pub use operator_diagnostics::{
     ProxyOperatorDiagnostics, proxy_operator_diagnostics, proxy_operator_diagnostics_from_overview,
 };
+pub use operator_incident_digest::{
+    ProxyOperatorIncidentCluster, ProxyOperatorIncidentDigest, ProxyOperatorIncidentLevel,
+    ProxyOperatorIncidentScope, proxy_operator_incident_digest,
+};
 pub use operator_incidents::{
     ProxyOperatorIncidents, proxy_operator_incidents, proxy_operator_incidents_from_histories,
 };
@@ -61,6 +67,10 @@ pub use operator_policy::{
 pub use operator_readiness::{
     ProxyOperatorReadiness, ProxyOperatorReadinessCounts, ProxyOperatorReadinessFlags,
     ProxyOperatorReadinessLevel, proxy_operator_readiness, proxy_operator_readiness_from_overview,
+};
+pub use operator_recovery::{
+    ProxyOperatorRecovery, ProxyOperatorRecoveryDestination, ProxyOperatorRecoveryRoute,
+    proxy_operator_recovery,
 };
 pub use operator_runtime_summary::{ProxyOperatorRuntimeSummary, proxy_operator_runtime_summary};
 pub use operator_snapshot::{

@@ -19,6 +19,7 @@
           <a href="#topology" data-section-link="topology">Topology</a>
           <a href="#traffic" data-section-link="traffic">Traffic</a>
           <a href="#worklist" data-section-link="worklist">Worklist</a>
+          <a href="#incident-digest" data-section-link="incident-digest">Incident Digest</a>
           <a href="#focus" data-section-link="focus">Focus</a>
           <a href="#routes" data-section-link="routes">Routes</a>
           <a href="#destinations" data-section-link="destinations">Destinations</a>
@@ -157,6 +158,39 @@
           </div>
           <div class="stat-grid" id="worklist-summary"></div>
           <div class="worklist-stack" id="worklist-items"></div>
+        </section>
+
+        <section class="two-column" id="incident-digest">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Incident Digest</p>
+                <h3>Grouped runtime and config pressure</h3>
+              </div>
+            </div>
+            <div class="stat-grid" id="incident-digest-summary"></div>
+            <div class="worklist-stack" id="incident-digest-items"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Recovery Candidates</p>
+                <h3>Cache, replay, and rehydrate surfaces</h3>
+              </div>
+            </div>
+            <div class="stat-grid" id="recovery-summary"></div>
+            <div class="recovery-grid">
+              <div>
+                <h4>Route candidates</h4>
+                <div class="worklist-stack" id="recovery-route-candidates"></div>
+              </div>
+              <div>
+                <h4>Destination candidates</h4>
+                <div class="worklist-stack" id="recovery-destination-candidates"></div>
+              </div>
+            </div>
+          </article>
         </section>
 
         <section class="two-column">
