@@ -1,124 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Result;
-use rosc_config::{BrokerConfig, DropPolicyConfig};
-use rosc_route::{CachePolicy, CapturePolicy, TrafficClass, TransportSelector};
-use rosc_telemetry::{
-    BreakerStateSnapshot, HealthSnapshot, RecentConfigEvent, RecentOperatorAction,
-};
-use serde::Serialize;
+use rosc_config::BrokerConfig;
+use rosc_route::{CapturePolicy, TransportSelector};
 
 use crate::ProxyLaunchProfileStatus;
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct UdpProxyStatusSnapshot {
-    pub launch_profile: ProxyLaunchProfileStatus,
-    pub summary: UdpProxySummary,
-    pub runtime: Option<UdpProxyRuntimeStatus>,
-    pub ingresses: Vec<UdpProxyIngressStatus>,
-    pub destinations: Vec<UdpProxyDestinationStatus>,
-    pub routes: Vec<UdpProxyRouteStatus>,
-    pub fallback_routes: Vec<UdpProxyFallbackStatus>,
-    pub route_assessments: Vec<UdpProxyRouteAssessment>,
-    pub warnings: Vec<String>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct UdpProxySummary {
-    pub total_routes: usize,
-    pub active_routes: usize,
-    pub disabled_routes: usize,
-    pub active_ingresses: usize,
-    pub active_destinations: usize,
-    pub fallback_ready_routes: usize,
-    pub fallback_missing_routes: usize,
-    pub warning_count: usize,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct UdpProxyRuntimeStatus {
-    pub traffic_frozen: bool,
-    pub isolated_route_ids: Vec<String>,
-    pub operator_actions_total: BTreeMap<String, u64>,
-    pub recent_operator_actions: Vec<RecentOperatorAction>,
-    pub recent_config_events: Vec<RecentConfigEvent>,
-    pub config_revision: u64,
-    pub config_rejections_total: u64,
-    pub config_blocked_total: u64,
-    pub config_reload_failures_total: u64,
-    pub ingress_packets_total: BTreeMap<String, u64>,
-    pub ingress_drops_total: BTreeMap<String, u64>,
-    pub dispatch_failures_total: BTreeMap<String, u64>,
-    pub route_matches_total: BTreeMap<String, u64>,
-    pub route_transform_failures_total: BTreeMap<String, u64>,
-    pub destination_drops_total: BTreeMap<String, u64>,
-    pub destinations: Vec<UdpProxyDestinationRuntimeStatus>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct UdpProxyDestinationRuntimeStatus {
-    pub destination_id: String,
-    pub queue_depth: usize,
-    pub send_total: u64,
-    pub send_failures_total: u64,
-    pub breaker_state: Option<BreakerStateSnapshot>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct UdpProxyIngressStatus {
-    pub id: String,
-    pub configured_bind: String,
-    pub bound_local_addr: Option<String>,
-    pub route_ids: Vec<String>,
-    pub max_packet_size: usize,
-    pub mode: rosc_osc::CompatibilityMode,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct UdpProxyDestinationStatus {
-    pub id: String,
-    pub bind: String,
-    pub target: String,
-    pub route_ids: Vec<String>,
-    pub queue_depth: usize,
-    pub drop_policy: DropPolicyConfig,
-    pub breaker_open_after_consecutive_failures: u32,
-    pub breaker_open_after_consecutive_queue_overflows: u32,
-    pub breaker_cooldown_ms: u64,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct UdpProxyRouteStatus {
-    pub id: String,
-    pub enabled: bool,
-    pub mode: rosc_osc::CompatibilityMode,
-    pub traffic_class: TrafficClass,
-    pub ingress_ids: Vec<String>,
-    pub address_patterns: Vec<String>,
-    pub destination_ids: Vec<String>,
-    pub rename_address: Option<String>,
-    pub cache_policy: CachePolicy,
-    pub capture_policy: CapturePolicy,
-    pub rehydrate_on_connect: bool,
-    pub replay_allowed: bool,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct UdpProxyFallbackStatus {
-    pub route_id: String,
-    pub direct_udp_targets: Vec<String>,
-    pub available: bool,
-    pub note: String,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct UdpProxyRouteAssessment {
-    pub route_id: String,
-    pub active: bool,
-    pub direct_udp_fallback_available: bool,
-    pub warning_count: usize,
-    pub warnings: Vec<String>,
-}
+use super::types::{
+    UdpProxyDestinationStatus, UdpProxyFallbackStatus, UdpProxyIngressStatus,
+    UdpProxyRouteAssessment, UdpProxyRouteStatus, UdpProxyStatusSnapshot, UdpProxySummary,
+};
 
 pub fn proxy_status_from_config(config: &BrokerConfig) -> Result<UdpProxyStatusSnapshot> {
     config.validate_runtime_references()?;
@@ -323,71 +214,6 @@ pub fn proxy_status_from_config(config: &BrokerConfig) -> Result<UdpProxyStatusS
     })
 }
 
-pub fn attach_runtime_status(
-    mut status: UdpProxyStatusSnapshot,
-    snapshot: &HealthSnapshot,
-) -> UdpProxyStatusSnapshot {
-    status.runtime = Some(UdpProxyRuntimeStatus {
-        traffic_frozen: snapshot.traffic_frozen,
-        isolated_route_ids: snapshot
-            .route_isolated
-            .iter()
-            .filter(|(_, isolated)| **isolated)
-            .map(|(route_id, _)| route_id.clone())
-            .collect(),
-        operator_actions_total: snapshot.operator_actions_total.clone(),
-        recent_operator_actions: snapshot.recent_operator_actions.clone(),
-        recent_config_events: snapshot.recent_config_events.clone(),
-        config_revision: snapshot.config_revision,
-        config_rejections_total: snapshot.config_rejections_total,
-        config_blocked_total: snapshot.config_blocked_total,
-        config_reload_failures_total: snapshot.config_reload_failures_total,
-        ingress_packets_total: snapshot.ingress_packets_total.clone(),
-        ingress_drops_total: collapse_reason_counts(&snapshot.ingress_drops_total),
-        dispatch_failures_total: collapse_dispatch_failures(&snapshot.dispatch_failures_total),
-        route_matches_total: snapshot.route_matches_total.clone(),
-        route_transform_failures_total: snapshot.route_transform_failures_total.clone(),
-        destination_drops_total: collapse_reason_counts(&snapshot.destination_drops_total),
-        destinations: destination_runtime(snapshot),
-    });
-    status
-}
-
-pub fn operator_warnings(status: &UdpProxyStatusSnapshot) -> Vec<String> {
-    let mut warnings = status.warnings.clone();
-    for route in &status.route_assessments {
-        if !route.active {
-            continue;
-        }
-        for warning in &route.warnings {
-            warnings.push(format!("route `{}`: {}", route.route_id, warning));
-        }
-    }
-    warnings
-}
-
-pub fn startup_blockers(
-    status: &UdpProxyStatusSnapshot,
-    fail_on_warnings: bool,
-    require_fallback_ready: bool,
-) -> Vec<String> {
-    let mut blockers = Vec::new();
-    if require_fallback_ready {
-        for route in &status.route_assessments {
-            if route.active && !route.direct_udp_fallback_available {
-                blockers.push(format!(
-                    "route `{}` does not have a direct UDP fallback target",
-                    route.route_id
-                ));
-            }
-        }
-    }
-    if fail_on_warnings {
-        blockers.extend(operator_warnings(status));
-    }
-    blockers
-}
-
 fn assess_route(
     route: &rosc_route::RouteSpec,
     destination_targets: &BTreeMap<&str, &str>,
@@ -423,62 +249,4 @@ fn assess_route(
         warning_count: warnings.len(),
         warnings,
     }
-}
-
-fn collapse_reason_counts(counts: &BTreeMap<(String, String), u64>) -> BTreeMap<String, u64> {
-    let mut collapsed = BTreeMap::new();
-    for ((id, _reason), count) in counts {
-        *collapsed.entry(id.clone()).or_default() += count;
-    }
-    collapsed
-}
-
-fn collapse_dispatch_failures(
-    counts: &BTreeMap<(String, String, String), u64>,
-) -> BTreeMap<String, u64> {
-    let mut collapsed = BTreeMap::new();
-    for ((route_id, _destination_id, _reason), count) in counts {
-        *collapsed.entry(route_id.clone()).or_default() += count;
-    }
-    collapsed
-}
-
-fn destination_runtime(snapshot: &HealthSnapshot) -> Vec<UdpProxyDestinationRuntimeStatus> {
-    let mut destination_ids = BTreeSet::new();
-    destination_ids.extend(snapshot.queue_depth.keys().cloned());
-    destination_ids.extend(snapshot.destination_sent_total.keys().cloned());
-    destination_ids.extend(
-        snapshot
-            .destination_send_failures_total
-            .keys()
-            .map(|(destination_id, _reason)| destination_id.clone()),
-    );
-    destination_ids.extend(snapshot.destination_breaker_state.keys().cloned());
-
-    destination_ids
-        .into_iter()
-        .map(|destination_id| UdpProxyDestinationRuntimeStatus {
-            queue_depth: snapshot
-                .queue_depth
-                .get(&destination_id)
-                .copied()
-                .unwrap_or_default(),
-            send_total: snapshot
-                .destination_sent_total
-                .get(&destination_id)
-                .copied()
-                .unwrap_or_default(),
-            send_failures_total: snapshot
-                .destination_send_failures_total
-                .iter()
-                .filter(|((id, _), _)| id == &destination_id)
-                .map(|(_, count)| *count)
-                .sum(),
-            breaker_state: snapshot
-                .destination_breaker_state
-                .get(&destination_id)
-                .cloned(),
-            destination_id,
-        })
-        .collect()
 }
