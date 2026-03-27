@@ -47,6 +47,7 @@ cargo run -p rosc-broker -- proxy-attention examples/phase-01-basic.toml --fail-
 cargo run -p rosc-broker -- proxy-incidents examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- proxy-handoff examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- proxy-timeline examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
+cargo run -p rosc-broker -- proxy-triage examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
@@ -69,12 +70,15 @@ curl http://127.0.0.1:19292/diagnostics?limit=10
 curl http://127.0.0.1:19292/attention
 curl http://127.0.0.1:19292/incidents?limit=10
 curl http://127.0.0.1:19292/handoff?limit=10
+curl http://127.0.0.1:19292/triage?limit=10
 curl http://127.0.0.1:19292/timeline?limit=10
 curl http://127.0.0.1:19292/trace?limit=10
 curl http://127.0.0.1:19292/routes/camera/handoff?limit=10
+curl http://127.0.0.1:19292/routes/camera/triage?limit=10
 curl http://127.0.0.1:19292/routes/camera/timeline?limit=10
 curl http://127.0.0.1:19292/routes/camera/trace?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/handoff?limit=10
+curl http://127.0.0.1:19292/destinations/udp_renderer/triage?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/timeline?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/trace?limit=10
 curl http://127.0.0.1:19292/overrides
@@ -88,7 +92,7 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` is intentionally loopback-only. Bind it to `127.0.0.1`, `::1`, or another
 local-only alias such as `localhost`; wildcard or externally reachable addresses are rejected.
 
-`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-assert-ready`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, `proxy-incidents`, `proxy-handoff`, and `proxy-timeline`
+`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-assert-ready`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, `proxy-incidents`, `proxy-handoff`, `proxy-timeline`, and `proxy-triage`
 intentionally write JSON only to stdout so they can be piped directly into tools such as `jq`
 without stripping summary lines first.
 
@@ -148,6 +152,8 @@ Current Phase 01 runtime coverage:
 - the embedded dashboard now renders focused route/destination handoff panels so operators can move from trace history to concrete next actions without leaving the focus workflow
 - snapshot-derived timeline catalogs now expose explicit global, route-linked, and destination-linked event history, and `proxy-timeline` plus control-plane `/timeline`, `/routes/{id}/timeline`, `/destinations/{id}/timeline` expose the same machine-readable slices for tooling
 - the embedded dashboard now renders focused route/destination timeline panels alongside trace and handoff so triage can move from current pressure to exact recent events without stitching extra requests
+- snapshot now also includes a triage catalog, and `proxy-triage` plus control-plane `/triage`, `/routes/{id}/triage`, `/destinations/{id}/triage` expose a merged global/focused recovery view with next steps, actions, and recorded timeline slices
+- handoff and triage guidance now treat `traffic_frozen` as a first-class global override, so focused recovery guidance tells the operator to thaw traffic before trusting apparently stable routes or destinations
 - `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
 - config rejection / block / reload-failure history now retains reason details instead of only counters
 

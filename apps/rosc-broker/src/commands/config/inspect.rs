@@ -222,3 +222,50 @@ pub(crate) async fn proxy_timeline(
     print_json_pretty(&timeline)?;
     Ok(())
 }
+
+pub(crate) async fn proxy_triage(
+    path: &Path,
+    resolve_bindings: bool,
+    history_limit: Option<usize>,
+    route_id: Option<&str>,
+    destination_id: Option<&str>,
+    options: ProxyCommandOptions,
+) -> Result<()> {
+    if route_id.is_some() && destination_id.is_some() {
+        bail!("proxy-triage accepts only one of --route-id or --destination-id");
+    }
+
+    let config = load_config(path)?;
+    let status =
+        status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
+    let snapshot =
+        rosc_broker::proxy_operator_snapshot(&status, safety_policy(options), history_limit);
+    let mut triage = snapshot.triage;
+
+    if let Some(route_id) = route_id {
+        let Some(route_triage) = triage
+            .route_triage
+            .iter()
+            .find(|triage| triage.route_id == route_id)
+            .cloned()
+        else {
+            bail!("unknown route triage `{route_id}`");
+        };
+        triage.route_triage = vec![route_triage];
+        triage.destination_triage.clear();
+    } else if let Some(destination_id) = destination_id {
+        let Some(destination_triage) = triage
+            .destination_triage
+            .iter()
+            .find(|triage| triage.destination_id == destination_id)
+            .cloned()
+        else {
+            bail!("unknown destination triage `{destination_id}`");
+        };
+        triage.route_triage.clear();
+        triage.destination_triage = vec![destination_triage];
+    }
+
+    print_json_pretty(&triage)?;
+    Ok(())
+}

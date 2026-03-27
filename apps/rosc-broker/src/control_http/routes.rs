@@ -18,7 +18,7 @@ use super::response::{
     invalid_query_error, map_action_result, operator_actions_response, operator_signals_response,
     overrides_response, overview_response, readiness_response, report_response,
     route_trace_response, snapshot_response, status_response, timeline_response, trace_response,
-    unsupported_route_error,
+    triage_response, unsupported_route_error,
 };
 
 pub(crate) async fn route_request(
@@ -84,6 +84,13 @@ pub(crate) async fn route_request(
             let snapshot = control.operator_snapshot(limit).await;
             handoff_response(snapshot.handoff)
         }
+        ("GET", "/triage") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            let snapshot = control.operator_snapshot(limit).await;
+            triage_response(snapshot.triage)
+        }
         ("GET", "/timeline") => {
             let Ok(limit) = history_limit(query) else {
                 return invalid_query_error("limit");
@@ -144,6 +151,36 @@ async fn route_nested_request(
     query: Option<&str>,
     control: Arc<dyn ProxyControlPlane>,
 ) -> HttpResponse {
+    if let Some(destination_id) = path
+        .strip_prefix("/destinations/")
+        .and_then(|path| path.strip_suffix("/triage"))
+    {
+        if request.method != "GET" || destination_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(destination_id) = decode_uri_component(destination_id) else {
+            return invalid_component_error("destination id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let snapshot = control.operator_snapshot(limit).await;
+        let Some(destination_triage) = snapshot
+            .triage
+            .destination_triage
+            .into_iter()
+            .find(|triage| triage.destination_id == destination_id)
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        return triage_response(crate::ProxyOperatorTriageCatalog {
+            state: snapshot.triage.state,
+            global: snapshot.triage.global,
+            route_triage: Vec::new(),
+            destination_triage: vec![destination_triage],
+        });
+    }
+
     if let Some(destination_id) = path
         .strip_prefix("/destinations/")
         .and_then(|path| path.strip_suffix("/timeline"))
@@ -271,6 +308,33 @@ async fn route_nested_request(
             state: snapshot.handoff.state,
             route_handoffs: vec![route_handoff],
             destination_handoffs: Vec::new(),
+        });
+    }
+
+    if let Some(route_id) = route_path.strip_suffix("/triage") {
+        if request.method != "GET" || route_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let snapshot = control.operator_snapshot(limit).await;
+        let Some(route_triage) = snapshot
+            .triage
+            .route_triage
+            .into_iter()
+            .find(|triage| triage.route_id == route_id)
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        return triage_response(crate::ProxyOperatorTriageCatalog {
+            state: snapshot.triage.state,
+            global: snapshot.triage.global,
+            route_triage: vec![route_triage],
+            destination_triage: Vec::new(),
         });
     }
 

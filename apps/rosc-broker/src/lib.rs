@@ -21,6 +21,7 @@ mod operator_runtime_summary;
 mod operator_snapshot;
 mod operator_timeline;
 mod operator_trace;
+mod operator_triage;
 mod operator_worklist;
 mod proxy_app;
 mod proxy_reload_supervisor;
@@ -91,6 +92,10 @@ pub use operator_trace::{
     ProxyOperatorDestinationTrace, ProxyOperatorRouteTrace, ProxyOperatorTraceCatalog,
     ProxyOperatorTraceEvent, ProxyOperatorTraceEventKind, ProxyOperatorTraceEventLevel,
     proxy_operator_trace,
+};
+pub use operator_triage::{
+    ProxyOperatorDestinationTriage, ProxyOperatorGlobalTriage, ProxyOperatorRouteTriage,
+    ProxyOperatorTriageCatalog, proxy_operator_triage,
 };
 pub use operator_worklist::{
     ProxyOperatorSuggestedAction, ProxyOperatorSuggestedActionKind, ProxyOperatorWorkItem,

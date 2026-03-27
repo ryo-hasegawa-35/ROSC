@@ -29,11 +29,14 @@ export function collectDashboardElements() {
     routeTraceDetail: document.getElementById("route-trace-detail"),
     routeTimelineDetail: document.getElementById("route-timeline-detail"),
     routeHandoffDetail: document.getElementById("route-handoff-detail"),
+    triageGlobalDetail: document.getElementById("triage-global-detail"),
+    routeTriageDetail: document.getElementById("route-triage-detail"),
     destinationFocusSelect: document.getElementById("destination-focus-select"),
     destinationFocusDetail: document.getElementById("destination-focus-detail"),
     destinationTraceDetail: document.getElementById("destination-trace-detail"),
     destinationTimelineDetail: document.getElementById("destination-timeline-detail"),
     destinationHandoffDetail: document.getElementById("destination-handoff-detail"),
+    destinationTriageDetail: document.getElementById("destination-triage-detail"),
     routesTable: document.getElementById("routes-table"),
     destinationsTable: document.getElementById("destinations-table"),
     overridesList: document.getElementById("overrides-list"),
@@ -77,6 +80,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderTrace(elements, dashboard, context.focusState);
   renderFocusedTimeline(elements, dashboard.timeline_catalog, context.focusState);
   renderHandoff(elements, snapshot.handoff, context.focusState);
+  renderTriage(elements, snapshot.triage, context.focusState);
   renderRoutes(elements, status, diagnostics);
   renderDestinations(elements, dashboard.destination_details);
   renderRecovery(elements, snapshot);
@@ -398,6 +402,18 @@ function renderHandoff(elements, handoff, focusState) {
   );
   renderRouteHandoff(elements, routeHandoff);
   renderDestinationHandoff(elements, destinationHandoff);
+}
+
+function renderTriage(elements, triage, focusState) {
+  renderGlobalTriage(elements, triage?.global);
+  const routeTriage = (triage?.route_triage || []).find(
+    (entry) => entry.route_id === focusState?.routeId,
+  );
+  const destinationTriage = (triage?.destination_triage || []).find(
+    (entry) => entry.destination_id === focusState?.destinationId,
+  );
+  renderRouteTriage(elements, routeTriage);
+  renderDestinationTriage(elements, destinationTriage);
 }
 
 function renderFocusedTimeline(elements, timelineCatalog, focusState) {
@@ -946,6 +962,91 @@ function renderDestinationHandoff(elements, handoff) {
   elements.destinationHandoffDetail.replaceChildren(wrapper);
 }
 
+function renderGlobalTriage(elements, triage) {
+  if (!triage) {
+    fillList(elements, elements.triageGlobalDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Global triage</p>
+        <h4>${escapeHtml(humanizeState(triage.state))}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(String(triage.state).toLowerCase())}">${escapeHtml(humanizeState(triage.state))}</span>
+    </div>
+    <p class="summary">${escapeHtml(triage.summary)}</p>
+  `;
+  wrapper.appendChild(traceSummaryBlock("Next steps", triage.next_steps));
+  if (triage.actions?.length > 0) {
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    actions.replaceChildren(...triage.actions.map((action) => worklistActionButton(action)));
+    wrapper.appendChild(actions);
+  }
+  elements.triageGlobalDetail.replaceChildren(wrapper);
+}
+
+function renderRouteTriage(elements, triage) {
+  if (!triage) {
+    fillList(elements, elements.routeTriageDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused route triage</p>
+        <h4>${escapeHtml(triage.route_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(String(triage.level).toLowerCase())}">${escapeHtml(humanizeState(triage.level))}</span>
+    </div>
+    <p class="summary">${escapeHtml(triage.summary)}</p>
+  `;
+  wrapper.appendChild(traceSummaryBlock("Next steps", triage.next_steps));
+  if (triage.actions?.length > 0) {
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    actions.replaceChildren(...triage.actions.map((action) => worklistActionButton(action)));
+    wrapper.appendChild(actions);
+  }
+  wrapper.appendChild(traceEventsBlock(triage.recent_events, "Recent related events"));
+  wrapper.appendChild(timelineEntriesBlock(triage.timeline, "Recorded timeline"));
+  elements.routeTriageDetail.replaceChildren(wrapper);
+}
+
+function renderDestinationTriage(elements, triage) {
+  if (!triage) {
+    fillList(elements, elements.destinationTriageDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused destination triage</p>
+        <h4>${escapeHtml(triage.destination_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(String(triage.level).toLowerCase())}">${escapeHtml(humanizeState(triage.level))}</span>
+    </div>
+    <p class="summary">${escapeHtml(triage.summary)}</p>
+  `;
+  wrapper.appendChild(traceSummaryBlock("Next steps", triage.next_steps));
+  if (triage.actions?.length > 0) {
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    actions.replaceChildren(...triage.actions.map((action) => worklistActionButton(action)));
+    wrapper.appendChild(actions);
+  }
+  wrapper.appendChild(traceEventsBlock(triage.recent_events, "Recent related events"));
+  wrapper.appendChild(timelineEntriesBlock(triage.timeline, "Recorded timeline"));
+  elements.destinationTriageDetail.replaceChildren(wrapper);
+}
+
 function traceSummaryBlock(title, reasons) {
   const block = document.createElement("div");
   block.className = "trace-summary";
@@ -971,6 +1072,47 @@ function traceEventsBlock(events, label = "Recent related events") {
   wrapper.replaceChildren(
     panelLabel(label),
     ...events.map((event) => traceEventCard(event)),
+  );
+  return wrapper;
+}
+
+function timelineEntriesBlock(entries, label) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-events";
+  wrapper.appendChild(panelLabel(label));
+  if (!entries || entries.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "No recorded timeline events right now.";
+    wrapper.appendChild(empty);
+    return wrapper;
+  }
+  wrapper.replaceChildren(
+    panelLabel(label),
+    ...entries.map((entry) => {
+      const item = document.createElement("article");
+      item.className = "trace-event";
+      item.dataset.level = entry.category === "config_event" ? "degraded" : "healthy";
+      item.innerHTML = `
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">${escapeHtml(entry.category.replaceAll("_", " "))}</p>
+            <h5>${escapeHtml(entry.label)}</h5>
+          </div>
+          <span class="trace-timestamp">${escapeHtml(formatTimestamp(entry.recorded_at_unix_ms))}</span>
+        </div>
+      `;
+      const meta = document.createElement("div");
+      meta.className = "trace-meta";
+      for (const detail of entry.details || []) {
+        const token = document.createElement("span");
+        token.className = "token";
+        token.textContent = detail;
+        meta.appendChild(token);
+      }
+      item.appendChild(meta);
+      return item;
+    }),
   );
   return wrapper;
 }

@@ -3,11 +3,12 @@ use serde::Serialize;
 use crate::{
     ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorHandoffCatalog,
     ProxyOperatorIncidentDigest, ProxyOperatorIncidents, ProxyOperatorOverview,
-    ProxyOperatorReadiness, ProxyOperatorRecovery, ProxyOperatorWorklist, ProxyRuntimeSafetyPolicy,
-    UdpProxyStatusSnapshot, proxy_operator_attention, proxy_operator_diagnostics_from_overview,
-    proxy_operator_handoff, proxy_operator_incident_digest,
-    proxy_operator_incidents_from_histories, proxy_operator_overview,
-    proxy_operator_readiness_from_overview, proxy_operator_recovery, proxy_operator_worklist,
+    ProxyOperatorReadiness, ProxyOperatorRecovery, ProxyOperatorTriageCatalog,
+    ProxyOperatorWorklist, ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot,
+    proxy_operator_attention, proxy_operator_diagnostics_from_overview, proxy_operator_handoff,
+    proxy_operator_incident_digest, proxy_operator_incidents_from_histories,
+    proxy_operator_overview, proxy_operator_readiness_from_overview, proxy_operator_recovery,
+    proxy_operator_triage, proxy_operator_worklist,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -21,6 +22,7 @@ pub struct ProxyOperatorSnapshot {
     pub recovery: ProxyOperatorRecovery,
     pub worklist: ProxyOperatorWorklist,
     pub handoff: ProxyOperatorHandoffCatalog,
+    pub triage: ProxyOperatorTriageCatalog,
 }
 
 pub fn proxy_operator_snapshot(
@@ -73,17 +75,26 @@ pub fn proxy_operator_snapshot_from_overview(
         recovery: ProxyOperatorRecovery::default(),
         worklist: ProxyOperatorWorklist::default(),
         handoff: ProxyOperatorHandoffCatalog::default(),
+        triage: ProxyOperatorTriageCatalog::default(),
     };
     let incident_digest = proxy_operator_incident_digest(&provisional_snapshot);
     let recovery = proxy_operator_recovery(&provisional_snapshot);
     let worklist = proxy_operator_worklist(&provisional_snapshot);
-    let handoff = proxy_operator_handoff(&provisional_snapshot);
-
-    ProxyOperatorSnapshot {
+    let post_recovery_snapshot = ProxyOperatorSnapshot {
         incident_digest,
         recovery,
         worklist,
+        ..provisional_snapshot.clone()
+    };
+    let handoff = proxy_operator_handoff(&post_recovery_snapshot);
+    let triage = proxy_operator_triage(&ProxyOperatorSnapshot {
+        handoff: handoff.clone(),
+        ..post_recovery_snapshot.clone()
+    });
+
+    ProxyOperatorSnapshot {
         handoff,
-        ..provisional_snapshot
+        triage,
+        ..post_recovery_snapshot
     }
 }

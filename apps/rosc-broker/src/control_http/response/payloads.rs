@@ -8,7 +8,8 @@ use crate::{
     ProxyOperatorDiagnostics, ProxyOperatorHandoffCatalog, ProxyOperatorIncidents,
     ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
     ProxyOperatorRouteTrace, ProxyOperatorSignalScope, ProxyOperatorSnapshot,
-    ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, UdpProxyStatusSnapshot,
+    ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog,
+    UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -117,6 +118,12 @@ pub(crate) struct OperatorTimelineResponse {
 }
 
 #[derive(Serialize)]
+pub(crate) struct OperatorTriageResponse {
+    pub(crate) ok: bool,
+    pub(crate) triage: ProxyOperatorTriageCatalog,
+}
+
+#[derive(Serialize)]
 pub(crate) struct OperatorOverridesResponse {
     pub(crate) ok: bool,
     pub(crate) overrides: ProxyOperatorOverrides,
@@ -156,6 +163,7 @@ pub(crate) enum ResponseBody {
     OperatorIncidents(OperatorIncidentsResponse),
     OperatorHandoff(OperatorHandoffResponse),
     OperatorTimeline(OperatorTimelineResponse),
+    OperatorTriage(OperatorTriageResponse),
     OperatorTrace(OperatorTraceResponse),
     OperatorRouteTrace(OperatorRouteTraceResponse),
     OperatorDestinationTrace(OperatorDestinationTraceResponse),
@@ -195,6 +203,7 @@ impl ResponseBody {
             Self::OperatorIncidents(body) => json_payload(body),
             Self::OperatorHandoff(body) => json_payload(body),
             Self::OperatorTimeline(body) => json_payload(body),
+            Self::OperatorTriage(body) => json_payload(body),
             Self::OperatorTrace(body) => json_payload(body),
             Self::OperatorRouteTrace(body) => json_payload(body),
             Self::OperatorDestinationTrace(body) => json_payload(body),

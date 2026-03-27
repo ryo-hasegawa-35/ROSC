@@ -208,3 +208,23 @@ fn proxy_timeline_stdout_is_json_only() {
     assert_eq!(value["routes"].as_array().unwrap().len(), 1);
     assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
 }
+
+#[test]
+fn proxy_triage_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-triage",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("global").is_some());
+    assert!(value.get("route_triage").is_some());
+    assert!(value.get("destination_triage").is_some());
+    assert_eq!(value["route_triage"].as_array().unwrap().len(), 1);
+    assert_eq!(value["route_triage"][0]["route_id"], "ue5_camera_fov");
+}

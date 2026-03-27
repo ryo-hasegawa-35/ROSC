@@ -339,6 +339,14 @@ fn operator_snapshot_bundles_readiness_diagnostics_attention_and_incidents() {
             .iter()
             .any(|item| item.id == "route:camera:restore")
     );
+    assert!(
+        snapshot
+            .triage
+            .global
+            .next_steps
+            .iter()
+            .any(|step| step.contains("Thaw traffic"))
+    );
 }
 
 #[test]
@@ -924,7 +932,7 @@ fn operator_handoff_derives_next_steps_from_trace_and_snapshot() {
         route_handoff
             .next_steps
             .iter()
-            .any(|step| step.contains("restore") || step.contains("forwarding"))
+            .any(|step| step.contains("Thaw traffic"))
     );
 
     let destination_handoff = handoff
@@ -936,7 +944,69 @@ fn operator_handoff_derives_next_steps_from_trace_and_snapshot() {
         destination_handoff
             .next_steps
             .iter()
-            .any(|step| step.contains("breaker") || step.contains("queue"))
+            .any(|step| step.contains("Thaw traffic"))
+    );
+}
+
+#[test]
+fn operator_triage_combines_global_actions_with_focused_history() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            recent_operator_actions: vec![RecentOperatorAction {
+                sequence: 11,
+                recorded_at_unix_ms: 1_100,
+                action: "freeze_traffic".to_owned(),
+                details: vec!["applied=true".to_owned()],
+            }],
+            recent_config_events: vec![RecentConfigEvent {
+                sequence: 12,
+                recorded_at_unix_ms: 1_200,
+                kind: RecentConfigEventKind::Blocked,
+                revision: Some(7),
+                details: vec!["route_id=camera".to_owned()],
+                added_ingresses: 0,
+                removed_ingresses: 0,
+                changed_ingresses: 0,
+                added_destinations: 0,
+                removed_destinations: 0,
+                changed_destinations: 0,
+                added_routes: 0,
+                removed_routes: 0,
+                changed_routes: 1,
+                launch_profile_mode: None,
+                disabled_capture_routes: 0,
+                disabled_replay_routes: 0,
+                disabled_restart_rehydrate_routes: 0,
+            }],
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let snapshot = proxy_operator_snapshot(&status, ProxyRuntimeSafetyPolicy::default(), Some(8));
+    let triage = snapshot.triage;
+
+    assert!(
+        triage
+            .global
+            .actions
+            .iter()
+            .any(|action| action.kind == rosc_broker::ProxyOperatorSuggestedActionKind::ThawTraffic)
+    );
+    let route_triage = triage
+        .route_triage
+        .iter()
+        .find(|entry| entry.route_id == "camera")
+        .expect("route triage should exist");
+    assert!(!route_triage.timeline.is_empty());
+    assert!(
+        route_triage
+            .next_steps
+            .iter()
+            .any(|step| step.contains("Thaw traffic"))
     );
 }
 

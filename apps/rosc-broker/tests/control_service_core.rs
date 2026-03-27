@@ -292,6 +292,11 @@ async fn control_service_serves_dashboard_assets() {
             .is_some()
     );
     assert!(
+        dashboard_data["dashboard"]["snapshot"]["triage"]["route_triage"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
         dashboard_data["dashboard"]["snapshot"]["worklist"]["items"]
             .as_array()
             .is_some()
@@ -598,6 +603,22 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|entry| entry["route_id"] == "camera")
     );
 
+    let triage = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /triage?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(triage["ok"], true);
+    assert!(
+        triage["triage"]["global"]["next_steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|step| step.as_str().unwrap().contains("Thaw traffic"))
+    );
+
     let timeline = json_body(
         &request(
             service.listen_addr(),
@@ -627,6 +648,19 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
         "camera"
     );
 
+    let route_triage = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/triage?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_triage["ok"], true);
+    assert_eq!(
+        route_triage["triage"]["route_triage"][0]["route_id"],
+        "camera"
+    );
+
     let route_timeline = json_body(
         &request(
             service.listen_addr(),
@@ -650,6 +684,19 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert_eq!(destination_handoff["ok"], true);
     assert_eq!(
         destination_handoff["handoff"]["destination_handoffs"][0]["destination_id"],
+        "udp_renderer"
+    );
+
+    let destination_triage = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/triage?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_triage["ok"], true);
+    assert_eq!(
+        destination_triage["triage"]["destination_triage"][0]["destination_id"],
         "udp_renderer"
     );
 

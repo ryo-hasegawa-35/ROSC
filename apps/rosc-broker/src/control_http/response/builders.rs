@@ -7,7 +7,8 @@ use crate::{
     ProxyOperatorDiagnostics, ProxyOperatorHandoffCatalog, ProxyOperatorIncidents,
     ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
     ProxyOperatorRouteTrace, ProxyOperatorSignalsView, ProxyOperatorSnapshot,
-    ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, UdpProxyStatusSnapshot,
+    ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog,
+    UdpProxyStatusSnapshot,
 };
 use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 
@@ -17,8 +18,8 @@ use super::payloads::{
     OperatorHandoffResponse, OperatorIncidentsResponse, OperatorOverridesResponse,
     OperatorOverviewResponse, OperatorReadinessResponse, OperatorReportResponse,
     OperatorRouteTraceResponse, OperatorSignalsResponse, OperatorSnapshotResponse,
-    OperatorTimelineResponse, OperatorTraceResponse, RecentConfigEventsResponse,
-    RecentOperatorActionsResponse, ResponseBody, StatusResponse,
+    OperatorTimelineResponse, OperatorTraceResponse, OperatorTriageResponse,
+    RecentConfigEventsResponse, RecentOperatorActionsResponse, ResponseBody, StatusResponse,
 };
 
 pub(crate) fn status_response(status: UdpProxyStatusSnapshot) -> HttpResponse {
@@ -183,6 +184,13 @@ pub(crate) fn timeline_response(timeline: ProxyOperatorTimelineCatalog) -> HttpR
     HttpResponse {
         status: "200 OK",
         body: ResponseBody::OperatorTimeline(OperatorTimelineResponse { ok: true, timeline }),
+    }
+}
+
+pub(crate) fn triage_response(triage: ProxyOperatorTriageCatalog) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorTriage(OperatorTriageResponse { ok: true, triage }),
     }
 }
 

@@ -209,6 +209,31 @@ pub async fn run(command: Command) -> Result<()> {
             )
             .await
         }
+        Command::ProxyTriage {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_triage(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
         Command::WatchConfig {
             path,
             poll_ms,

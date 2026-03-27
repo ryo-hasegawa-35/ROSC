@@ -287,7 +287,8 @@ body {
 }
 
 .overview-grid,
-.two-column {
+.two-column,
+.triage-grid {
   display: grid;
   gap: 24px;
 }
@@ -298,6 +299,10 @@ body {
 
 .two-column {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.triage-grid {
+  grid-template-columns: 2fr 1fr 1fr;
 }
 
 .panel {
@@ -674,6 +679,7 @@ td code {
 
   .overview-grid,
   .two-column,
+  .triage-grid,
   .topology-grid,
   .recovery-grid,
   .detail-grid {

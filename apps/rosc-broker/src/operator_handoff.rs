@@ -47,7 +47,7 @@ pub fn proxy_operator_handoff_from_trace(
             route_id: trace.route_id.clone(),
             level: trace.level,
             summary: trace.summary.clone(),
-            next_steps: route_next_steps(&trace),
+            next_steps: route_next_steps(&trace, snapshot.overview.report.overrides.traffic_frozen),
             actions: trace.actions.clone(),
             recent_events: trace.recent_events.clone(),
         })
@@ -60,7 +60,10 @@ pub fn proxy_operator_handoff_from_trace(
             destination_id: trace.destination_id.clone(),
             level: trace.level,
             summary: trace.summary.clone(),
-            next_steps: destination_next_steps(&trace),
+            next_steps: destination_next_steps(
+                &trace,
+                snapshot.overview.report.overrides.traffic_frozen,
+            ),
             actions: trace.actions.clone(),
             recent_events: trace.recent_events.clone(),
         })
@@ -78,8 +81,14 @@ pub fn proxy_operator_handoff_from_trace(
     }
 }
 
-fn route_next_steps(trace: &crate::ProxyOperatorRouteTrace) -> Vec<String> {
+fn route_next_steps(trace: &crate::ProxyOperatorRouteTrace, traffic_frozen: bool) -> Vec<String> {
     let mut steps = Vec::new();
+    if traffic_frozen {
+        steps.push(
+            "Thaw traffic before expecting this route to resume live forwarding or recovery."
+                .to_owned(),
+        );
+    }
     if trace
         .open_reasons
         .iter()
@@ -125,8 +134,17 @@ fn route_next_steps(trace: &crate::ProxyOperatorRouteTrace) -> Vec<String> {
     steps
 }
 
-fn destination_next_steps(trace: &crate::ProxyOperatorDestinationTrace) -> Vec<String> {
+fn destination_next_steps(
+    trace: &crate::ProxyOperatorDestinationTrace,
+    traffic_frozen: bool,
+) -> Vec<String> {
     let mut steps = Vec::new();
+    if traffic_frozen {
+        steps.push(
+            "Thaw traffic before treating this destination as fully recovered or stable."
+                .to_owned(),
+        );
+    }
     if trace
         .open_reasons
         .iter()

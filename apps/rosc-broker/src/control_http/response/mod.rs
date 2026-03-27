@@ -10,7 +10,7 @@ pub(crate) use builders::{
     invalid_query_error, map_action_result, operator_actions_response, operator_signals_response,
     overrides_response, overview_response, readiness_response, readyz_response, report_response,
     route_trace_response, snapshot_response, status_response, timeline_response, trace_response,
-    unsupported_route_error,
+    triage_response, unsupported_route_error,
 };
 pub(crate) use payloads::{HttpResponse, ResponseBody};
 pub(crate) use transport::{
