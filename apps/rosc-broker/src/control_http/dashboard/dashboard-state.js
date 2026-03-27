@@ -72,6 +72,25 @@ export function routeActionRequest(routeAction, routeId, dashboard) {
   };
 }
 
+export function normalizeFocusState(dashboard, focusState = {}) {
+  return {
+    routeId: normalizeFocusId(
+      focusState.routeId,
+      dashboard.route_details,
+      dashboard.snapshot.incidents.problematic_routes.map((route) => route.route_id),
+      "route_id",
+    ),
+    destinationId: normalizeFocusId(
+      focusState.destinationId,
+      dashboard.destination_details,
+      dashboard.snapshot.incidents.problematic_destinations.map(
+        (destination) => destination.destination_id,
+      ),
+      "destination_id",
+    ),
+  };
+}
+
 export function buildTrafficPulse(traffic, previousSample, recordedAtUnixMs) {
   const sample = {
     recordedAtUnixMs,
@@ -140,4 +159,19 @@ function rate(current, previous, seconds) {
     return 0;
   }
   return Math.max(0, (current - previous) / seconds);
+}
+
+function normalizeFocusId(currentId, details, preferredIds, key) {
+  if (!Array.isArray(details) || details.length === 0) {
+    return null;
+  }
+  if (currentId && details.some((detail) => detail[key] === currentId)) {
+    return currentId;
+  }
+  for (const preferredId of preferredIds) {
+    if (details.some((detail) => detail[key] === preferredId)) {
+      return preferredId;
+    }
+  }
+  return details[0][key];
 }

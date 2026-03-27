@@ -18,6 +18,7 @@
           <a href="#overview" data-section-link="overview">Overview</a>
           <a href="#topology" data-section-link="topology">Topology</a>
           <a href="#traffic" data-section-link="traffic">Traffic</a>
+          <a href="#focus" data-section-link="focus">Focus</a>
           <a href="#routes" data-section-link="routes">Routes</a>
           <a href="#destinations" data-section-link="destinations">Destinations</a>
           <a href="#recovery" data-section-link="recovery">Recovery</a>
@@ -146,6 +147,36 @@
         </section>
 
         <section class="two-column">
+          <article class="panel" id="focus">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Focus</p>
+                <h3>Route drill-down</h3>
+              </div>
+            </div>
+            <div class="detail-controls">
+              <label class="detail-label" for="route-focus-select">Selected route</label>
+              <select id="route-focus-select"></select>
+            </div>
+            <div class="detail-card" id="route-focus-detail"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Focus</p>
+                <h3>Destination drill-down</h3>
+              </div>
+            </div>
+            <div class="detail-controls">
+              <label class="detail-label" for="destination-focus-select">Selected destination</label>
+              <select id="destination-focus-select"></select>
+            </div>
+            <div class="detail-card" id="destination-focus-detail"></div>
+          </article>
+        </section>
+
+        <section class="two-column">
           <article class="panel" id="routes">
             <div class="panel-header">
               <div>
@@ -162,7 +193,7 @@
                     <th>Mode</th>
                     <th>Class</th>
                     <th>Warnings</th>
-                    <th>Action</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="routes-table"></tbody>
@@ -186,7 +217,7 @@
                     <th>Queue</th>
                     <th>Breaker</th>
                     <th>Send failures</th>
-                    <th>Action</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="destinations-table"></tbody>

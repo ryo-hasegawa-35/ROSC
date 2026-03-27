@@ -440,6 +440,99 @@ td code {
   margin-left: 6px;
 }
 
+.mini-button.is-secondary {
+  color: var(--accent);
+  border-color: rgba(15, 118, 110, 0.24);
+  background: rgba(15, 118, 110, 0.06);
+}
+
+.detail-controls {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.detail-label {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.detail-controls select {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  color: var(--text);
+  font: inherit;
+  padding: 12px 14px;
+}
+
+.detail-card {
+  display: grid;
+  gap: 14px;
+}
+
+.detail-shell {
+  border-radius: 18px;
+  padding: 18px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+}
+
+.detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 12px;
+}
+
+.detail-metric {
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(24, 32, 37, 0.04);
+}
+
+.detail-metric dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.detail-metric dd {
+  margin: 6px 0 0;
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.detail-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.detail-list li {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(24, 32, 37, 0.04);
+  border: 1px solid rgba(24, 32, 37, 0.06);
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .recovery-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -481,7 +574,8 @@ td code {
   .overview-grid,
   .two-column,
   .topology-grid,
-  .recovery-grid {
+  .recovery-grid,
+  .detail-grid {
     grid-template-columns: 1fr;
   }
 

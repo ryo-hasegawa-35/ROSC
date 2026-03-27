@@ -505,6 +505,22 @@ fn operator_dashboard_bundles_snapshot_traffic_and_timeline() {
         dashboard.traffic.noisiest_destinations[0].id,
         "udp_renderer"
     );
+    let camera_detail = dashboard
+        .route_details
+        .iter()
+        .find(|detail| detail.route_id == "camera")
+        .expect("camera detail should exist");
+    assert_eq!(camera_detail.dispatch_failures_total, 2);
+    assert_eq!(camera_detail.transform_failures_total, 1);
+    assert_eq!(camera_detail.direct_udp_targets, vec!["127.0.0.1:9001"]);
+
+    let renderer_detail = dashboard
+        .destination_details
+        .iter()
+        .find(|detail| detail.destination_id == "udp_renderer")
+        .expect("renderer detail should exist");
+    assert_eq!(renderer_detail.send_failures_total, 5);
+    assert_eq!(renderer_detail.drops_total, 4);
     assert_eq!(dashboard.timeline.len(), 2);
     assert_eq!(
         dashboard.timeline[0].category,

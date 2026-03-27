@@ -39,8 +39,9 @@ pub use managed_proxy::{FrozenStartupBehavior, ManagedProxyStartupOptions, Manag
 pub use operator_attention::{ProxyOperatorAttention, proxy_operator_attention};
 pub use operator_dashboard::{
     DASHBOARD_REFRESH_INTERVAL_MS, ProxyOperatorCounterEntry, ProxyOperatorDashboard,
-    ProxyOperatorTimelineCategory, ProxyOperatorTimelineEntry, ProxyOperatorTrafficSummary,
-    proxy_operator_dashboard, proxy_operator_dashboard_from_snapshot,
+    ProxyOperatorDestinationDetail, ProxyOperatorDestinationDetailState, ProxyOperatorRouteDetail,
+    ProxyOperatorRouteDetailState, ProxyOperatorTimelineCategory, ProxyOperatorTimelineEntry,
+    ProxyOperatorTrafficSummary, proxy_operator_dashboard, proxy_operator_dashboard_from_snapshot,
 };
 pub use operator_diagnostics::{
     ProxyOperatorDiagnostics, proxy_operator_diagnostics, proxy_operator_diagnostics_from_overview,

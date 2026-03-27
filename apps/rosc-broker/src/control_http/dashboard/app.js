@@ -2,6 +2,7 @@ import {
   buildTrafficPulse,
   fetchDashboardData,
   globalActionRequest,
+  normalizeFocusState,
   postControlAction,
   routeActionRequest,
 } from "/dashboard/dashboard-state.js";
@@ -21,8 +22,25 @@ let lastDashboard = null;
 let lastTrafficSample = null;
 let refreshTimer = null;
 let refreshIntervalMs = 2500;
+let lastRenderContext = null;
+let focusState = {
+  routeId: null,
+  destinationId: null,
+};
 
 elements.refreshButton.addEventListener("click", () => refreshDashboard());
+elements.routeFocusSelect.addEventListener("change", (event) => {
+  focusState.routeId = event.target.value || null;
+  if (lastDashboard) {
+    renderCurrentDashboard();
+  }
+});
+elements.destinationFocusSelect.addEventListener("change", (event) => {
+  focusState.destinationId = event.target.value || null;
+  if (lastDashboard) {
+    renderCurrentDashboard();
+  }
+});
 window.addEventListener("hashchange", () => syncActiveSection(elements));
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
@@ -49,6 +67,22 @@ document.body.addEventListener("click", async (event) => {
       lastDashboard,
     );
     await runAction(request);
+    return;
+  }
+
+  const focusRouteButton = event.target.closest("[data-focus-route-id]");
+  if (focusRouteButton) {
+    focusState.routeId = focusRouteButton.dataset.focusRouteId || null;
+    window.location.hash = "#focus";
+    renderCurrentDashboard();
+    return;
+  }
+
+  const focusDestinationButton = event.target.closest("[data-focus-destination-id]");
+  if (focusDestinationButton) {
+    focusState.destinationId = focusDestinationButton.dataset.focusDestinationId || null;
+    window.location.hash = "#focus";
+    renderCurrentDashboard();
   }
 });
 
@@ -68,16 +102,28 @@ async function refreshDashboard() {
     lastDashboard = dashboard;
     lastTrafficSample = trafficPulse.sample;
     refreshIntervalMs = dashboard.refresh_interval_ms || refreshIntervalMs;
-
-    renderDashboard(elements, dashboard, {
-      refreshedAt,
-      trafficPulse,
-    });
+    focusState = normalizeFocusState(dashboard, focusState);
+    lastRenderContext = { refreshedAt, trafficPulse };
+    renderCurrentDashboard();
     scheduleRefresh();
   } catch (error) {
     console.error(error);
     renderConnectionError(elements, error);
   }
+}
+
+function renderCurrentDashboard() {
+  if (!lastDashboard) {
+    return;
+  }
+  const context = lastRenderContext || {
+    refreshedAt: new Date(),
+    trafficPulse: { sample: lastTrafficSample, rates: null },
+  };
+  renderDashboard(elements, lastDashboard, {
+    ...context,
+    focusState,
+  });
 }
 
 async function runAction(request) {

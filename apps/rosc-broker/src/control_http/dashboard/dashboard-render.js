@@ -16,6 +16,10 @@ export function collectDashboardElements() {
     topologyDestinations: document.getElementById("topology-destinations"),
     trafficStats: document.getElementById("traffic-stats"),
     trafficHotspots: document.getElementById("traffic-hotspots"),
+    routeFocusSelect: document.getElementById("route-focus-select"),
+    routeFocusDetail: document.getElementById("route-focus-detail"),
+    destinationFocusSelect: document.getElementById("destination-focus-select"),
+    destinationFocusDetail: document.getElementById("destination-focus-detail"),
     routesTable: document.getElementById("routes-table"),
     destinationsTable: document.getElementById("destinations-table"),
     overridesList: document.getElementById("overrides-list"),
@@ -52,8 +56,9 @@ export function renderDashboard(elements, dashboard, context) {
   renderReadiness(elements, readiness);
   renderTopology(elements, status);
   renderTraffic(elements, dashboard.traffic, context.trafficPulse, snapshot);
+  renderFocus(elements, dashboard, context.focusState);
   renderRoutes(elements, status, diagnostics);
-  renderDestinations(elements, status);
+  renderDestinations(elements, dashboard.destination_details);
   renderRecovery(elements, snapshot);
   renderIncidents(elements, incidents);
   renderConfig(elements, dashboard, snapshot);
@@ -163,6 +168,8 @@ function renderTopology(elements, status) {
     status.routes.map((route) => ({
       title: route.id,
       state: route.enabled ? "healthy" : "warning",
+      actionLabel: "Focus route",
+      actionDataset: `data-focus-route-id="${escapeHtml(route.id)}"`,
       body: [
         `mode: ${route.mode}`,
         `class: ${route.traffic_class}`,
@@ -178,6 +185,8 @@ function renderTopology(elements, status) {
     status.destinations.map((destination) => ({
       title: destination.id,
       state: destination.route_ids.length > 0 ? "healthy" : "warning",
+      actionLabel: "Focus destination",
+      actionDataset: `data-focus-destination-id="${escapeHtml(destination.id)}"`,
       body: [
         `bind: ${destination.bind}`,
         `target: ${destination.target}`,
@@ -217,6 +226,30 @@ function renderTraffic(elements, traffic, trafficPulse, snapshot) {
   fillList(elements, elements.trafficHotspots, hotspots);
 }
 
+function renderFocus(elements, dashboard, focusState) {
+  const routeDetails = dashboard.route_details || [];
+  const destinationDetails = dashboard.destination_details || [];
+  renderDetailSelect(
+    elements.routeFocusSelect,
+    routeDetails,
+    "route_id",
+    focusState?.routeId,
+  );
+  renderDetailSelect(
+    elements.destinationFocusSelect,
+    destinationDetails,
+    "destination_id",
+    focusState?.destinationId,
+  );
+
+  const routeDetail = routeDetails.find((detail) => detail.route_id === focusState?.routeId);
+  const destinationDetail = destinationDetails.find(
+    (detail) => detail.destination_id === focusState?.destinationId,
+  );
+  renderRouteDetail(elements, routeDetail);
+  renderDestinationDetail(elements, destinationDetail);
+}
+
 function renderRoutes(elements, status, diagnostics) {
   const isolatedRoutes = new Set(status.runtime?.isolated_route_ids || []);
   const runtimeRoutes = new Set(
@@ -238,12 +271,17 @@ function renderRoutes(elements, status, diagnostics) {
         warnings.push("transform failures observed");
       }
       row.innerHTML = `
-        <td><code>${escapeHtml(assessment.route_id)}</code></td>
+        <td>
+          <button class="mini-button is-secondary" data-focus-route-id="${escapeHtml(assessment.route_id)}">
+            ${escapeHtml(assessment.route_id)}
+          </button>
+        </td>
         <td><span class="entity-state" data-level="${escapeHtml(routeStateLevel(assessment, warnings))}">${escapeHtml(routeStateLabel(assessment, warnings))}</span></td>
         <td>${escapeHtml(route?.mode || "--")}</td>
         <td>${escapeHtml(route?.traffic_class || "--")}</td>
         <td>${escapeHtml(warnings.join(" | ") || "none")}</td>
         <td>
+          <button class="mini-button is-secondary" data-focus-route-id="${escapeHtml(assessment.route_id)}">Focus</button>
           <button class="mini-button" data-route-action="toggle-isolation" data-route-id="${escapeHtml(assessment.route_id)}">
             ${isolatedRoutes.has(assessment.route_id) ? "Restore" : "Isolate"}
           </button>
@@ -254,24 +292,24 @@ function renderRoutes(elements, status, diagnostics) {
   );
 }
 
-function renderDestinations(elements, status) {
-  const runtimeDestinations = new Map(
-    (status.runtime?.destinations || []).map((destination) => [destination.destination_id, destination]),
-  );
-
+function renderDestinations(elements, destinationDetails) {
   elements.destinationsTable.replaceChildren(
-    ...status.destinations.map((destination) => {
-      const runtime = runtimeDestinations.get(destination.id);
-      const breaker = runtime?.breaker_state || "closed";
+    ...destinationDetails.map((destination) => {
+      const breaker = destination.breaker_state || "closed";
       const row = document.createElement("tr");
       row.innerHTML = `
-        <td><code>${escapeHtml(destination.id)}</code></td>
-        <td><code>${escapeHtml(destination.target)}</code></td>
-        <td>${escapeHtml(String(runtime?.queue_depth ?? destination.queue_depth))}</td>
-        <td><span class="entity-state" data-level="${escapeHtml(breakerLevel(breaker))}">${escapeHtml(String(breaker))}</span></td>
-        <td>${escapeHtml(String(runtime?.send_failures_total ?? 0))}</td>
         <td>
-          <button class="mini-button" data-action="rehydrate-destination" data-destination-id="${escapeHtml(destination.id)}">Rehydrate</button>
+          <button class="mini-button is-secondary" data-focus-destination-id="${escapeHtml(destination.destination_id)}">
+            ${escapeHtml(destination.destination_id)}
+          </button>
+        </td>
+        <td><code>${escapeHtml(destination.target)}</code></td>
+        <td>${escapeHtml(String(destination.live_queue_depth))}</td>
+        <td><span class="entity-state" data-level="${escapeHtml(breakerLevel(breaker))}">${escapeHtml(String(breaker))}</span></td>
+        <td>${escapeHtml(String(destination.send_failures_total))}</td>
+        <td>
+          <button class="mini-button is-secondary" data-focus-destination-id="${escapeHtml(destination.destination_id)}">Focus</button>
+          <button class="mini-button" data-action="rehydrate-destination" data-destination-id="${escapeHtml(destination.destination_id)}">Rehydrate</button>
         </td>
       `;
       return row;
@@ -374,6 +412,11 @@ function fillEntityColumn(elements, container, items) {
             <span class="entity-state" data-level="${escapeHtml(item.state)}">${escapeHtml(humanizeState(item.state))}</span>
           </div>
           ${item.body.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
+          ${
+            item.actionLabel && item.actionDataset
+              ? `<div class="detail-actions"><button class="mini-button is-secondary" ${item.actionDataset}>${escapeHtml(item.actionLabel)}</button></div>`
+              : ""
+          }
         `;
         return card;
       }),
@@ -438,6 +481,176 @@ function statCard(label, value, context) {
   return card;
 }
 
+function renderDetailSelect(select, details, key, selectedId) {
+  select.replaceChildren(
+    ...details.map((detail) => {
+      const option = document.createElement("option");
+      option.value = detail[key];
+      option.textContent = detail[key];
+      option.selected = detail[key] === selectedId;
+      return option;
+    }),
+  );
+}
+
+function renderRouteDetail(elements, detail) {
+  if (!detail) {
+    fillList(elements, elements.routeFocusDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "detail-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Selected route</p>
+        <h4>${escapeHtml(detail.route_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(routeDetailLevel(detail.state))}">${escapeHtml(routeDetailLabel(detail.state))}</span>
+    </div>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Mode", detail.mode],
+      ["Class", detail.traffic_class],
+      ["Dispatch failures", detail.dispatch_failures_total],
+      ["Transform failures", detail.transform_failures_total],
+    ]),
+  );
+  wrapper.appendChild(
+    detailGrid(
+      "Routing",
+      [
+        `Ingresses: ${detail.ingress_ids.join(", ") || "none"}`,
+        `Patterns: ${detail.address_patterns.join(", ") || "none"}`,
+        `Destinations: ${detail.destination_ids.join(", ") || "none"}`,
+        `Rename address: ${detail.rename_address || "none"}`,
+      ],
+      "Recovery",
+      [
+        `Cache policy: ${detail.cache_policy}`,
+        `Capture policy: ${detail.capture_policy}`,
+        `Rehydrate on connect: ${detail.rehydrate_on_connect}`,
+        `Replay allowed: ${detail.replay_allowed}`,
+        `Fallback ready: ${detail.direct_udp_fallback_available}`,
+        `Fallback targets: ${detail.direct_udp_targets.join(", ") || "none"}`,
+      ],
+    ),
+  );
+  const warningBlock = document.createElement("div");
+  warningBlock.innerHTML = `<p class="panel-label">Warnings</p>`;
+  const warningList = document.createElement("ul");
+  warningList.className = "detail-list";
+  warningList.replaceChildren(
+    ...emptyListItems(detail.warnings.length > 0 ? detail.warnings : ["No route-specific warnings right now."]),
+  );
+  warningBlock.appendChild(warningList);
+  wrapper.appendChild(warningBlock);
+
+  const actions = document.createElement("div");
+  actions.className = "detail-actions";
+  actions.innerHTML = `
+    <button class="mini-button is-secondary" data-route-action="toggle-isolation" data-route-id="${escapeHtml(detail.route_id)}">
+      ${detail.isolated ? "Restore route" : "Isolate route"}
+    </button>
+  `;
+  wrapper.appendChild(actions);
+  elements.routeFocusDetail.replaceChildren(wrapper);
+}
+
+function renderDestinationDetail(elements, detail) {
+  if (!detail) {
+    fillList(elements, elements.destinationFocusDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "detail-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Selected destination</p>
+        <h4>${escapeHtml(detail.destination_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(destinationDetailLevel(detail.state))}">${escapeHtml(destinationDetailLabel(detail.state))}</span>
+    </div>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Live queue", detail.live_queue_depth],
+      ["Configured queue", detail.configured_queue_depth],
+      ["Send failures", detail.send_failures_total],
+      ["Drops", detail.drops_total],
+    ]),
+  );
+  wrapper.appendChild(
+    detailGrid(
+      "Transport",
+      [
+        `Bind: ${detail.bind}`,
+        `Target: ${detail.target}`,
+        `Routes: ${detail.route_ids.join(", ") || "none"}`,
+        `Drop policy: ${detail.drop_policy}`,
+      ],
+      "Breaker",
+      [
+        `State: ${detail.breaker_state || "closed"}`,
+        `Send total: ${detail.send_total}`,
+        `Open after failures: ${detail.breaker_open_after_consecutive_failures}`,
+        `Open after queue overflow: ${detail.breaker_open_after_consecutive_queue_overflows}`,
+        `Cooldown: ${detail.breaker_cooldown_ms} ms`,
+      ],
+    ),
+  );
+
+  const actions = document.createElement("div");
+  actions.className = "detail-actions";
+  actions.innerHTML = `
+    <button class="mini-button" data-action="rehydrate-destination" data-destination-id="${escapeHtml(detail.destination_id)}">Rehydrate destination</button>
+  `;
+  wrapper.appendChild(actions);
+  elements.destinationFocusDetail.replaceChildren(wrapper);
+}
+
+function metricGrid(entries) {
+  const grid = document.createElement("dl");
+  grid.className = "detail-metrics";
+  grid.replaceChildren(
+    ...entries.map(([label, value]) => {
+      const metric = document.createElement("div");
+      metric.className = "detail-metric";
+      metric.innerHTML = `<dt>${escapeHtml(String(label))}</dt><dd>${escapeHtml(String(value))}</dd>`;
+      return metric;
+    }),
+  );
+  return grid;
+}
+
+function detailGrid(leftTitle, leftItems, rightTitle, rightItems) {
+  const grid = document.createElement("div");
+  grid.className = "detail-grid";
+  grid.appendChild(detailListBlock(leftTitle, leftItems));
+  grid.appendChild(detailListBlock(rightTitle, rightItems));
+  return grid;
+}
+
+function detailListBlock(title, items) {
+  const block = document.createElement("div");
+  block.innerHTML = `<p class="panel-label">${escapeHtml(title)}</p>`;
+  const list = document.createElement("ul");
+  list.className = "detail-list";
+  list.replaceChildren(...emptyListItems(items));
+  block.appendChild(list);
+  return block;
+}
+
+function emptyListItems(items) {
+  return items.map((item) => {
+    const entry = document.createElement("li");
+    entry.textContent = item;
+    return entry;
+  });
+}
+
 function describeHero(readiness, attention) {
   if (readiness.reasons.length > 0) {
     return readiness.reasons[0];
@@ -462,6 +675,32 @@ function routeStateLabel(assessment, warnings) {
   return warnings.length > 0 ? "Needs attention" : "Healthy";
 }
 
+function routeDetailLevel(state) {
+  if (state === "isolated") {
+    return "warning";
+  }
+  if (state === "disabled") {
+    return "warning";
+  }
+  if (state === "warning") {
+    return "degraded";
+  }
+  return "healthy";
+}
+
+function routeDetailLabel(state) {
+  if (state === "isolated") {
+    return "Isolated";
+  }
+  if (state === "disabled") {
+    return "Disabled";
+  }
+  if (state === "warning") {
+    return "Needs attention";
+  }
+  return "Healthy";
+}
+
 function breakerLevel(state) {
   if (state === "Open") {
     return "blocked";
@@ -470,6 +709,26 @@ function breakerLevel(state) {
     return "degraded";
   }
   return "healthy";
+}
+
+function destinationDetailLevel(state) {
+  if (state === "blocked") {
+    return "blocked";
+  }
+  if (state === "warning") {
+    return "degraded";
+  }
+  return "healthy";
+}
+
+function destinationDetailLabel(state) {
+  if (state === "blocked") {
+    return "Blocked";
+  }
+  if (state === "warning") {
+    return "Needs attention";
+  }
+  return "Healthy";
 }
 
 function applyStateBadge(element, level, label) {

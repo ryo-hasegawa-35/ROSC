@@ -243,6 +243,14 @@ async fn control_service_serves_dashboard_assets() {
         true
     );
     assert_eq!(
+        dashboard_data["dashboard"]["route_details"][0]["route_id"],
+        "camera"
+    );
+    assert_eq!(
+        dashboard_data["dashboard"]["destination_details"][0]["destination_id"],
+        "udp_renderer"
+    );
+    assert_eq!(
         dashboard_data["dashboard"]["timeline"]
             .as_array()
             .unwrap()
