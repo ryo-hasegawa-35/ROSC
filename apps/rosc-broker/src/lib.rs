@@ -11,6 +11,7 @@ mod operator_board;
 mod operator_casebook;
 mod operator_dashboard;
 mod operator_diagnostics;
+mod operator_focus;
 mod operator_handoff;
 mod operator_history;
 mod operator_incident_digest;
@@ -61,6 +62,10 @@ pub use operator_dashboard::{
 };
 pub use operator_diagnostics::{
     ProxyOperatorDiagnostics, proxy_operator_diagnostics, proxy_operator_diagnostics_from_overview,
+};
+pub use operator_focus::{
+    ProxyOperatorDestinationFocusPacket, ProxyOperatorFocusCatalog, ProxyOperatorRouteFocusPacket,
+    proxy_operator_focus_from_dashboard,
 };
 pub use operator_handoff::{
     ProxyOperatorDestinationHandoff, ProxyOperatorHandoffCatalog, ProxyOperatorRouteHandoff,

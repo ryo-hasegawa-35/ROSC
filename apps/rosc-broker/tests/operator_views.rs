@@ -5,10 +5,11 @@ use rosc_broker::{
     ProxyOperatorSignalScope, ProxyOperatorState, ProxyOperatorTimelineCategory,
     ProxyRuntimeSafetyPolicy, attach_runtime_status, proxy_operator_attention,
     proxy_operator_board, proxy_operator_casebook, proxy_operator_dashboard,
-    proxy_operator_diagnostics, proxy_operator_handoff, proxy_operator_incidents_from_histories,
-    proxy_operator_overview, proxy_operator_readiness, proxy_operator_recovery,
-    proxy_operator_report, proxy_operator_signals_view, proxy_operator_snapshot,
-    proxy_operator_timeline, proxy_operator_trace, proxy_status_from_config,
+    proxy_operator_diagnostics, proxy_operator_focus_from_dashboard, proxy_operator_handoff,
+    proxy_operator_incidents_from_histories, proxy_operator_overview, proxy_operator_readiness,
+    proxy_operator_recovery, proxy_operator_report, proxy_operator_signals_view,
+    proxy_operator_snapshot, proxy_operator_timeline, proxy_operator_trace,
+    proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -552,6 +553,7 @@ fn operator_dashboard_bundles_snapshot_traffic_and_timeline() {
         dashboard.traffic.noisiest_destinations[0].id,
         "udp_renderer"
     );
+    assert_eq!(dashboard.focus.state, "warning");
     let camera_detail = dashboard
         .route_details
         .iter()
@@ -649,6 +651,110 @@ fn operator_dashboard_bundles_snapshot_traffic_and_timeline() {
             .destinations
             .iter()
             .any(|timeline| timeline.destination_id == "udp_renderer")
+    );
+    assert!(
+        dashboard
+            .focus
+            .routes
+            .iter()
+            .any(|packet| packet.route_id == "camera"
+                && packet.trace.is_some()
+                && packet.timeline.is_some()
+                && packet.handoff.is_some()
+                && packet.triage.is_some()
+                && packet.casebook.is_some())
+    );
+    assert!(
+        dashboard
+            .focus
+            .destinations
+            .iter()
+            .any(|packet| packet.destination_id == "udp_renderer"
+                && packet.trace.is_some()
+                && packet.timeline.is_some()
+                && packet.handoff.is_some()
+                && packet.triage.is_some()
+                && packet.casebook.is_some())
+    );
+}
+
+#[test]
+fn operator_focus_catalog_bundles_linked_route_and_destination_context() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            queue_depth: [("udp_renderer".to_owned(), 3)].into_iter().collect(),
+            recent_operator_actions: vec![RecentOperatorAction {
+                sequence: 21,
+                recorded_at_unix_ms: 2_100,
+                action: "isolate_route".to_owned(),
+                details: vec!["route_id=camera".to_owned()],
+            }],
+            recent_config_events: vec![RecentConfigEvent {
+                sequence: 22,
+                recorded_at_unix_ms: 2_200,
+                kind: RecentConfigEventKind::Blocked,
+                revision: Some(8),
+                details: vec![
+                    "route_id=camera".to_owned(),
+                    "destination_id=udp_renderer".to_owned(),
+                ],
+                added_ingresses: 0,
+                removed_ingresses: 0,
+                changed_ingresses: 0,
+                added_destinations: 0,
+                removed_destinations: 0,
+                changed_destinations: 1,
+                added_routes: 0,
+                removed_routes: 0,
+                changed_routes: 1,
+                launch_profile_mode: None,
+                disabled_capture_routes: 0,
+                disabled_replay_routes: 0,
+                disabled_restart_rehydrate_routes: 0,
+            }],
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let dashboard = proxy_operator_dashboard(&status, ProxyRuntimeSafetyPolicy::default(), Some(8));
+    let focus = proxy_operator_focus_from_dashboard(&dashboard);
+
+    let route_packet = focus
+        .routes
+        .iter()
+        .find(|packet| packet.route_id == "camera")
+        .expect("route packet should exist");
+    assert!(route_packet.trace.is_some());
+    assert!(route_packet.timeline.is_some());
+    assert!(route_packet.handoff.is_some());
+    assert!(route_packet.triage.is_some());
+    assert!(route_packet.casebook.is_some());
+    assert!(
+        route_packet
+            .board_items
+            .iter()
+            .any(|item| item.route_id.as_deref() == Some("camera"))
+    );
+
+    let destination_packet = focus
+        .destinations
+        .iter()
+        .find(|packet| packet.destination_id == "udp_renderer")
+        .expect("destination packet should exist");
+    assert!(destination_packet.trace.is_some());
+    assert!(destination_packet.timeline.is_some());
+    assert!(destination_packet.handoff.is_some());
+    assert!(destination_packet.triage.is_some());
+    assert!(destination_packet.casebook.is_some());
+    assert!(
+        destination_packet
+            .board_items
+            .iter()
+            .any(|item| item.destination_id.as_deref() == Some("udp_renderer"))
     );
 }
 

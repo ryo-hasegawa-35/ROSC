@@ -189,6 +189,7 @@ async fn control_service_serves_dashboard_assets() {
     assert!(dashboard.contains("ROSC Operator Console"));
     assert!(dashboard.contains("/dashboard/app.js"));
     assert!(dashboard.contains("Route next steps"));
+    assert!(dashboard.contains("Route focus packet"));
     assert!(dashboard.contains("Route-linked event history"));
 
     let css = request(
@@ -303,6 +304,16 @@ async fn control_service_serves_dashboard_assets() {
     );
     assert!(
         dashboard_data["dashboard"]["snapshot"]["board"]["degraded_items"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["focus"]["routes"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["focus"]["destinations"]
             .as_array()
             .is_some()
     );
@@ -661,6 +672,29 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|entry| entry["route_id"] == "camera")
     );
 
+    let focus = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /focus?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(focus["ok"], true);
+    assert!(
+        focus["focus"]["routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["route_id"] == "camera")
+    );
+    assert!(
+        focus["focus"]["destinations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["destination_id"] == "udp_renderer")
+    );
+
     let timeline = json_body(
         &request(
             service.listen_addr(),
@@ -715,6 +749,17 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
         route_casebook["casebook"]["route_casebooks"][0]["route_id"],
         "camera"
     );
+
+    let route_focus = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/focus?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_focus["ok"], true);
+    assert_eq!(route_focus["focus"]["routes"][0]["route_id"], "camera");
+    assert_eq!(route_focus["focus"]["destinations"], json!([]));
 
     let route_board = json_body(
         &request(
@@ -783,6 +828,20 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
         destination_casebook["casebook"]["destination_casebooks"][0]["destination_id"],
         "udp_renderer"
     );
+
+    let destination_focus = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/focus?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_focus["ok"], true);
+    assert_eq!(
+        destination_focus["focus"]["destinations"][0]["destination_id"],
+        "udp_renderer"
+    );
+    assert_eq!(destination_focus["focus"]["routes"], json!([]));
 
     let destination_board = json_body(
         &request(

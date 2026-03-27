@@ -399,6 +399,8 @@ function renderRecoveryCandidates(elements, recovery) {
 function renderFocus(elements, dashboard, focusState) {
   const routeDetails = dashboard.route_details || [];
   const destinationDetails = dashboard.destination_details || [];
+  const routeFocusPackets = dashboard.focus?.routes || [];
+  const destinationFocusPackets = dashboard.focus?.destinations || [];
   renderDetailSelect(
     elements.routeFocusSelect,
     routeDetails,
@@ -412,12 +414,14 @@ function renderFocus(elements, dashboard, focusState) {
     focusState?.destinationId,
   );
 
-  const routeDetail = routeDetails.find((detail) => detail.route_id === focusState?.routeId);
-  const destinationDetail = destinationDetails.find(
-    (detail) => detail.destination_id === focusState?.destinationId,
+  const routeFocus = routeFocusPackets.find(
+    (packet) => packet.route_id === focusState?.routeId,
   );
-  renderRouteDetail(elements, routeDetail);
-  renderDestinationDetail(elements, destinationDetail);
+  const destinationFocus = destinationFocusPackets.find(
+    (packet) => packet.destination_id === focusState?.destinationId,
+  );
+  renderRouteFocusPacket(elements, routeFocus);
+  renderDestinationFocusPacket(elements, destinationFocus);
 }
 
 function renderTrace(elements, dashboard, focusState) {
@@ -723,17 +727,18 @@ function renderDetailSelect(select, details, key, selectedId) {
   );
 }
 
-function renderRouteDetail(elements, detail) {
-  if (!detail) {
+function renderRouteFocusPacket(elements, packet) {
+  if (!packet) {
     fillList(elements, elements.routeFocusDetail, []);
     return;
   }
+  const detail = packet.detail;
   const wrapper = document.createElement("div");
   wrapper.className = "detail-shell";
   wrapper.innerHTML = `
     <div class="panel-header">
       <div>
-        <p class="panel-label">Selected route</p>
+        <p class="panel-label">Focused route packet</p>
         <h4>${escapeHtml(detail.route_id)}</h4>
       </div>
       <span class="entity-state" data-level="${escapeHtml(routeDetailLevel(detail.state))}">${escapeHtml(routeDetailLabel(detail.state))}</span>
@@ -767,12 +772,47 @@ function renderRouteDetail(elements, detail) {
       ],
     ),
   );
+  wrapper.appendChild(
+    metricGrid([
+      ["Trace events", packet.trace?.recent_events?.length || 0],
+      ["Timeline entries", packet.timeline?.entries?.length || 0],
+      ["Next steps", packet.handoff?.next_steps?.length || 0],
+      ["Board items", packet.board_items?.length || 0],
+    ]),
+  );
+  wrapper.appendChild(
+    detailGrid(
+      "Focus packet",
+      [
+        `Trace level: ${packet.trace?.level || "none"}`,
+        `Triage level: ${packet.triage?.level || "none"}`,
+        `Casebook level: ${packet.casebook?.level || "none"}`,
+        `Board lanes: ${packet.board_items?.map((item) => item.level).join(", ") || "none"}`,
+      ],
+      "Linked context",
+      [
+        `Handoff summary: ${packet.handoff?.summary || "none"}`,
+        `Triage summary: ${packet.triage?.summary || "none"}`,
+        `Casebook summary: ${packet.casebook?.summary || "none"}`,
+        `Latest trace: ${packet.trace?.recent_events?.[0]?.title || "none"}`,
+      ],
+    ),
+  );
   const warningBlock = document.createElement("div");
-  warningBlock.innerHTML = `<p class="panel-label">Warnings</p>`;
+  warningBlock.innerHTML = `<p class="panel-label">Warnings and next steps</p>`;
   const warningList = document.createElement("ul");
   warningList.className = "detail-list";
+  const routeWarnings = [
+    ...(detail.warnings || []),
+    ...(packet.handoff?.next_steps || []),
+    ...(packet.triage?.next_steps || []),
+  ];
   warningList.replaceChildren(
-    ...emptyListItems(detail.warnings.length > 0 ? detail.warnings : ["No route-specific warnings right now."]),
+    ...emptyListItems(
+      routeWarnings.length > 0
+        ? routeWarnings
+        : ["No route-specific warnings right now."],
+    ),
   );
   warningBlock.appendChild(warningList);
   wrapper.appendChild(warningBlock);
@@ -788,17 +828,18 @@ function renderRouteDetail(elements, detail) {
   elements.routeFocusDetail.replaceChildren(wrapper);
 }
 
-function renderDestinationDetail(elements, detail) {
-  if (!detail) {
+function renderDestinationFocusPacket(elements, packet) {
+  if (!packet) {
     fillList(elements, elements.destinationFocusDetail, []);
     return;
   }
+  const detail = packet.detail;
   const wrapper = document.createElement("div");
   wrapper.className = "detail-shell";
   wrapper.innerHTML = `
     <div class="panel-header">
       <div>
-        <p class="panel-label">Selected destination</p>
+        <p class="panel-label">Focused destination packet</p>
         <h4>${escapeHtml(detail.destination_id)}</h4>
       </div>
       <span class="entity-state" data-level="${escapeHtml(destinationDetailLevel(detail.state))}">${escapeHtml(destinationDetailLabel(detail.state))}</span>
@@ -831,6 +872,49 @@ function renderDestinationDetail(elements, detail) {
       ],
     ),
   );
+  wrapper.appendChild(
+    metricGrid([
+      ["Trace events", packet.trace?.recent_events?.length || 0],
+      ["Timeline entries", packet.timeline?.entries?.length || 0],
+      ["Next steps", packet.handoff?.next_steps?.length || 0],
+      ["Board items", packet.board_items?.length || 0],
+    ]),
+  );
+  wrapper.appendChild(
+    detailGrid(
+      "Focus packet",
+      [
+        `Trace level: ${packet.trace?.level || "none"}`,
+        `Triage level: ${packet.triage?.level || "none"}`,
+        `Casebook level: ${packet.casebook?.level || "none"}`,
+        `Board lanes: ${packet.board_items?.map((item) => item.level).join(", ") || "none"}`,
+      ],
+      "Linked context",
+      [
+        `Handoff summary: ${packet.handoff?.summary || "none"}`,
+        `Triage summary: ${packet.triage?.summary || "none"}`,
+        `Casebook summary: ${packet.casebook?.summary || "none"}`,
+        `Latest trace: ${packet.trace?.recent_events?.[0]?.title || "none"}`,
+      ],
+    ),
+  );
+  const attentionBlock = document.createElement("div");
+  attentionBlock.innerHTML = `<p class="panel-label">Warnings and next steps</p>`;
+  const attentionList = document.createElement("ul");
+  attentionList.className = "detail-list";
+  const destinationWarnings = [
+    ...(packet.handoff?.next_steps || []),
+    ...(packet.triage?.next_steps || []),
+  ];
+  attentionList.replaceChildren(
+    ...emptyListItems(
+      destinationWarnings.length > 0
+        ? destinationWarnings
+        : ["No destination-specific warnings right now."],
+    ),
+  );
+  attentionBlock.appendChild(attentionList);
+  wrapper.appendChild(attentionBlock);
 
   const actions = document.createElement("div");
   actions.className = "detail-actions";

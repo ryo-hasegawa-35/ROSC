@@ -6,10 +6,11 @@ use serde::Serialize;
 use crate::{
     ProxyOperatorAttention, ProxyOperatorBoard, ProxyOperatorCasebookCatalog,
     ProxyOperatorDashboard, ProxyOperatorDestinationTrace, ProxyOperatorDiagnostics,
-    ProxyOperatorHandoffCatalog, ProxyOperatorIncidents, ProxyOperatorOverrides,
-    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace,
-    ProxyOperatorSignalScope, ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog,
-    ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog, UdpProxyStatusSnapshot,
+    ProxyOperatorFocusCatalog, ProxyOperatorHandoffCatalog, ProxyOperatorIncidents,
+    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
+    ProxyOperatorRouteTrace, ProxyOperatorSignalScope, ProxyOperatorSnapshot,
+    ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog,
+    UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -136,6 +137,12 @@ pub(crate) struct OperatorBoardResponse {
 }
 
 #[derive(Serialize)]
+pub(crate) struct OperatorFocusResponse {
+    pub(crate) ok: bool,
+    pub(crate) focus: ProxyOperatorFocusCatalog,
+}
+
+#[derive(Serialize)]
 pub(crate) struct OperatorOverridesResponse {
     pub(crate) ok: bool,
     pub(crate) overrides: ProxyOperatorOverrides,
@@ -178,6 +185,7 @@ pub(crate) enum ResponseBody {
     OperatorTriage(OperatorTriageResponse),
     OperatorCasebook(OperatorCasebookResponse),
     OperatorBoard(OperatorBoardResponse),
+    OperatorFocus(OperatorFocusResponse),
     OperatorTrace(OperatorTraceResponse),
     OperatorRouteTrace(OperatorRouteTraceResponse),
     OperatorDestinationTrace(OperatorDestinationTraceResponse),
@@ -220,6 +228,7 @@ impl ResponseBody {
             Self::OperatorTriage(body) => json_payload(body),
             Self::OperatorCasebook(body) => json_payload(body),
             Self::OperatorBoard(body) => json_payload(body),
+            Self::OperatorFocus(body) => json_payload(body),
             Self::OperatorTrace(body) => json_payload(body),
             Self::OperatorRouteTrace(body) => json_payload(body),
             Self::OperatorDestinationTrace(body) => json_payload(body),

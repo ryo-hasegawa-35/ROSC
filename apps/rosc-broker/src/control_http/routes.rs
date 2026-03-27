@@ -14,11 +14,11 @@ use super::response::{
     HttpResponse, blockers_response, board_response, casebook_response, config_events_response,
     dashboard_css_response, dashboard_data_response, dashboard_html_response,
     dashboard_js_response, dashboard_render_js_response, dashboard_state_js_response,
-    destination_trace_response, diagnostics_response, handoff_response, incidents_response,
-    invalid_component_error, invalid_query_error, map_action_result, operator_actions_response,
-    operator_signals_response, overrides_response, overview_response, readiness_response,
-    report_response, route_trace_response, snapshot_response, status_response, timeline_response,
-    trace_response, triage_response, unsupported_route_error,
+    destination_trace_response, diagnostics_response, focus_response, handoff_response,
+    incidents_response, invalid_component_error, invalid_query_error, map_action_result,
+    operator_actions_response, operator_signals_response, overrides_response, overview_response,
+    readiness_response, report_response, route_trace_response, snapshot_response, status_response,
+    timeline_response, trace_response, triage_response, unsupported_route_error,
 };
 
 pub(crate) async fn route_request(
@@ -119,6 +119,13 @@ pub(crate) async fn route_request(
             let dashboard = control.operator_dashboard(limit).await;
             trace_response(dashboard.trace)
         }
+        ("GET", "/focus") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            let dashboard = control.operator_dashboard(limit).await;
+            focus_response(dashboard.focus)
+        }
         ("GET", "/overrides") => {
             let report = control.operator_report().await;
             overrides_response(report.overrides)
@@ -165,6 +172,34 @@ async fn route_nested_request(
     query: Option<&str>,
     control: Arc<dyn ProxyControlPlane>,
 ) -> HttpResponse {
+    if let Some(destination_id) = path
+        .strip_prefix("/destinations/")
+        .and_then(|path| path.strip_suffix("/focus"))
+    {
+        if request.method != "GET" || destination_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(destination_id) = decode_uri_component(destination_id) else {
+            return invalid_component_error("destination id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let dashboard = control.operator_dashboard(limit).await;
+        let mut focus = dashboard.focus;
+        let Some(destination_focus) = focus
+            .destinations
+            .iter()
+            .find(|packet| packet.destination_id == destination_id)
+            .cloned()
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        focus.routes.clear();
+        focus.destinations = vec![destination_focus];
+        return focus_response(focus);
+    }
+
     if let Some(destination_id) = path
         .strip_prefix("/destinations/")
         .and_then(|path| path.strip_suffix("/board"))
@@ -354,6 +389,31 @@ async fn route_nested_request(
     let Some(route_path) = path.strip_prefix("/routes/") else {
         return unsupported_route_error(&request.path);
     };
+
+    if let Some(route_id) = route_path.strip_suffix("/focus") {
+        if request.method != "GET" || route_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let dashboard = control.operator_dashboard(limit).await;
+        let mut focus = dashboard.focus;
+        let Some(route_focus) = focus
+            .routes
+            .iter()
+            .find(|packet| packet.route_id == route_id)
+            .cloned()
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        focus.routes = vec![route_focus];
+        focus.destinations.clear();
+        return focus_response(focus);
+    }
 
     if let Some(route_id) = route_path.strip_suffix("/board") {
         if request.method != "GET" || route_id.is_empty() {

@@ -267,3 +267,23 @@ fn proxy_board_stdout_is_json_only() {
     assert!(value.get("degraded_items").is_some());
     assert!(value.get("watch_items").is_some());
 }
+
+#[test]
+fn proxy_focus_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-focus",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("routes").is_some());
+    assert!(value.get("destinations").is_some());
+    assert_eq!(value["routes"].as_array().unwrap().len(), 1);
+    assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
+}
