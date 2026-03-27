@@ -13,6 +13,33 @@ use tokio::net::UdpSocket;
 use tokio::sync::oneshot;
 
 fn proxy_config(ingress_bind: &str, destination_addr: &str, rename_address: &str) -> BrokerConfig {
+    proxy_config_with_bind(
+        ingress_bind,
+        "127.0.0.1:0",
+        destination_addr,
+        rename_address,
+        Some(&["/ue5/camera/fov"]),
+    )
+}
+
+fn proxy_config_with_bind(
+    ingress_bind: &str,
+    destination_bind: &str,
+    destination_addr: &str,
+    rename_address: &str,
+    address_patterns: Option<&[&str]>,
+) -> BrokerConfig {
+    let address_patterns = match address_patterns {
+        Some(patterns) => format!(
+            "address_patterns = [{}]",
+            patterns
+                .iter()
+                .map(|pattern| format!("\"{pattern}\""))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        None => String::new(),
+    };
     BrokerConfig::from_toml_str(&format!(
         r#"
         [[udp_ingresses]]
@@ -22,7 +49,7 @@ fn proxy_config(ingress_bind: &str, destination_addr: &str, rename_address: &str
 
         [[udp_destinations]]
         id = "udp_renderer"
-        bind = "127.0.0.1:0"
+        bind = "{destination_bind}"
         target = "{destination_addr}"
 
         [[routes]]
@@ -33,7 +60,7 @@ fn proxy_config(ingress_bind: &str, destination_addr: &str, rename_address: &str
 
         [routes.match]
         ingress_ids = ["udp_localhost_in"]
-        address_patterns = ["/ue5/camera/fov"]
+        {address_patterns}
         protocols = ["osc_udp"]
 
         [routes.transform]
@@ -74,21 +101,12 @@ async fn send_packet(target: std::net::SocketAddr, value: f32) {
 
 #[tokio::test]
 async fn managed_proxy_reloads_to_a_new_destination() {
-    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let ingress_addr = reserved.local_addr().unwrap();
-    drop(reserved);
-
     let first_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let second_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let config_a = proxy_config(
-        &ingress_addr.to_string(),
+        "127.0.0.1:0",
         &first_listener.local_addr().unwrap().to_string(),
         "/render/a",
-    );
-    let config_b = proxy_config(
-        &ingress_addr.to_string(),
-        &second_listener.local_addr().unwrap().to_string(),
-        "/render/b",
     );
 
     let mut proxy = ManagedUdpProxy::start(
@@ -110,6 +128,15 @@ async fn managed_proxy_reloads_to_a_new_destination() {
     let first_message = recv_message(&first_listener).await;
     assert_eq!(first_message.address, "/render/a");
 
+    let config_b = proxy_config(
+        &proxy
+            .app()
+            .ingress_local_addr("udp_localhost_in")
+            .unwrap()
+            .to_string(),
+        &second_listener.local_addr().unwrap().to_string(),
+        "/render/b",
+    );
     proxy.reload(config_b).await.unwrap();
     let runtime = proxy
         .app()
@@ -136,21 +163,45 @@ async fn managed_proxy_reloads_to_a_new_destination() {
 }
 
 #[tokio::test]
-async fn managed_proxy_rolls_back_when_reload_fails() {
-    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let ingress_addr = reserved.local_addr().unwrap();
-    drop(reserved);
+async fn managed_proxy_blocked_startup_releases_fixed_destination_bind() {
+    let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let reserved_bind = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let destination_bind = reserved_bind.local_addr().unwrap();
+    drop(reserved_bind);
 
+    let error = ManagedUdpProxy::start(
+        proxy_config_with_bind(
+            "127.0.0.1:0",
+            &destination_bind.to_string(),
+            &listener.local_addr().unwrap().to_string(),
+            "/render/blocked",
+            None,
+        ),
+        InMemoryTelemetry::default(),
+        32,
+        ProxyRuntimeSafetyPolicy {
+            fail_on_warnings: true,
+            require_fallback_ready: false,
+        },
+        ProxyLaunchProfileMode::Normal,
+        ManagedProxyStartupOptions::default(),
+    )
+    .await
+    .err()
+    .expect("startup should be blocked by route warnings");
+    assert!(error.to_string().contains("udp proxy startup blocked"));
+
+    let rebound = UdpSocket::bind(destination_bind).await.unwrap();
+    drop(rebound);
+}
+
+#[tokio::test]
+async fn managed_proxy_rolls_back_when_reload_fails() {
     let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let good_config = proxy_config(
-        &ingress_addr.to_string(),
+        "127.0.0.1:0",
         &listener.local_addr().unwrap().to_string(),
         "/render/good",
-    );
-    let bad_config = proxy_config(
-        &ingress_addr.to_string(),
-        &ingress_addr.to_string(),
-        "/render/bad",
     );
 
     let mut proxy = ManagedUdpProxy::start(
@@ -164,6 +215,12 @@ async fn managed_proxy_rolls_back_when_reload_fails() {
     .await
     .unwrap();
 
+    let ingress_addr = proxy.app().ingress_local_addr("udp_localhost_in").unwrap();
+    let bad_config = proxy_config(
+        &ingress_addr.to_string(),
+        &ingress_addr.to_string(),
+        "/render/bad",
+    );
     let error = proxy
         .reload(bad_config)
         .await
@@ -186,16 +243,71 @@ async fn managed_proxy_rolls_back_when_reload_fails() {
 }
 
 #[tokio::test]
-async fn managed_proxy_status_exposes_runtime_config_after_startup() {
-    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let ingress_addr = reserved.local_addr().unwrap();
-    drop(reserved);
+async fn managed_proxy_reload_failure_and_shutdown_release_fixed_destination_bind() {
+    let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let reserved_bind = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let destination_bind = reserved_bind.local_addr().unwrap();
+    drop(reserved_bind);
 
+    let mut proxy = ManagedUdpProxy::start(
+        proxy_config_with_bind(
+            "127.0.0.1:0",
+            &destination_bind.to_string(),
+            &listener.local_addr().unwrap().to_string(),
+            "/render/fixed-bind",
+            Some(&["/ue5/camera/fov"]),
+        ),
+        InMemoryTelemetry::default(),
+        32,
+        ProxyRuntimeSafetyPolicy::default(),
+        ProxyLaunchProfileMode::Normal,
+        ManagedProxyStartupOptions::default(),
+    )
+    .await
+    .unwrap();
+
+    let conflicting_socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let conflicting_bind = conflicting_socket.local_addr().unwrap();
+    let ingress_addr = proxy.app().ingress_local_addr("udp_localhost_in").unwrap();
+
+    let error = proxy
+        .reload(proxy_config_with_bind(
+            &ingress_addr.to_string(),
+            &conflicting_bind.to_string(),
+            &listener.local_addr().unwrap().to_string(),
+            "/render/bad-bind",
+            Some(&["/ue5/camera/fov"]),
+        ))
+        .await
+        .expect_err("reload should fail when the new fixed bind is already in use");
+    assert!(
+        error
+            .to_string()
+            .contains("failed to apply the new proxy configuration")
+    );
+
+    send_packet(
+        proxy.app().ingress_local_addr("udp_localhost_in").unwrap(),
+        90.0,
+    )
+    .await;
+    let restored_message = recv_message(&listener).await;
+    assert_eq!(restored_message.address, "/render/fixed-bind");
+
+    proxy.shutdown().await;
+    drop(conflicting_socket);
+
+    let rebound = UdpSocket::bind(destination_bind).await.unwrap();
+    drop(rebound);
+}
+
+#[tokio::test]
+async fn managed_proxy_status_exposes_runtime_config_after_startup() {
     let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let telemetry = InMemoryTelemetry::default();
     let mut proxy = ManagedUdpProxy::start(
         proxy_config(
-            &ingress_addr.to_string(),
+            "127.0.0.1:0",
             &listener.local_addr().unwrap().to_string(),
             "/render/status",
         ),
@@ -313,14 +425,10 @@ async fn managed_proxy_start_frozen_blocks_startup_traffic_without_a_race() {
 
 #[tokio::test]
 async fn managed_proxy_can_freeze_and_thaw_traffic() {
-    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let ingress_addr = reserved.local_addr().unwrap();
-    drop(reserved);
-
     let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let mut proxy = ManagedUdpProxy::start(
         proxy_config(
-            &ingress_addr.to_string(),
+            "127.0.0.1:0",
             &listener.local_addr().unwrap().to_string(),
             "/render/frozen",
         ),
@@ -368,14 +476,10 @@ async fn managed_proxy_can_freeze_and_thaw_traffic() {
 
 #[tokio::test]
 async fn managed_proxy_can_isolate_and_restore_routes() {
-    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let ingress_addr = reserved.local_addr().unwrap();
-    drop(reserved);
-
     let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let mut proxy = ManagedUdpProxy::start(
         proxy_config(
-            &ingress_addr.to_string(),
+            "127.0.0.1:0",
             &listener.local_addr().unwrap().to_string(),
             "/render/isolation",
         ),
@@ -439,14 +543,10 @@ async fn managed_proxy_can_isolate_and_restore_routes() {
 
 #[tokio::test]
 async fn managed_proxy_restore_all_routes_records_aggregate_action() {
-    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let ingress_addr = reserved.local_addr().unwrap();
-    drop(reserved);
-
     let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let mut proxy = ManagedUdpProxy::start(
         proxy_config(
-            &ingress_addr.to_string(),
+            "127.0.0.1:0",
             &listener.local_addr().unwrap().to_string(),
             "/render/restore-all",
         ),
@@ -490,21 +590,12 @@ async fn managed_proxy_restore_all_routes_records_aggregate_action() {
 
 #[tokio::test]
 async fn managed_proxy_preserves_frozen_state_across_reload() {
-    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let ingress_addr = reserved.local_addr().unwrap();
-    drop(reserved);
-
     let first_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let second_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let config_a = proxy_config(
-        &ingress_addr.to_string(),
+        "127.0.0.1:0",
         &first_listener.local_addr().unwrap().to_string(),
         "/render/a",
-    );
-    let config_b = proxy_config(
-        &ingress_addr.to_string(),
-        &second_listener.local_addr().unwrap().to_string(),
-        "/render/b",
     );
 
     let mut proxy = ManagedUdpProxy::start(
@@ -519,6 +610,15 @@ async fn managed_proxy_preserves_frozen_state_across_reload() {
     .unwrap();
 
     proxy.freeze_traffic();
+    let config_b = proxy_config(
+        &proxy
+            .app()
+            .ingress_local_addr("udp_localhost_in")
+            .unwrap()
+            .to_string(),
+        &second_listener.local_addr().unwrap().to_string(),
+        "/render/b",
+    );
     proxy.reload(config_b).await.unwrap();
 
     let runtime = proxy
@@ -566,21 +666,12 @@ async fn managed_proxy_preserves_frozen_state_across_reload() {
 
 #[tokio::test]
 async fn managed_proxy_preserves_route_isolation_across_reload() {
-    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let ingress_addr = reserved.local_addr().unwrap();
-    drop(reserved);
-
     let first_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let second_listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let config_a = proxy_config(
-        &ingress_addr.to_string(),
+        "127.0.0.1:0",
         &first_listener.local_addr().unwrap().to_string(),
         "/render/a",
-    );
-    let config_b = proxy_config(
-        &ingress_addr.to_string(),
-        &second_listener.local_addr().unwrap().to_string(),
-        "/render/b",
     );
 
     let mut proxy = ManagedUdpProxy::start(
@@ -595,6 +686,15 @@ async fn managed_proxy_preserves_route_isolation_across_reload() {
     .unwrap();
 
     assert!(proxy.isolate_route("camera"));
+    let config_b = proxy_config(
+        &proxy
+            .app()
+            .ingress_local_addr("udp_localhost_in")
+            .unwrap()
+            .to_string(),
+        &second_listener.local_addr().unwrap().to_string(),
+        "/render/b",
+    );
     proxy.reload(config_b).await.unwrap();
 
     let runtime = proxy
@@ -642,16 +742,12 @@ async fn managed_proxy_preserves_route_isolation_across_reload() {
 
 #[tokio::test]
 async fn managed_proxy_safe_mode_marks_launch_profile_and_disables_optional_features() {
-    let reserved = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let ingress_addr = reserved.local_addr().unwrap();
-    drop(reserved);
-
     let listener = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let config = BrokerConfig::from_toml_str(&format!(
         r#"
         [[udp_ingresses]]
         id = "udp_localhost_in"
-        bind = "{ingress_addr}"
+        bind = "127.0.0.1:0"
         mode = "osc1_0_strict"
 
         [[udp_destinations]]

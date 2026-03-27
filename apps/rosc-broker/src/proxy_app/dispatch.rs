@@ -17,6 +17,7 @@ pub(super) async fn spawn_ingress_tasks(
         anyhow::bail!("udp proxy ingress tasks are already running");
     }
     app.ensure_ingresses_bound().await?;
+    app.ensure_destinations_bound().await?;
 
     let (queue, rx) = IngressQueue::new(QueuePolicy {
         max_depth: ingress_queue_depth,
@@ -101,6 +102,22 @@ pub(super) async fn ensure_ingresses_bound(app: &mut UdpProxyApp) -> Result<()> 
     app.ingresses = super::build::bind_ingresses_from_specs(&app.ingress_specs).await?;
     app.ingress_addrs = super::build::ingress_addresses(&app.ingresses)?;
     super::build::refresh_ingress_status(&mut app.status, &app.ingress_addrs);
+    Ok(())
+}
+
+pub(super) async fn ensure_destinations_bound(app: &mut UdpProxyApp) -> Result<()> {
+    if !app.destinations.is_empty() {
+        return Ok(());
+    }
+
+    app.destinations = Arc::new(
+        super::build::build_destinations(
+            &app.config,
+            &app.ingress_addrs,
+            app.runtime.telemetry.clone(),
+        )
+        .await?,
+    );
     Ok(())
 }
 

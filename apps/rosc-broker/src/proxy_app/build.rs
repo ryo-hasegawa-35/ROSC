@@ -37,6 +37,7 @@ pub(super) async fn build_proxy_app(
     let destinations = build_destinations(config, &ingress_addrs, telemetry.clone()).await?;
 
     Ok(UdpProxyApp {
+        config: config.clone(),
         runtime,
         recovery,
         destinations: Arc::new(destinations),

@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::io;
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 
@@ -13,6 +14,7 @@ use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream, UdpSocket};
 use tokio::sync::{Notify, mpsc};
+use tokio::task::JoinHandle;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct QueuePolicy {
@@ -181,6 +183,7 @@ pub struct DestinationWorkerHandle {
     destination_id: String,
     queue: Arc<DestinationQueue>,
     state: Arc<Mutex<DestinationState>>,
+    task: Arc<Mutex<Option<JoinHandle<()>>>>,
     policy: DestinationPolicy,
     telemetry: Arc<dyn TelemetrySink>,
 }
@@ -194,6 +197,7 @@ struct DestinationState {
 struct DestinationQueue {
     capacity: usize,
     inner: tokio::sync::Mutex<VecDeque<PacketEnvelope>>,
+    closed: AtomicBool,
     notify: Notify,
 }
 
@@ -345,6 +349,10 @@ impl EgressSink for UdpEgressSink {
 }
 
 impl DestinationRegistry {
+    pub fn is_empty(&self) -> bool {
+        self.destinations.is_empty()
+    }
+
     pub fn register(&mut self, handle: DestinationWorkerHandle) {
         self.destinations
             .insert(handle.destination_id.clone(), handle);
@@ -368,6 +376,12 @@ impl DestinationRegistry {
             .enqueue(dispatch.packet)
             .await
             .map_err(RuntimeDispatchError::from)
+    }
+
+    pub async fn shutdown(&self) {
+        for handle in self.destinations.values() {
+            handle.shutdown().await;
+        }
     }
 }
 
@@ -399,7 +413,7 @@ impl DestinationWorkerHandle {
         let task_policy = policy.clone();
         let task_destination_id = destination_id.clone();
         let task_telemetry = Arc::clone(&telemetry);
-        tokio::spawn(async move {
+        let task = tokio::spawn(async move {
             worker_loop(
                 task_destination_id,
                 task_policy,
@@ -415,6 +429,7 @@ impl DestinationWorkerHandle {
             destination_id,
             queue,
             state,
+            task: Arc::new(Mutex::new(Some(task))),
             policy,
             telemetry,
         }
@@ -514,6 +529,19 @@ impl DestinationWorkerHandle {
         }
         Ok(())
     }
+
+    pub async fn shutdown(&self) {
+        self.queue.close();
+        let handle = self
+            .task
+            .lock()
+            .expect("destination worker task mutex poisoned")
+            .take();
+        if let Some(handle) = handle {
+            handle.abort();
+            let _ = handle.await;
+        }
+    }
 }
 
 impl DestinationQueue {
@@ -521,6 +549,7 @@ impl DestinationQueue {
         Self {
             capacity,
             inner: tokio::sync::Mutex::new(VecDeque::new()),
+            closed: AtomicBool::new(false),
             notify: Notify::new(),
         }
     }
@@ -548,17 +577,48 @@ impl DestinationQueue {
         QueueInsertResult { outcome, depth }
     }
 
-    async fn recv(&self) -> PacketEnvelope {
+    async fn recv(&self) -> Option<PacketEnvelope> {
         loop {
-            if let Some(packet) = self.inner.lock().await.pop_front() {
-                return packet;
-            }
-            self.notify.notified().await;
+            let notified = {
+                let mut queue = self.inner.lock().await;
+                if let Some(packet) = queue.pop_front() {
+                    return Some(packet);
+                }
+                if self.closed.load(Ordering::SeqCst) {
+                    return None;
+                }
+                self.notify.notified()
+            };
+            notified.await;
         }
+    }
+
+    fn close(&self) {
+        if !self.closed.swap(true, Ordering::SeqCst) {
+            self.notify.notify_waiters();
+        }
+    }
+
+    fn is_closed(&self) -> bool {
+        self.closed.load(Ordering::SeqCst)
     }
 
     async fn len(&self) -> usize {
         self.inner.lock().await.len()
+    }
+}
+
+impl Drop for DestinationWorkerHandle {
+    fn drop(&mut self) {
+        self.queue.close();
+        if let Some(handle) = self
+            .task
+            .lock()
+            .expect("destination worker task mutex poisoned")
+            .take()
+        {
+            handle.abort();
+        }
     }
 }
 
@@ -576,8 +636,10 @@ async fn worker_loop(
     telemetry: Arc<dyn TelemetrySink>,
 ) {
     loop {
-        wait_for_breaker(&destination_id, &policy.breaker, &state, &telemetry).await;
-        let packet = queue.recv().await;
+        wait_for_breaker(&destination_id, &policy.breaker, &state, &telemetry, &queue).await;
+        let Some(packet) = queue.recv().await else {
+            break;
+        };
 
         telemetry.emit(BrokerEvent::QueueDepthChanged {
             queue_id: destination_id.clone(),
@@ -648,8 +710,12 @@ async fn wait_for_breaker(
     breaker_policy: &BreakerPolicy,
     state: &Arc<Mutex<DestinationState>>,
     telemetry: &Arc<dyn TelemetrySink>,
+    queue: &Arc<DestinationQueue>,
 ) {
     loop {
+        if queue.is_closed() {
+            break;
+        }
         let maybe_wait = {
             let mut state = state.lock().expect("destination status mutex poisoned");
             if state.status.breaker_state != BreakerState::Open {

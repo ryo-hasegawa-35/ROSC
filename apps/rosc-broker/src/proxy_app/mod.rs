@@ -21,6 +21,7 @@ use crate::route_control::RouteControlState;
 use crate::traffic_control::TrafficControlState;
 
 pub struct UdpProxyApp {
+    config: BrokerConfig,
     runtime: Arc<Runtime<InMemoryTelemetry>>,
     recovery: Arc<RecoveryEngine<InMemoryTelemetry>>,
     destinations: Arc<DestinationRegistry>,
@@ -169,10 +170,16 @@ impl UdpProxyApp {
 
     pub async fn shutdown(&mut self) {
         self.tasks.shutdown().await;
+        self.destinations.shutdown().await;
+        self.destinations = Arc::new(DestinationRegistry::default());
     }
 
     async fn ensure_ingresses_bound(&mut self) -> Result<()> {
         dispatch::ensure_ingresses_bound(self).await
+    }
+
+    async fn ensure_destinations_bound(&mut self) -> Result<()> {
+        dispatch::ensure_destinations_bound(self).await
     }
 
     async fn dispatch_packet(&self, packet: &PacketEnvelope) -> rosc_runtime::DispatchOutcome {
