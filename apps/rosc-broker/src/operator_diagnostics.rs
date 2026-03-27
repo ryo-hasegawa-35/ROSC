@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::{
     ProxyOperatorOverview, ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot,
-    proxy_operator_overview,
+    operator_history::bounded_recent_entries, proxy_operator_overview,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -40,15 +40,5 @@ pub fn proxy_operator_diagnostics(
             history_limit,
         ),
         overview,
-    }
-}
-
-fn bounded_recent_entries<T>(entries: Vec<T>, limit: Option<usize>) -> Vec<T> {
-    match limit {
-        Some(limit) if entries.len() > limit => {
-            let start = entries.len() - limit;
-            entries.into_iter().skip(start).collect()
-        }
-        _ => entries,
     }
 }

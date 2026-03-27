@@ -8,6 +8,7 @@ mod launch_profile;
 mod managed_proxy;
 mod operator_attention;
 mod operator_diagnostics;
+mod operator_history;
 mod operator_incidents;
 mod operator_overview;
 mod operator_policy;

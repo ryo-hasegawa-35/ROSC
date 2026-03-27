@@ -1,9 +1,10 @@
-use rosc_telemetry::{RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction};
+use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 use serde::Serialize;
 
 use crate::{
     ProxyOperatorDestinationSignal, ProxyOperatorReport, ProxyOperatorRouteSignal,
     ProxyOperatorState,
+    operator_history::{bounded_recent_config_issues, bounded_recent_entries},
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -32,24 +33,14 @@ pub fn proxy_operator_incidents_from_histories(
     recent_config_events: Vec<RecentConfigEvent>,
     history_limit: Option<usize>,
 ) -> ProxyOperatorIncidents {
-    let filtered_config_issues = recent_config_events
-        .into_iter()
-        .filter(|event| {
-            !matches!(
-                event.kind,
-                RecentConfigEventKind::Applied | RecentConfigEventKind::LaunchProfileChanged
-            )
-        })
-        .collect::<Vec<_>>();
-
     ProxyOperatorIncidents {
         state: report.state.clone(),
         open_blockers: report.blockers.clone(),
         open_warnings: report.warnings.clone(),
         latest_operator_action: report.highlights.latest_operator_action.clone(),
         latest_config_issue: report.highlights.latest_config_issue.clone(),
-        recent_operator_actions: bounded_recent(recent_operator_actions, history_limit),
-        recent_config_issues: bounded_recent(filtered_config_issues, history_limit),
+        recent_operator_actions: bounded_recent_entries(recent_operator_actions, history_limit),
+        recent_config_issues: bounded_recent_config_issues(recent_config_events, history_limit),
         problematic_routes: report
             .route_signals
             .iter()
@@ -62,15 +53,5 @@ pub fn proxy_operator_incidents_from_histories(
             .filter(|signal| signal.is_problematic())
             .cloned()
             .collect(),
-    }
-}
-
-fn bounded_recent<T>(entries: Vec<T>, limit: Option<usize>) -> Vec<T> {
-    match limit {
-        Some(limit) if entries.len() > limit => {
-            let start = entries.len() - limit;
-            entries.into_iter().skip(start).collect()
-        }
-        _ => entries,
     }
 }
