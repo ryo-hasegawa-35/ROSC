@@ -205,7 +205,50 @@ async fn control_service_serves_dashboard_assets() {
     .await;
     assert!(js.contains("HTTP/1.1 200 OK"));
     assert!(js.contains("Content-Type: application/javascript; charset=utf-8"));
-    assert!(js.contains("REFRESH_INTERVAL_MS"));
+    assert!(js.contains("fetchDashboardData"));
+
+    let state_js = request(
+        service.listen_addr(),
+        "GET /dashboard/dashboard-state.js HTTP/1.1\r\nHost: localhost\r\n\r\n",
+    )
+    .await;
+    assert!(state_js.contains("HTTP/1.1 200 OK"));
+    assert!(state_js.contains("Content-Type: application/javascript; charset=utf-8"));
+    assert!(state_js.contains("buildTrafficPulse"));
+
+    let render_js = request(
+        service.listen_addr(),
+        "GET /dashboard/dashboard-render.js HTTP/1.1\r\nHost: localhost\r\n\r\n",
+    )
+    .await;
+    assert!(render_js.contains("HTTP/1.1 200 OK"));
+    assert!(render_js.contains("Content-Type: application/javascript; charset=utf-8"));
+    assert!(render_js.contains("renderDashboard"));
+
+    let dashboard_data = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /dashboard/data?limit=2 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(dashboard_data["ok"], true);
+    assert_eq!(dashboard_data["dashboard"]["refresh_interval_ms"], 2500);
+    assert_eq!(
+        dashboard_data["dashboard"]["snapshot"]["overview"]["status"]["summary"]["active_routes"],
+        1
+    );
+    assert_eq!(
+        dashboard_data["dashboard"]["traffic"]["has_runtime_status"],
+        true
+    );
+    assert_eq!(
+        dashboard_data["dashboard"]["timeline"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
 
     service.shutdown().await.unwrap();
     proxy.lock().await.shutdown().await;

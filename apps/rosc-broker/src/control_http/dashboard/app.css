@@ -71,6 +71,7 @@ body {
 
 .subcopy,
 .panel-note,
+.action-feedback,
 .empty-state,
 .timeline li,
 .callout-list li,
@@ -135,6 +136,10 @@ body {
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.action-feedback {
+  margin: 14px 0 0;
 }
 
 .connection-status {
@@ -363,6 +368,18 @@ body {
   border-radius: 16px;
   background: var(--panel-strong);
   border: 1px solid var(--line);
+}
+
+.callout-list li[data-level="healthy"] {
+  border-color: rgba(39, 117, 78, 0.24);
+}
+
+.callout-list li[data-level="degraded"] {
+  border-color: rgba(194, 107, 30, 0.28);
+}
+
+.callout-list li[data-level="blocked"] {
+  border-color: rgba(165, 59, 42, 0.28);
 }
 
 .entity-card h4,

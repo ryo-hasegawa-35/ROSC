@@ -9,10 +9,12 @@ use super::request::{
 };
 use super::response::{
     HttpResponse, blockers_response, config_events_response, dashboard_css_response,
-    dashboard_html_response, dashboard_js_response, diagnostics_response, incidents_response,
-    invalid_component_error, invalid_query_error, map_action_result, operator_actions_response,
-    operator_signals_response, overrides_response, overview_response, readiness_response,
-    report_response, snapshot_response, status_response, unsupported_route_error,
+    dashboard_data_response, dashboard_html_response, dashboard_js_response,
+    dashboard_render_js_response, dashboard_state_js_response, diagnostics_response,
+    incidents_response, invalid_component_error, invalid_query_error, map_action_result,
+    operator_actions_response, operator_signals_response, overrides_response, overview_response,
+    readiness_response, report_response, snapshot_response, status_response,
+    unsupported_route_error,
 };
 
 pub(crate) async fn route_request(
@@ -24,6 +26,14 @@ pub(crate) async fn route_request(
         ("GET", "/dashboard") | ("GET", "/dashboard/") => dashboard_html_response(),
         ("GET", "/dashboard/app.css") => dashboard_css_response(),
         ("GET", "/dashboard/app.js") => dashboard_js_response(),
+        ("GET", "/dashboard/dashboard-state.js") => dashboard_state_js_response(),
+        ("GET", "/dashboard/dashboard-render.js") => dashboard_render_js_response(),
+        ("GET", "/dashboard/data") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            dashboard_data_response(control.operator_dashboard(limit).await)
+        }
         ("GET", "/status") => status_response(control.status_snapshot().await),
         ("GET", "/report") => report_response(control.operator_report().await),
         ("GET", "/overview") => overview_response(control.operator_overview().await),

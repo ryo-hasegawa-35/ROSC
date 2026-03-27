@@ -17,15 +17,18 @@
         <nav class="primary-nav" aria-label="Dashboard sections">
           <a href="#overview" data-section-link="overview">Overview</a>
           <a href="#topology" data-section-link="topology">Topology</a>
+          <a href="#traffic" data-section-link="traffic">Traffic</a>
           <a href="#routes" data-section-link="routes">Routes</a>
           <a href="#destinations" data-section-link="destinations">Destinations</a>
           <a href="#recovery" data-section-link="recovery">Recovery</a>
           <a href="#incidents" data-section-link="incidents">Incidents</a>
+          <a href="#config" data-section-link="config">Config</a>
         </nav>
         <section class="sidebar-panel">
           <p class="panel-label">Connection</p>
           <div class="connection-status" id="connection-status">Connecting…</div>
           <button class="ghost-button" id="refresh-button" type="button">Refresh now</button>
+          <p class="panel-note action-feedback" id="action-feedback">No operator action yet.</p>
         </section>
         <section class="sidebar-panel">
           <p class="panel-label">Operator actions</p>
@@ -121,6 +124,28 @@
         </section>
 
         <section class="two-column">
+          <article class="panel" id="traffic">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Traffic</p>
+                <h3>Runtime pressure and flow</h3>
+              </div>
+            </div>
+            <div class="stat-grid" id="traffic-stats"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Hotspots</p>
+                <h3>Who is moving and failing</h3>
+              </div>
+            </div>
+            <ul class="callout-list" id="traffic-hotspots"></ul>
+          </article>
+        </section>
+
+        <section class="two-column">
           <article class="panel" id="routes">
             <div class="panel-header">
               <div>
@@ -207,6 +232,37 @@
                 <ul class="callout-list" id="problematic-entities"></ul>
               </div>
             </div>
+          </article>
+        </section>
+
+        <section class="two-column" id="config">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Config</p>
+                <h3>Runtime config state</h3>
+              </div>
+            </div>
+            <div class="recovery-grid">
+              <div>
+                <h4>Current state</h4>
+                <ul class="callout-list" id="config-summary"></ul>
+              </div>
+              <div>
+                <h4>Current risks</h4>
+                <ul class="callout-list" id="config-risks"></ul>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-label">Timeline</p>
+                <h3>Operator and config events</h3>
+              </div>
+            </div>
+            <ol class="timeline" id="event-timeline"></ol>
           </article>
         </section>
       </main>

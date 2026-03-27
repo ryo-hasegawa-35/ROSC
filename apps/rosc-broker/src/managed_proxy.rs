@@ -4,9 +4,9 @@ use rosc_telemetry::{InMemoryTelemetry, TelemetrySink};
 
 use crate::UdpProxyStatusSnapshot;
 use crate::{
-    ProxyLaunchProfileMode, ProxyOperatorDiagnostics, ProxyOperatorIncidents,
-    ProxyOperatorOverview, ProxyOperatorReport, ProxyOperatorSnapshot, ProxyRuntimeSafetyPolicy,
-    UdpProxyApp, apply_launch_profile, emit_config_transition,
+    ProxyLaunchProfileMode, ProxyOperatorDashboard, ProxyOperatorDiagnostics,
+    ProxyOperatorIncidents, ProxyOperatorOverview, ProxyOperatorReport, ProxyOperatorSnapshot,
+    ProxyRuntimeSafetyPolicy, UdpProxyApp, apply_launch_profile, emit_config_transition,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -91,6 +91,10 @@ impl ManagedUdpProxy {
             self.safety_policy,
             history_limit,
         )
+    }
+
+    pub fn operator_dashboard(&self, history_limit: Option<usize>) -> ProxyOperatorDashboard {
+        crate::proxy_operator_dashboard(&self.status_snapshot(), self.safety_policy, history_limit)
     }
 
     pub fn operator_incidents(&self, history_limit: Option<usize>) -> ProxyOperatorIncidents {

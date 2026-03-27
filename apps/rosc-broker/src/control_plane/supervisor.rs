@@ -4,8 +4,9 @@ use async_trait::async_trait;
 use tokio::sync::Mutex;
 
 use crate::{
-    ManagedProxyFileSupervisor, ProxyOperatorDiagnostics, ProxyOperatorIncidents,
-    ProxyOperatorOverview, ProxyOperatorReport, ProxyOperatorSnapshot, UdpProxyStatusSnapshot,
+    ManagedProxyFileSupervisor, ProxyOperatorDashboard, ProxyOperatorDiagnostics,
+    ProxyOperatorIncidents, ProxyOperatorOverview, ProxyOperatorReport, ProxyOperatorSnapshot,
+    UdpProxyStatusSnapshot,
 };
 
 use super::shared::{
@@ -40,6 +41,10 @@ impl ProxyControlPlane for ManagedProxyFileSupervisorController {
 
     async fn operator_snapshot(&self, history_limit: Option<usize>) -> ProxyOperatorSnapshot {
         self.inner.lock().await.operator_snapshot(history_limit)
+    }
+
+    async fn operator_dashboard(&self, history_limit: Option<usize>) -> ProxyOperatorDashboard {
+        self.inner.lock().await.operator_dashboard(history_limit)
     }
 
     async fn operator_diagnostics(&self, history_limit: Option<usize>) -> ProxyOperatorDiagnostics {

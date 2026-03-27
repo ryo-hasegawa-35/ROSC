@@ -4,9 +4,9 @@ use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 use serde::Serialize;
 
 use crate::{
-    ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorIncidents,
-    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
-    ProxyOperatorSignalScope, ProxyOperatorSnapshot, UdpProxyStatusSnapshot,
+    ProxyOperatorAttention, ProxyOperatorDashboard, ProxyOperatorDiagnostics,
+    ProxyOperatorIncidents, ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness,
+    ProxyOperatorReport, ProxyOperatorSignalScope, ProxyOperatorSnapshot, UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -61,6 +61,12 @@ pub(crate) struct OperatorSnapshotResponse {
 }
 
 #[derive(Serialize)]
+pub(crate) struct OperatorDashboardResponse {
+    pub(crate) ok: bool,
+    pub(crate) dashboard: Box<ProxyOperatorDashboard>,
+}
+
+#[derive(Serialize)]
 pub(crate) struct OperatorDiagnosticsResponse {
     pub(crate) ok: bool,
     pub(crate) diagnostics: Box<ProxyOperatorDiagnostics>,
@@ -112,6 +118,7 @@ pub(crate) enum ResponseBody {
     OperatorOverview(Box<OperatorOverviewResponse>),
     OperatorReadiness(Box<OperatorReadinessResponse>),
     OperatorSnapshot(Box<OperatorSnapshotResponse>),
+    OperatorDashboard(Box<OperatorDashboardResponse>),
     OperatorDiagnostics(Box<OperatorDiagnosticsResponse>),
     OperatorAttention(OperatorAttentionResponse),
     OperatorIncidents(OperatorIncidentsResponse),
@@ -145,6 +152,7 @@ impl ResponseBody {
             Self::OperatorOverview(body) => json_payload(body),
             Self::OperatorReadiness(body) => json_payload(body),
             Self::OperatorSnapshot(body) => json_payload(body),
+            Self::OperatorDashboard(body) => json_payload(body),
             Self::OperatorDiagnostics(body) => json_payload(body),
             Self::OperatorAttention(body) => json_payload(body),
             Self::OperatorIncidents(body) => json_payload(body),

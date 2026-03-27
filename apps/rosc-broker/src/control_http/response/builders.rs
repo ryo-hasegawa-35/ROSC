@@ -1,18 +1,20 @@
-use crate::control_http::dashboard::{DASHBOARD_CSS, DASHBOARD_HTML, DASHBOARD_JS};
+use crate::control_http::dashboard::{
+    DASHBOARD_CSS, DASHBOARD_HTML, DASHBOARD_JS, DASHBOARD_RENDER_JS, DASHBOARD_STATE_JS,
+};
 use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError};
 use crate::{
-    ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorIncidents,
-    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
-    ProxyOperatorSignalsView, ProxyOperatorSnapshot, UdpProxyStatusSnapshot,
+    ProxyOperatorAttention, ProxyOperatorDashboard, ProxyOperatorDiagnostics,
+    ProxyOperatorIncidents, ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness,
+    ProxyOperatorReport, ProxyOperatorSignalsView, ProxyOperatorSnapshot, UdpProxyStatusSnapshot,
 };
 use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 
 use super::payloads::{
     ActionResponse, BlockersResponse, HttpResponse, OperatorAttentionResponse,
-    OperatorDiagnosticsResponse, OperatorIncidentsResponse, OperatorOverridesResponse,
-    OperatorOverviewResponse, OperatorReadinessResponse, OperatorReportResponse,
-    OperatorSignalsResponse, OperatorSnapshotResponse, RecentConfigEventsResponse,
-    RecentOperatorActionsResponse, ResponseBody, StatusResponse,
+    OperatorDashboardResponse, OperatorDiagnosticsResponse, OperatorIncidentsResponse,
+    OperatorOverridesResponse, OperatorOverviewResponse, OperatorReadinessResponse,
+    OperatorReportResponse, OperatorSignalsResponse, OperatorSnapshotResponse,
+    RecentConfigEventsResponse, RecentOperatorActionsResponse, ResponseBody, StatusResponse,
 };
 
 pub(crate) fn status_response(status: UdpProxyStatusSnapshot) -> HttpResponse {
@@ -48,6 +50,26 @@ pub(crate) fn dashboard_js_response() -> HttpResponse {
         body: ResponseBody::StaticAsset {
             content_type: "application/javascript; charset=utf-8",
             body: DASHBOARD_JS,
+        },
+    }
+}
+
+pub(crate) fn dashboard_state_js_response() -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::StaticAsset {
+            content_type: "application/javascript; charset=utf-8",
+            body: DASHBOARD_STATE_JS,
+        },
+    }
+}
+
+pub(crate) fn dashboard_render_js_response() -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::StaticAsset {
+            content_type: "application/javascript; charset=utf-8",
+            body: DASHBOARD_RENDER_JS,
         },
     }
 }
@@ -102,6 +124,16 @@ pub(crate) fn snapshot_response(snapshot: ProxyOperatorSnapshot) -> HttpResponse
         body: ResponseBody::OperatorSnapshot(Box::new(OperatorSnapshotResponse {
             ok: true,
             snapshot: Box::new(snapshot),
+        })),
+    }
+}
+
+pub(crate) fn dashboard_data_response(dashboard: ProxyOperatorDashboard) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorDashboard(Box::new(OperatorDashboardResponse {
+            ok: true,
+            dashboard: Box::new(dashboard),
         })),
     }
 }

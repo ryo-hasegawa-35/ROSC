@@ -2,8 +2,9 @@ mod common;
 
 use common::broad_scope_config;
 use rosc_broker::{
-    ProxyOperatorSignalScope, ProxyOperatorState, ProxyRuntimeSafetyPolicy, attach_runtime_status,
-    proxy_operator_attention, proxy_operator_diagnostics, proxy_operator_incidents_from_histories,
+    ProxyOperatorSignalScope, ProxyOperatorState, ProxyOperatorTimelineCategory,
+    ProxyRuntimeSafetyPolicy, attach_runtime_status, proxy_operator_attention,
+    proxy_operator_dashboard, proxy_operator_diagnostics, proxy_operator_incidents_from_histories,
     proxy_operator_overview, proxy_operator_readiness, proxy_operator_report,
     proxy_operator_signals_view, proxy_operator_snapshot, proxy_status_from_config,
 };
@@ -409,6 +410,119 @@ fn operator_diagnostics_bounds_recent_history_without_changing_overview() {
             .recent_config_event_count,
         2
     );
+}
+
+#[test]
+fn operator_dashboard_bundles_snapshot_traffic_and_timeline() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            ingress_packets_total: [("udp_localhost_in".to_owned(), 120)].into_iter().collect(),
+            ingress_drops_total: [(("udp_localhost_in".to_owned(), "queue_full".to_owned()), 3)]
+                .into_iter()
+                .collect(),
+            route_matches_total: [("camera".to_owned(), 90)].into_iter().collect(),
+            dispatch_failures_total: [(
+                (
+                    "camera".to_owned(),
+                    "udp_renderer".to_owned(),
+                    "breaker_open".to_owned(),
+                ),
+                2,
+            )]
+            .into_iter()
+            .collect(),
+            route_transform_failures_total: [("camera".to_owned(), 1)].into_iter().collect(),
+            destination_drops_total: [(
+                ("udp_renderer".to_owned(), "queue_overflow".to_owned()),
+                4,
+            )]
+            .into_iter()
+            .collect(),
+            destination_sent_total: [("udp_renderer".to_owned(), 75)].into_iter().collect(),
+            destination_send_failures_total: [(
+                ("udp_renderer".to_owned(), "socket_error".to_owned()),
+                5,
+            )]
+            .into_iter()
+            .collect(),
+            destination_breaker_state: [(
+                "udp_renderer".to_owned(),
+                rosc_telemetry::BreakerStateSnapshot::Open,
+            )]
+            .into_iter()
+            .collect(),
+            recent_operator_actions: vec![RecentOperatorAction {
+                sequence: 10,
+                recorded_at_unix_ms: 1_000,
+                action: "freeze_traffic".to_owned(),
+                details: vec!["applied=true".to_owned()],
+            }],
+            recent_config_events: vec![RecentConfigEvent {
+                sequence: 11,
+                recorded_at_unix_ms: 1_100,
+                kind: RecentConfigEventKind::Blocked,
+                revision: Some(4),
+                details: vec!["unsafe wildcard route".to_owned()],
+                added_ingresses: 0,
+                removed_ingresses: 0,
+                changed_ingresses: 0,
+                added_destinations: 0,
+                removed_destinations: 0,
+                changed_destinations: 0,
+                added_routes: 0,
+                removed_routes: 0,
+                changed_routes: 1,
+                launch_profile_mode: Some("safe_mode".to_owned()),
+                disabled_capture_routes: 1,
+                disabled_replay_routes: 1,
+                disabled_restart_rehydrate_routes: 1,
+            }],
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let dashboard = proxy_operator_dashboard(&status, ProxyRuntimeSafetyPolicy::default(), Some(8));
+
+    assert_eq!(dashboard.refresh_interval_ms, 2_500);
+    assert_eq!(dashboard.snapshot.overview.status, status);
+    assert!(dashboard.traffic.has_runtime_status);
+    assert_eq!(dashboard.traffic.ingress_packets_total, 120);
+    assert_eq!(dashboard.traffic.ingress_drops_total, 3);
+    assert_eq!(dashboard.traffic.route_matches_total, 90);
+    assert_eq!(dashboard.traffic.route_dispatch_failures_total, 2);
+    assert_eq!(dashboard.traffic.route_transform_failures_total, 1);
+    assert_eq!(dashboard.traffic.destination_send_total, 75);
+    assert_eq!(dashboard.traffic.destination_send_failures_total, 5);
+    assert_eq!(dashboard.traffic.destination_drops_total, 4);
+    assert_eq!(
+        dashboard.traffic.busiest_ingresses[0].id,
+        "udp_localhost_in"
+    );
+    assert_eq!(dashboard.traffic.busiest_routes[0].id, "camera");
+    assert_eq!(
+        dashboard.traffic.noisiest_destinations[0].id,
+        "udp_renderer"
+    );
+    assert_eq!(dashboard.timeline.len(), 2);
+    assert_eq!(
+        dashboard.timeline[0].category,
+        ProxyOperatorTimelineCategory::ConfigEvent
+    );
+    assert_eq!(dashboard.timeline[0].label, "config_blocked");
+    assert_eq!(dashboard.timeline[0].recorded_at_unix_ms, 1_100);
+    assert!(
+        dashboard.timeline[0]
+            .details
+            .iter()
+            .any(|detail| detail == "revision=4")
+    );
+    assert_eq!(
+        dashboard.timeline[1].category,
+        ProxyOperatorTimelineCategory::OperatorAction
+    );
+    assert_eq!(dashboard.timeline[1].label, "freeze_traffic");
 }
 
 #[test]

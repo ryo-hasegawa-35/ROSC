@@ -7,6 +7,7 @@ mod health_service;
 mod launch_profile;
 mod managed_proxy;
 mod operator_attention;
+mod operator_dashboard;
 mod operator_diagnostics;
 mod operator_history;
 mod operator_incidents;
@@ -36,6 +37,11 @@ pub use launch_profile::{
 };
 pub use managed_proxy::{FrozenStartupBehavior, ManagedProxyStartupOptions, ManagedUdpProxy};
 pub use operator_attention::{ProxyOperatorAttention, proxy_operator_attention};
+pub use operator_dashboard::{
+    DASHBOARD_REFRESH_INTERVAL_MS, ProxyOperatorCounterEntry, ProxyOperatorDashboard,
+    ProxyOperatorTimelineCategory, ProxyOperatorTimelineEntry, ProxyOperatorTrafficSummary,
+    proxy_operator_dashboard, proxy_operator_dashboard_from_snapshot,
+};
 pub use operator_diagnostics::{
     ProxyOperatorDiagnostics, proxy_operator_diagnostics, proxy_operator_diagnostics_from_overview,
 };
