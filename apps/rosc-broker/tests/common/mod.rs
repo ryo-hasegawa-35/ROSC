@@ -1,3 +1,7 @@
+#![allow(dead_code)]
+
+pub mod control_service;
+
 use rosc_config::BrokerConfig;
 
 pub fn broad_scope_config() -> BrokerConfig {
