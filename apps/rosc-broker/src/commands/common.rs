@@ -91,7 +91,7 @@ pub(crate) fn print_proxy_report(
 
 pub(crate) fn print_proxy_overview_summary(overview: &rosc_broker::ProxyOperatorOverview) {
     println!(
-        "proxy overview: state={} blockers={} warnings={} problematic_routes={} problematic_destinations={}",
+        "proxy overview: state={} blockers={} warnings={} problematic_routes={} problematic_destinations={} recent_operator_actions={} recent_config_events={}",
         match overview.report.state {
             rosc_broker::ProxyOperatorState::Healthy => "healthy",
             rosc_broker::ProxyOperatorState::Warning => "warning",
@@ -101,5 +101,29 @@ pub(crate) fn print_proxy_overview_summary(overview: &rosc_broker::ProxyOperator
         overview.report.warnings.len(),
         overview.problematic_signals.route_signals.len(),
         overview.problematic_signals.destination_signals.len(),
+        overview.runtime_summary.recent_operator_action_count,
+        overview.runtime_summary.recent_config_event_count,
+    );
+}
+
+pub(crate) fn print_proxy_diagnostics_summary(diagnostics: &rosc_broker::ProxyOperatorDiagnostics) {
+    let overview = &diagnostics.overview;
+    println!(
+        "proxy diagnostics: state={} blockers={} warnings={} problematic_routes={} problematic_destinations={} recent_operator_actions={} recent_config_events={} traffic_frozen={} isolated_routes={} backlog_destinations={} open_breakers={}",
+        match overview.report.state {
+            rosc_broker::ProxyOperatorState::Healthy => "healthy",
+            rosc_broker::ProxyOperatorState::Warning => "warning",
+            rosc_broker::ProxyOperatorState::Blocked => "blocked",
+        },
+        overview.report.blockers.len(),
+        overview.report.warnings.len(),
+        overview.problematic_signals.route_signals.len(),
+        overview.problematic_signals.destination_signals.len(),
+        diagnostics.recent_operator_actions.len(),
+        diagnostics.recent_config_events.len(),
+        overview.runtime_summary.traffic_frozen,
+        overview.runtime_summary.isolated_route_count,
+        overview.runtime_summary.destinations_with_backlog,
+        overview.runtime_summary.destinations_with_open_breakers,
     );
 }

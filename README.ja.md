@@ -37,6 +37,7 @@ cargo run -p rosc-broker -- check-config examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml --safe-mode
 cargo run -p rosc-broker -- proxy-overview examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
+cargo run -p rosc-broker -- proxy-diagnostics examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
@@ -50,6 +51,7 @@ curl -X POST "http://127.0.0.1:19292/routes/camera/replay/sandbox_tap?limit=1"
 curl http://127.0.0.1:19292/status
 curl http://127.0.0.1:19292/report
 curl http://127.0.0.1:19292/overview
+curl http://127.0.0.1:19292/diagnostics?limit=10
 curl http://127.0.0.1:19292/overrides
 curl http://127.0.0.1:19292/signals
 curl http://127.0.0.1:19292/signals?scope=problematic
@@ -100,6 +102,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - CLI の report 表示と control-plane の `/report` `/blockers` が同じ safety evaluation を共有するようになり、運用判断のズレを減らした
 - control-plane の `/report` から structured な override / runtime signal / route signal / destination signal を読めるようにし、`/overrides` `/signals` から個別取得もできるようにした
 - `proxy-overview` と control-plane の `/overview` で、report・current status・problematic signal view をまとめた operator 向け 1-shot snapshot を取得できるようにした
+- `proxy-diagnostics` と control-plane の `/diagnostics` で、その 1-shot snapshot に bounded な recent operator/config history も束ねて返せるようにし、インシデント一次切り分けをやりやすくした
 - `/signals?scope=problematic` で、operator が今見るべき route / destination signal だけに payload を絞れるようにした
 - config の reject / block / reload failure も counters だけでなく reason 付きの recent history として残るようになった
 

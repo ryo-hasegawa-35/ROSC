@@ -1,8 +1,8 @@
 use rosc_broker::{
     ProxyLaunchProfileMode, ProxyOperatorSignalScope, ProxyOperatorState, ProxyRuntimeSafetyPolicy,
-    attach_runtime_status, evaluate_proxy_runtime_policy, proxy_operator_overview,
-    proxy_operator_report, proxy_operator_signals_view, proxy_startup_report_lines,
-    proxy_status_from_config,
+    attach_runtime_status, evaluate_proxy_runtime_policy, proxy_operator_diagnostics,
+    proxy_operator_overview, proxy_operator_report, proxy_operator_signals_view,
+    proxy_startup_report_lines, proxy_status_from_config,
 };
 use rosc_config::BrokerConfig;
 use rosc_telemetry::{
@@ -466,6 +466,105 @@ fn operator_overview_embeds_problematic_signals() {
             .route_signals
             .iter()
             .any(|signal| signal.route_id == "camera" && signal.isolated)
+    );
+    assert!(overview.runtime_summary.has_runtime_status);
+    assert!(overview.runtime_summary.traffic_frozen);
+    assert_eq!(overview.runtime_summary.isolated_route_count, 1);
+}
+
+#[test]
+fn operator_diagnostics_bounds_recent_history_without_changing_overview() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            recent_operator_actions: vec![
+                RecentOperatorAction {
+                    sequence: 1,
+                    recorded_at_unix_ms: 100,
+                    action: "freeze_traffic".to_owned(),
+                    details: vec!["applied=true".to_owned()],
+                },
+                RecentOperatorAction {
+                    sequence: 2,
+                    recorded_at_unix_ms: 200,
+                    action: "thaw_traffic".to_owned(),
+                    details: vec!["applied=true".to_owned()],
+                },
+            ],
+            recent_config_events: vec![
+                RecentConfigEvent {
+                    sequence: 3,
+                    recorded_at_unix_ms: 300,
+                    kind: RecentConfigEventKind::Applied,
+                    revision: Some(1),
+                    details: Vec::new(),
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 0,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 0,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                },
+                RecentConfigEvent {
+                    sequence: 4,
+                    recorded_at_unix_ms: 400,
+                    kind: RecentConfigEventKind::Blocked,
+                    revision: Some(2),
+                    details: vec!["unsafe wildcard route".to_owned()],
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 0,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 1,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                },
+            ],
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let diagnostics =
+        proxy_operator_diagnostics(&status, ProxyRuntimeSafetyPolicy::default(), Some(1));
+
+    assert_eq!(diagnostics.overview.status, status);
+    assert_eq!(diagnostics.recent_operator_actions.len(), 1);
+    assert_eq!(
+        diagnostics.recent_operator_actions[0].action,
+        "thaw_traffic"
+    );
+    assert_eq!(diagnostics.recent_config_events.len(), 1);
+    assert_eq!(
+        diagnostics.recent_config_events[0].kind,
+        RecentConfigEventKind::Blocked
+    );
+    assert_eq!(
+        diagnostics
+            .overview
+            .runtime_summary
+            .recent_operator_action_count,
+        2
+    );
+    assert_eq!(
+        diagnostics
+            .overview
+            .runtime_summary
+            .recent_config_event_count,
+        2
     );
 }
 

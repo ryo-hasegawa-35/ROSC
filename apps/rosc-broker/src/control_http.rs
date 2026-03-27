@@ -10,8 +10,9 @@ use tokio::net::TcpStream;
 
 use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError, ProxyControlPlane};
 use crate::{
-    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReport, ProxyOperatorSignalScope,
-    ProxyOperatorSignalsView, UdpProxyStatusSnapshot, proxy_operator_signals_view,
+    ProxyOperatorDiagnostics, ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReport,
+    ProxyOperatorSignalScope, ProxyOperatorSignalsView, UdpProxyStatusSnapshot,
+    proxy_operator_signals_view,
 };
 
 #[cfg(test)]
@@ -65,6 +66,12 @@ struct OperatorOverviewResponse {
 }
 
 #[derive(Serialize)]
+struct OperatorDiagnosticsResponse {
+    ok: bool,
+    diagnostics: Box<ProxyOperatorDiagnostics>,
+}
+
+#[derive(Serialize)]
 struct OperatorOverridesResponse {
     ok: bool,
     overrides: ProxyOperatorOverrides,
@@ -96,6 +103,7 @@ enum ResponseBody {
     Action(ActionResponse),
     OperatorReport(OperatorReportResponse),
     OperatorOverview(Box<OperatorOverviewResponse>),
+    OperatorDiagnostics(Box<OperatorDiagnosticsResponse>),
     OperatorOverrides(OperatorOverridesResponse),
     OperatorSignals(OperatorSignalsResponse),
     Blockers(BlockersResponse),
@@ -177,6 +185,18 @@ async fn route_request(request: HttpRequest, control: Arc<dyn ProxyControlPlane>
                 overview: control.operator_overview().await,
             })),
         },
+        ("GET", "/diagnostics") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            HttpResponse {
+                status: "200 OK",
+                body: ResponseBody::OperatorDiagnostics(Box::new(OperatorDiagnosticsResponse {
+                    ok: true,
+                    diagnostics: Box::new(control.operator_diagnostics(limit).await),
+                })),
+            }
+        }
         ("GET", "/overrides") => {
             let report = control.operator_report().await;
             HttpResponse {
@@ -624,6 +644,7 @@ impl ResponseBody {
             Self::Action(body) => serde_json::to_vec(body),
             Self::OperatorReport(body) => serde_json::to_vec(body),
             Self::OperatorOverview(body) => serde_json::to_vec(body),
+            Self::OperatorDiagnostics(body) => serde_json::to_vec(body),
             Self::OperatorOverrides(body) => serde_json::to_vec(body),
             Self::OperatorSignals(body) => serde_json::to_vec(body),
             Self::Blockers(body) => serde_json::to_vec(body),

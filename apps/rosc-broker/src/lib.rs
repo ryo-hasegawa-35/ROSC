@@ -6,8 +6,10 @@ mod control_service;
 mod health_service;
 mod launch_profile;
 mod managed_proxy;
+mod operator_diagnostics;
 mod operator_overview;
 mod operator_policy;
+mod operator_runtime_summary;
 mod proxy_app;
 mod proxy_reload_supervisor;
 mod proxy_status;
@@ -28,6 +30,7 @@ pub use launch_profile::{
     PreparedLaunchConfig, ProxyLaunchProfileMode, ProxyLaunchProfileStatus, apply_launch_profile,
 };
 pub use managed_proxy::{FrozenStartupBehavior, ManagedProxyStartupOptions, ManagedUdpProxy};
+pub use operator_diagnostics::{ProxyOperatorDiagnostics, proxy_operator_diagnostics};
 pub use operator_overview::{ProxyOperatorOverview, proxy_operator_overview};
 pub use operator_policy::{
     ProxyOperatorDestinationSignal, ProxyOperatorHighlights, ProxyOperatorOverrides,
@@ -36,6 +39,7 @@ pub use operator_policy::{
     ProxyRuntimeSafetyPolicy, evaluate_proxy_runtime_policy, proxy_operator_report,
     proxy_operator_signals_view, proxy_startup_report_lines,
 };
+pub use operator_runtime_summary::{ProxyOperatorRuntimeSummary, proxy_operator_runtime_summary};
 pub use proxy_app::UdpProxyApp;
 pub use proxy_reload_supervisor::{ManagedProxyFileSupervisor, ProxyReloadOutcome};
 pub use proxy_status::{

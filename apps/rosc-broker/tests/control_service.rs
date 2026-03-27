@@ -461,6 +461,30 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert_eq!(blockers["ok"], true);
     assert!(blockers["blockers"].as_array().unwrap().is_empty());
 
+    let diagnostics = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /diagnostics?limit=1 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(diagnostics["ok"], true);
+    assert_eq!(
+        diagnostics["diagnostics"]["overview"]["report"]["state"],
+        "warning"
+    );
+    assert_eq!(
+        diagnostics["diagnostics"]["overview"]["runtime_summary"]["traffic_frozen"],
+        true
+    );
+    assert_eq!(
+        diagnostics["diagnostics"]["recent_operator_actions"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
     let overrides = json_body(
         &request(
             service.listen_addr(),
@@ -528,6 +552,14 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     .await;
     assert!(invalid_scope.contains("HTTP/1.1 400 Bad Request"));
     assert!(invalid_scope.contains("invalid query parameter `scope`"));
+
+    let invalid_diagnostics_limit = request(
+        service.listen_addr(),
+        "GET /diagnostics?limit=0 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+    )
+    .await;
+    assert!(invalid_diagnostics_limit.contains("HTTP/1.1 400 Bad Request"));
+    assert!(invalid_diagnostics_limit.contains("invalid query parameter `limit`"));
 
     service.shutdown().await.unwrap();
     proxy.lock().await.shutdown().await;

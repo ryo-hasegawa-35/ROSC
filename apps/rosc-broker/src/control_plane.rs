@@ -5,8 +5,8 @@ use serde::Serialize;
 use tokio::sync::Mutex;
 
 use crate::{
-    ManagedProxyFileSupervisor, ManagedUdpProxy, ProxyOperatorOverview, ProxyOperatorReport,
-    UdpProxyStatusSnapshot,
+    ManagedProxyFileSupervisor, ManagedUdpProxy, ProxyOperatorDiagnostics, ProxyOperatorOverview,
+    ProxyOperatorReport, UdpProxyStatusSnapshot,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -42,6 +42,7 @@ pub trait ProxyControlPlane: Send + Sync + 'static {
     async fn status_snapshot(&self) -> UdpProxyStatusSnapshot;
     async fn operator_report(&self) -> ProxyOperatorReport;
     async fn operator_overview(&self) -> ProxyOperatorOverview;
+    async fn operator_diagnostics(&self, history_limit: Option<usize>) -> ProxyOperatorDiagnostics;
     async fn freeze_traffic(&self) -> ControlPlaneActionResult;
     async fn thaw_traffic(&self) -> ControlPlaneActionResult;
     async fn isolate_route(
@@ -88,6 +89,10 @@ impl ProxyControlPlane for ManagedUdpProxyController {
 
     async fn operator_overview(&self) -> ProxyOperatorOverview {
         self.inner.lock().await.operator_overview()
+    }
+
+    async fn operator_diagnostics(&self, history_limit: Option<usize>) -> ProxyOperatorDiagnostics {
+        self.inner.lock().await.operator_diagnostics(history_limit)
     }
 
     async fn freeze_traffic(&self) -> ControlPlaneActionResult {
@@ -230,6 +235,10 @@ impl ProxyControlPlane for ManagedProxyFileSupervisorController {
 
     async fn operator_overview(&self) -> ProxyOperatorOverview {
         self.inner.lock().await.operator_overview()
+    }
+
+    async fn operator_diagnostics(&self, history_limit: Option<usize>) -> ProxyOperatorDiagnostics {
+        self.inner.lock().await.operator_diagnostics(history_limit)
     }
 
     async fn freeze_traffic(&self) -> ControlPlaneActionResult {
