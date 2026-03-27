@@ -19,6 +19,7 @@ mod operator_readiness;
 mod operator_recovery;
 mod operator_runtime_summary;
 mod operator_snapshot;
+mod operator_timeline;
 mod operator_trace;
 mod operator_worklist;
 mod proxy_app;
@@ -45,8 +46,8 @@ pub use operator_attention::{ProxyOperatorAttention, proxy_operator_attention};
 pub use operator_dashboard::{
     DASHBOARD_REFRESH_INTERVAL_MS, ProxyOperatorCounterEntry, ProxyOperatorDashboard,
     ProxyOperatorDestinationDetail, ProxyOperatorDestinationDetailState, ProxyOperatorRouteDetail,
-    ProxyOperatorRouteDetailState, ProxyOperatorTimelineCategory, ProxyOperatorTimelineEntry,
-    ProxyOperatorTrafficSummary, proxy_operator_dashboard, proxy_operator_dashboard_from_snapshot,
+    ProxyOperatorRouteDetailState, ProxyOperatorTrafficSummary, proxy_operator_dashboard,
+    proxy_operator_dashboard_from_snapshot,
 };
 pub use operator_diagnostics::{
     ProxyOperatorDiagnostics, proxy_operator_diagnostics, proxy_operator_diagnostics_from_overview,
@@ -81,6 +82,10 @@ pub use operator_recovery::{
 pub use operator_runtime_summary::{ProxyOperatorRuntimeSummary, proxy_operator_runtime_summary};
 pub use operator_snapshot::{
     ProxyOperatorSnapshot, proxy_operator_snapshot, proxy_operator_snapshot_from_overview,
+};
+pub use operator_timeline::{
+    ProxyOperatorDestinationTimeline, ProxyOperatorRouteTimeline, ProxyOperatorTimelineCatalog,
+    ProxyOperatorTimelineCategory, ProxyOperatorTimelineEntry, proxy_operator_timeline,
 };
 pub use operator_trace::{
     ProxyOperatorDestinationTrace, ProxyOperatorRouteTrace, ProxyOperatorTraceCatalog,

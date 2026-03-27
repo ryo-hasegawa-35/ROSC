@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use crate::control_plane::ProxyControlPlane;
-use crate::{ProxyOperatorSignalScope, proxy_operator_attention, proxy_operator_signals_view};
+use crate::{
+    ProxyOperatorSignalScope, ProxyOperatorTimelineCatalog, proxy_operator_attention,
+    proxy_operator_signals_view,
+};
 
 use super::request::{
     HttpRequest, allow_degraded, decode_uri_component, history_limit, query_parameter,
@@ -14,7 +17,7 @@ use super::response::{
     diagnostics_response, handoff_response, incidents_response, invalid_component_error,
     invalid_query_error, map_action_result, operator_actions_response, operator_signals_response,
     overrides_response, overview_response, readiness_response, report_response,
-    route_trace_response, snapshot_response, status_response, trace_response,
+    route_trace_response, snapshot_response, status_response, timeline_response, trace_response,
     unsupported_route_error,
 };
 
@@ -81,6 +84,13 @@ pub(crate) async fn route_request(
             let snapshot = control.operator_snapshot(limit).await;
             handoff_response(snapshot.handoff)
         }
+        ("GET", "/timeline") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            let dashboard = control.operator_dashboard(limit).await;
+            timeline_response(dashboard.timeline_catalog)
+        }
         ("GET", "/trace") => {
             let Ok(limit) = history_limit(query) else {
                 return invalid_query_error("limit");
@@ -134,6 +144,36 @@ async fn route_nested_request(
     query: Option<&str>,
     control: Arc<dyn ProxyControlPlane>,
 ) -> HttpResponse {
+    if let Some(destination_id) = path
+        .strip_prefix("/destinations/")
+        .and_then(|path| path.strip_suffix("/timeline"))
+    {
+        if request.method != "GET" || destination_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(destination_id) = decode_uri_component(destination_id) else {
+            return invalid_component_error("destination id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let dashboard = control.operator_dashboard(limit).await;
+        let timeline_catalog = dashboard.timeline_catalog;
+        let global = timeline_catalog.global.clone();
+        let Some(destination_timeline) = timeline_catalog
+            .destinations
+            .into_iter()
+            .find(|timeline| timeline.destination_id == destination_id)
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        return timeline_response(ProxyOperatorTimelineCatalog {
+            global,
+            routes: Vec::new(),
+            destinations: vec![destination_timeline],
+        });
+    }
+
     if let Some(destination_id) = path
         .strip_prefix("/destinations/")
         .and_then(|path| path.strip_suffix("/handoff"))
@@ -231,6 +271,33 @@ async fn route_nested_request(
             state: snapshot.handoff.state,
             route_handoffs: vec![route_handoff],
             destination_handoffs: Vec::new(),
+        });
+    }
+
+    if let Some(route_id) = route_path.strip_suffix("/timeline") {
+        if request.method != "GET" || route_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let dashboard = control.operator_dashboard(limit).await;
+        let timeline_catalog = dashboard.timeline_catalog;
+        let global = timeline_catalog.global.clone();
+        let Some(route_timeline) = timeline_catalog
+            .routes
+            .into_iter()
+            .find(|timeline| timeline.route_id == route_id)
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        return timeline_response(ProxyOperatorTimelineCatalog {
+            global,
+            routes: vec![route_timeline],
+            destinations: Vec::new(),
         });
     }
 

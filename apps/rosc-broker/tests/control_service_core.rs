@@ -189,6 +189,7 @@ async fn control_service_serves_dashboard_assets() {
     assert!(dashboard.contains("ROSC Operator Console"));
     assert!(dashboard.contains("/dashboard/app.js"));
     assert!(dashboard.contains("Route next steps"));
+    assert!(dashboard.contains("Route-linked event history"));
 
     let css = request(
         service.listen_addr(),
@@ -262,6 +263,21 @@ async fn control_service_serves_dashboard_assets() {
     );
     assert!(
         dashboard_data["dashboard"]["trace"]["destinations"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["timeline_catalog"]["global"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["timeline_catalog"]["routes"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["timeline_catalog"]["destinations"]
             .as_array()
             .is_some()
     );
@@ -582,6 +598,22 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|entry| entry["route_id"] == "camera")
     );
 
+    let timeline = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /timeline?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(timeline["ok"], true);
+    assert!(
+        timeline["timeline"]["global"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["label"] == "freeze_traffic")
+    );
+
     let route_handoff = json_body(
         &request(
             service.listen_addr(),
@@ -595,6 +627,19 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
         "camera"
     );
 
+    let route_timeline = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/timeline?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_timeline["ok"], true);
+    assert_eq!(
+        route_timeline["timeline"]["routes"][0]["route_id"],
+        "camera"
+    );
+
     let destination_handoff = json_body(
         &request(
             service.listen_addr(),
@@ -605,6 +650,19 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert_eq!(destination_handoff["ok"], true);
     assert_eq!(
         destination_handoff["handoff"]["destination_handoffs"][0]["destination_id"],
+        "udp_renderer"
+    );
+
+    let destination_timeline = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/timeline?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_timeline["ok"], true);
+    assert_eq!(
+        destination_timeline["timeline"]["destinations"][0]["destination_id"],
         "udp_renderer"
     );
 

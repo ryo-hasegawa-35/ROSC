@@ -44,6 +44,7 @@ cargo run -p rosc-broker -- proxy-diagnostics examples/phase-01-basic.toml --fai
 cargo run -p rosc-broker -- proxy-attention examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
 cargo run -p rosc-broker -- proxy-incidents examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- proxy-handoff examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
+cargo run -p rosc-broker -- proxy-timeline examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
@@ -66,10 +67,13 @@ curl http://127.0.0.1:19292/diagnostics?limit=10
 curl http://127.0.0.1:19292/attention
 curl http://127.0.0.1:19292/incidents?limit=10
 curl http://127.0.0.1:19292/handoff?limit=10
+curl http://127.0.0.1:19292/timeline?limit=10
 curl http://127.0.0.1:19292/trace?limit=10
 curl http://127.0.0.1:19292/routes/camera/handoff?limit=10
+curl http://127.0.0.1:19292/routes/camera/timeline?limit=10
 curl http://127.0.0.1:19292/routes/camera/trace?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/handoff?limit=10
+curl http://127.0.0.1:19292/destinations/udp_renderer/timeline?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/trace?limit=10
 curl http://127.0.0.1:19292/overrides
 curl http://127.0.0.1:19292/signals
@@ -82,7 +86,7 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` は意図的に loopback 専用です。`127.0.0.1`、`::1`、`localhost` のような
 ローカル専用アドレスだけを使い、wildcard や外部から到達できる bind は拒否されます。
 
-`proxy-status`、`proxy-overview`、`proxy-readiness`、`proxy-assert-ready`、`proxy-snapshot`、`proxy-diagnostics`、`proxy-attention`、`proxy-incidents`、`proxy-handoff`
+`proxy-status`、`proxy-overview`、`proxy-readiness`、`proxy-assert-ready`、`proxy-snapshot`、`proxy-diagnostics`、`proxy-attention`、`proxy-incidents`、`proxy-handoff`、`proxy-timeline`
 は、`jq` などへそのまま流せるように stdout へ JSON だけを出す契約にそろえています。
 
 Docker 経由で同じ確認を行う場合:
@@ -139,6 +143,8 @@ docker compose run --rm rosc-dev cargo test --workspace
 - control-plane の `/trace`、`/routes/{id}/trace`、`/destinations/{id}/trace` から、その linked trace を埋め込み dashboard 以外の外部 tooling でも直接取得できるようにした
 - snapshot に machine-readable な handoff catalog も追加し、`proxy-handoff` と control-plane の `/handoff`、`/routes/{id}/handoff`、`/destinations/{id}/handoff` から route / destination ごとの次アクションを取得できるようにした
 - 埋め込み dashboard に focused route / destination handoff panel も追加し、trace history からそのまま具体的な次ステップへつなげられるようにした
+- snapshot 派生の timeline catalog に global / route-linked / destination-linked の event history も追加し、`proxy-timeline` と control-plane の `/timeline`、`/routes/{id}/timeline`、`/destinations/{id}/timeline` から同じ slice を機械可読に取得できるようにした
+- 埋め込み dashboard でも focused route / destination timeline panel を追加し、現在の pressure から直近 event までを追加リクエストなしで続けて見られるようにした
 - `/signals?scope=problematic` で、operator が今見るべき route / destination signal だけに payload を絞れるようにした
 - config の reject / block / reload failure も counters だけでなく reason 付きの recent history として残るようになった
 

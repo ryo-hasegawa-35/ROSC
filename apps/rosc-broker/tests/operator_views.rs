@@ -7,7 +7,8 @@ use rosc_broker::{
     proxy_operator_dashboard, proxy_operator_diagnostics, proxy_operator_handoff,
     proxy_operator_incidents_from_histories, proxy_operator_overview, proxy_operator_readiness,
     proxy_operator_recovery, proxy_operator_report, proxy_operator_signals_view,
-    proxy_operator_snapshot, proxy_operator_trace, proxy_status_from_config,
+    proxy_operator_snapshot, proxy_operator_timeline, proxy_operator_trace,
+    proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -563,6 +564,7 @@ fn operator_dashboard_bundles_snapshot_traffic_and_timeline() {
     );
     assert_eq!(dashboard.snapshot.recovery.cached_routes, 0);
     assert_eq!(dashboard.snapshot.recovery.rehydrate_ready_destinations, 1);
+    assert_eq!(dashboard.timeline_catalog.global.len(), 2);
     assert!(
         dashboard
             .trace
@@ -612,6 +614,20 @@ fn operator_dashboard_bundles_snapshot_traffic_and_timeline() {
         ProxyOperatorTimelineCategory::OperatorAction
     );
     assert_eq!(dashboard.timeline[1].label, "freeze_traffic");
+    assert!(
+        dashboard
+            .timeline_catalog
+            .routes
+            .iter()
+            .any(|timeline| timeline.route_id == "camera")
+    );
+    assert!(
+        dashboard
+            .timeline_catalog
+            .destinations
+            .iter()
+            .any(|timeline| timeline.destination_id == "udp_renderer")
+    );
 }
 
 #[test]
@@ -724,6 +740,145 @@ fn operator_trace_links_runtime_actions_and_config_events_to_entities() {
                 .details
                 .iter()
                 .any(|detail| detail == "destination_id=udp_renderer")
+    }));
+}
+
+#[test]
+fn operator_trace_and_timeline_only_link_explicit_config_events_to_matching_entities() {
+    let config = rosc_config::BrokerConfig::from_toml_str(
+        r#"
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "127.0.0.1:0"
+        target = "127.0.0.1:9001"
+
+        [[udp_destinations]]
+        id = "udp_lights"
+        bind = "127.0.0.1:0"
+        target = "127.0.0.1:9002"
+
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+        [routes.match]
+        address_patterns = ["/camera/fov"]
+        protocols = ["osc_udp"]
+        [[routes.destinations]]
+        target = "udp_renderer"
+        transport = "osc_udp"
+
+        [[routes]]
+        id = "lights"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+        [routes.match]
+        address_patterns = ["/lights/intensity"]
+        protocols = ["osc_udp"]
+        [[routes.destinations]]
+        target = "udp_lights"
+        transport = "osc_udp"
+        "#,
+    )
+    .expect("config should parse");
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            recent_config_events: vec![
+                RecentConfigEvent {
+                    sequence: 1,
+                    recorded_at_unix_ms: 100,
+                    kind: RecentConfigEventKind::Blocked,
+                    revision: Some(4),
+                    details: vec![
+                        "route_id=camera".to_owned(),
+                        "destination_id=udp_renderer".to_owned(),
+                        "unsafe wildcard route".to_owned(),
+                    ],
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 1,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 1,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                },
+                RecentConfigEvent {
+                    sequence: 2,
+                    recorded_at_unix_ms: 200,
+                    kind: RecentConfigEventKind::Rejected,
+                    revision: Some(5),
+                    details: vec![
+                        "destination_id=udp_lights".to_owned(),
+                        "queue policy mismatch".to_owned(),
+                    ],
+                    added_ingresses: 0,
+                    removed_ingresses: 0,
+                    changed_ingresses: 0,
+                    added_destinations: 0,
+                    removed_destinations: 0,
+                    changed_destinations: 1,
+                    added_routes: 0,
+                    removed_routes: 0,
+                    changed_routes: 0,
+                    launch_profile_mode: None,
+                    disabled_capture_routes: 0,
+                    disabled_replay_routes: 0,
+                    disabled_restart_rehydrate_routes: 0,
+                },
+            ],
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let snapshot = proxy_operator_snapshot(&status, ProxyRuntimeSafetyPolicy::default(), Some(8));
+    let trace = proxy_operator_trace(&snapshot);
+    let timeline = proxy_operator_timeline(&snapshot);
+
+    let camera_trace = trace
+        .routes
+        .iter()
+        .find(|route| route.route_id == "camera")
+        .expect("camera trace should exist");
+    assert!(camera_trace.recent_events.iter().any(|event| {
+        event.kind == rosc_broker::ProxyOperatorTraceEventKind::ConfigEvent
+            && event.details.iter().any(|detail| detail == "revision=4")
+    }));
+
+    let lights_trace = trace
+        .routes
+        .iter()
+        .find(|route| route.route_id == "lights")
+        .expect("lights trace should exist");
+    assert!(!lights_trace.recent_events.iter().any(|event| {
+        event.kind == rosc_broker::ProxyOperatorTraceEventKind::ConfigEvent
+            && event.details.iter().any(|detail| detail == "revision=4")
+    }));
+    assert!(lights_trace.recent_events.iter().any(|event| {
+        event.kind == rosc_broker::ProxyOperatorTraceEventKind::ConfigEvent
+            && event.details.iter().any(|detail| detail == "revision=5")
+    }));
+
+    let renderer_timeline = timeline
+        .destinations
+        .iter()
+        .find(|entry| entry.destination_id == "udp_renderer")
+        .expect("renderer timeline should exist");
+    assert!(renderer_timeline.entries.iter().any(|entry| {
+        entry.category == ProxyOperatorTimelineCategory::ConfigEvent
+            && entry.details.iter().any(|detail| detail == "revision=4")
+    }));
+    assert!(!renderer_timeline.entries.iter().any(|entry| {
+        entry.category == ProxyOperatorTimelineCategory::ConfigEvent
+            && entry.details.iter().any(|detail| detail == "revision=5")
     }));
 }
 

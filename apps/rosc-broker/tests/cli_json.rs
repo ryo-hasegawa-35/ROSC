@@ -188,3 +188,23 @@ fn proxy_handoff_stdout_is_json_only() {
     assert!(value.get("route_handoffs").is_some());
     assert!(value.get("destination_handoffs").is_some());
 }
+
+#[test]
+fn proxy_timeline_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-timeline",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("global").is_some());
+    assert!(value.get("routes").is_some());
+    assert!(value.get("destinations").is_some());
+    assert_eq!(value["routes"].as_array().unwrap().len(), 1);
+    assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
+}

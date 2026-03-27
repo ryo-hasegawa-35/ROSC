@@ -6,6 +6,9 @@ use rosc_telemetry::{
 };
 use serde::Serialize;
 
+use crate::operator_timeline::{
+    config_event_label, config_event_targets_destination, config_event_targets_route,
+};
 use crate::{
     ProxyOperatorSnapshot, ProxyOperatorSuggestedAction, ProxyOperatorSuggestedActionKind,
 };
@@ -458,7 +461,7 @@ fn route_events(
             .diagnostics
             .recent_config_events
             .iter()
-            .filter(|event| config_event_targets_route(event, route_id))
+            .filter(|event| config_event_targets_route(event, route_id, destination_ids))
             .cloned()
             .map(config_event_trace),
     );
@@ -521,7 +524,7 @@ fn destination_events(
             .diagnostics
             .recent_config_events
             .iter()
-            .filter(|event| config_event_targets_destination(event, destination_id))
+            .filter(|event| config_event_targets_destination(event, destination_id, route_ids))
             .cloned()
             .map(config_event_trace),
     );
@@ -616,34 +619,6 @@ fn matches_global_action(action: &str) -> bool {
     )
 }
 
-fn config_event_targets_route(event: &RecentConfigEvent, route_id: &str) -> bool {
-    event.details.iter().any(|detail| {
-        detail_mentions(detail, route_id)
-            || detail_matches_target_line(detail, "route_id", route_id)
-    }) || event.changed_routes > 0
-        && matches!(
-            event.kind,
-            RecentConfigEventKind::Blocked
-                | RecentConfigEventKind::Rejected
-                | RecentConfigEventKind::ReloadFailed
-                | RecentConfigEventKind::LaunchProfileChanged
-        )
-}
-
-fn config_event_targets_destination(event: &RecentConfigEvent, destination_id: &str) -> bool {
-    event.details.iter().any(|detail| {
-        detail_mentions(detail, destination_id)
-            || detail_matches_target_line(detail, "destination_id", destination_id)
-    }) || event.changed_destinations > 0
-        && matches!(
-            event.kind,
-            RecentConfigEventKind::Blocked
-                | RecentConfigEventKind::Rejected
-                | RecentConfigEventKind::ReloadFailed
-                | RecentConfigEventKind::LaunchProfileChanged
-        )
-}
-
 fn detail_matches_target(details: &[String], key: &str, expected: &str) -> bool {
     details
         .iter()
@@ -655,18 +630,4 @@ fn detail_matches_target_line(detail: &str, key: &str, expected: &str) -> bool {
         .strip_prefix(&format!("{key}="))
         .map(|value| value == expected)
         .unwrap_or(false)
-}
-
-fn detail_mentions(detail: &str, expected: &str) -> bool {
-    detail.contains(expected)
-}
-
-fn config_event_label(kind: RecentConfigEventKind) -> &'static str {
-    match kind {
-        RecentConfigEventKind::Applied => "applied",
-        RecentConfigEventKind::Rejected => "rejected",
-        RecentConfigEventKind::Blocked => "blocked",
-        RecentConfigEventKind::ReloadFailed => "reload_failed",
-        RecentConfigEventKind::LaunchProfileChanged => "launch_profile_changed",
-    }
 }

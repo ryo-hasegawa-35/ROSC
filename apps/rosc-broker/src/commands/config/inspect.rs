@@ -175,3 +175,50 @@ pub(crate) async fn proxy_handoff(
     print_json_pretty(&snapshot.handoff)?;
     Ok(())
 }
+
+pub(crate) async fn proxy_timeline(
+    path: &Path,
+    resolve_bindings: bool,
+    history_limit: Option<usize>,
+    route_id: Option<&str>,
+    destination_id: Option<&str>,
+    options: ProxyCommandOptions,
+) -> Result<()> {
+    if route_id.is_some() && destination_id.is_some() {
+        bail!("proxy-timeline accepts only one of --route-id or --destination-id");
+    }
+
+    let config = load_config(path)?;
+    let status =
+        status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
+    let snapshot =
+        rosc_broker::proxy_operator_snapshot(&status, safety_policy(options), history_limit);
+    let mut timeline = rosc_broker::proxy_operator_timeline(&snapshot);
+
+    if let Some(route_id) = route_id {
+        let Some(route_timeline) = timeline
+            .routes
+            .iter()
+            .find(|timeline| timeline.route_id == route_id)
+            .cloned()
+        else {
+            bail!("unknown route timeline `{route_id}`");
+        };
+        timeline.routes = vec![route_timeline];
+        timeline.destinations.clear();
+    } else if let Some(destination_id) = destination_id {
+        let Some(destination_timeline) = timeline
+            .destinations
+            .iter()
+            .find(|timeline| timeline.destination_id == destination_id)
+            .cloned()
+        else {
+            bail!("unknown destination timeline `{destination_id}`");
+        };
+        timeline.routes.clear();
+        timeline.destinations = vec![destination_timeline];
+    }
+
+    print_json_pretty(&timeline)?;
+    Ok(())
+}

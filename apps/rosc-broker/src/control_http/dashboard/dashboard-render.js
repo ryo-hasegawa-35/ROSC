@@ -27,10 +27,12 @@ export function collectDashboardElements() {
     routeFocusSelect: document.getElementById("route-focus-select"),
     routeFocusDetail: document.getElementById("route-focus-detail"),
     routeTraceDetail: document.getElementById("route-trace-detail"),
+    routeTimelineDetail: document.getElementById("route-timeline-detail"),
     routeHandoffDetail: document.getElementById("route-handoff-detail"),
     destinationFocusSelect: document.getElementById("destination-focus-select"),
     destinationFocusDetail: document.getElementById("destination-focus-detail"),
     destinationTraceDetail: document.getElementById("destination-trace-detail"),
+    destinationTimelineDetail: document.getElementById("destination-timeline-detail"),
     destinationHandoffDetail: document.getElementById("destination-handoff-detail"),
     routesTable: document.getElementById("routes-table"),
     destinationsTable: document.getElementById("destinations-table"),
@@ -73,6 +75,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderRecoveryCandidates(elements, snapshot.recovery);
   renderFocus(elements, dashboard, context.focusState);
   renderTrace(elements, dashboard, context.focusState);
+  renderFocusedTimeline(elements, dashboard.timeline_catalog, context.focusState);
   renderHandoff(elements, snapshot.handoff, context.focusState);
   renderRoutes(elements, status, diagnostics);
   renderDestinations(elements, dashboard.destination_details);
@@ -397,6 +400,17 @@ function renderHandoff(elements, handoff, focusState) {
   renderDestinationHandoff(elements, destinationHandoff);
 }
 
+function renderFocusedTimeline(elements, timelineCatalog, focusState) {
+  const routeTimeline = (timelineCatalog?.routes || []).find(
+    (entry) => entry.route_id === focusState?.routeId,
+  );
+  const destinationTimeline = (timelineCatalog?.destinations || []).find(
+    (entry) => entry.destination_id === focusState?.destinationId,
+  );
+  renderRouteTimeline(elements, routeTimeline);
+  renderDestinationTimeline(elements, destinationTimeline);
+}
+
 function renderRoutes(elements, status, diagnostics) {
   const isolatedRoutes = new Set(status.runtime?.isolated_route_ids || []);
   const runtimeRoutes = new Set(
@@ -541,7 +555,7 @@ function renderConfig(elements, dashboard, snapshot) {
   fillTimeline(
     elements,
     elements.eventTimeline,
-    dashboard.timeline.map((entry) => ({
+    dashboard.timeline_catalog.global.map((entry) => ({
       title: `${entry.category}: ${entry.label}`,
       details: entry.details,
       timestamp: entry.recorded_at_unix_ms,
@@ -832,6 +846,50 @@ function renderDestinationTrace(elements, trace) {
   elements.destinationTraceDetail.replaceChildren(wrapper);
 }
 
+function renderRouteTimeline(elements, timeline) {
+  if (!timeline) {
+    fillList(elements, elements.routeTimelineDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused route timeline</p>
+        <h4>${escapeHtml(timeline.route_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(timeline.entries.length > 0 ? "degraded" : "healthy")}">${escapeHtml(
+        timeline.entries.length > 0 ? `${timeline.entries.length} events` : "Quiet",
+      )}</span>
+    </div>
+  `;
+  wrapper.appendChild(traceEventsBlock(timeline.entries, "Route timeline"));
+  elements.routeTimelineDetail.replaceChildren(wrapper);
+}
+
+function renderDestinationTimeline(elements, timeline) {
+  if (!timeline) {
+    fillList(elements, elements.destinationTimelineDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused destination timeline</p>
+        <h4>${escapeHtml(timeline.destination_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(timeline.entries.length > 0 ? "degraded" : "healthy")}">${escapeHtml(
+        timeline.entries.length > 0 ? `${timeline.entries.length} events` : "Quiet",
+      )}</span>
+    </div>
+  `;
+  wrapper.appendChild(traceEventsBlock(timeline.entries, "Destination timeline"));
+  elements.destinationTimelineDetail.replaceChildren(wrapper);
+}
+
 function renderRouteHandoff(elements, handoff) {
   if (!handoff) {
     fillList(elements, elements.routeHandoffDetail, []);
@@ -899,10 +957,10 @@ function traceSummaryBlock(title, reasons) {
   return block;
 }
 
-function traceEventsBlock(events) {
+function traceEventsBlock(events, label = "Recent related events") {
   const wrapper = document.createElement("div");
   wrapper.className = "trace-events";
-  wrapper.appendChild(panelLabel("Recent related events"));
+  wrapper.appendChild(panelLabel(label));
   if (!events || events.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
@@ -911,7 +969,7 @@ function traceEventsBlock(events) {
     return wrapper;
   }
   wrapper.replaceChildren(
-    panelLabel("Recent related events"),
+    panelLabel(label),
     ...events.map((event) => traceEventCard(event)),
   );
   return wrapper;
