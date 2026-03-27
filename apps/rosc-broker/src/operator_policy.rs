@@ -34,6 +34,14 @@ pub struct ProxyOperatorReport {
     pub report_lines: Vec<String>,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProxyOperatorSignalScope {
+    #[default]
+    All,
+    Problematic,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProxyOperatorState {
@@ -88,6 +96,14 @@ pub struct ProxyOperatorDestinationSignal {
     pub send_failures_total: u64,
     pub drops_total: u64,
     pub breaker_state: Option<BreakerStateSnapshot>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ProxyOperatorSignalsView {
+    pub scope: ProxyOperatorSignalScope,
+    pub runtime_signals: ProxyOperatorRuntimeSignals,
+    pub route_signals: Vec<ProxyOperatorRouteSignal>,
+    pub destination_signals: Vec<ProxyOperatorDestinationSignal>,
 }
 
 pub fn evaluate_proxy_runtime_policy(
@@ -175,6 +191,70 @@ pub fn proxy_operator_report(
         destination_signals,
         highlights,
         report_lines,
+    }
+}
+
+impl ProxyOperatorSignalScope {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "all" => Some(Self::All),
+            "problematic" => Some(Self::Problematic),
+            _ => None,
+        }
+    }
+}
+
+impl ProxyOperatorRouteSignal {
+    pub fn is_problematic(&self) -> bool {
+        !self.active
+            || self.isolated
+            || !self.direct_udp_fallback_available
+            || !self.config_warnings.is_empty()
+            || self.dispatch_failures_total > 0
+            || self.transform_failures_total > 0
+    }
+}
+
+impl ProxyOperatorDestinationSignal {
+    pub fn is_problematic(&self) -> bool {
+        self.queue_depth > 0
+            || self.send_failures_total > 0
+            || self.drops_total > 0
+            || matches!(
+                self.breaker_state,
+                Some(BreakerStateSnapshot::Open | BreakerStateSnapshot::HalfOpen)
+            )
+    }
+}
+
+pub fn proxy_operator_signals_view(
+    report: &ProxyOperatorReport,
+    scope: ProxyOperatorSignalScope,
+) -> ProxyOperatorSignalsView {
+    let route_signals = match scope {
+        ProxyOperatorSignalScope::All => report.route_signals.clone(),
+        ProxyOperatorSignalScope::Problematic => report
+            .route_signals
+            .iter()
+            .filter(|signal| signal.is_problematic())
+            .cloned()
+            .collect(),
+    };
+    let destination_signals = match scope {
+        ProxyOperatorSignalScope::All => report.destination_signals.clone(),
+        ProxyOperatorSignalScope::Problematic => report
+            .destination_signals
+            .iter()
+            .filter(|signal| signal.is_problematic())
+            .cloned()
+            .collect(),
+    };
+
+    ProxyOperatorSignalsView {
+        scope,
+        runtime_signals: report.runtime_signals.clone(),
+        route_signals,
+        destination_signals,
     }
 }
 

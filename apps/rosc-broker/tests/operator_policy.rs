@@ -1,7 +1,7 @@
 use rosc_broker::{
-    ProxyLaunchProfileMode, ProxyOperatorState, ProxyRuntimeSafetyPolicy, attach_runtime_status,
-    evaluate_proxy_runtime_policy, proxy_operator_report, proxy_startup_report_lines,
-    proxy_status_from_config,
+    ProxyLaunchProfileMode, ProxyOperatorSignalScope, ProxyOperatorState, ProxyRuntimeSafetyPolicy,
+    attach_runtime_status, evaluate_proxy_runtime_policy, proxy_operator_report,
+    proxy_operator_signals_view, proxy_startup_report_lines, proxy_status_from_config,
 };
 use rosc_config::BrokerConfig;
 use rosc_telemetry::{
@@ -384,6 +384,59 @@ fn operator_report_surfaces_runtime_failure_signals() {
             && route.dispatch_failures_total == 3
             && route.transform_failures_total == 1
     }));
+}
+
+#[test]
+fn operator_signals_view_can_filter_to_problematic_entries() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            destination_drops_total: [(
+                ("udp_renderer".to_owned(), "queue_overflow".to_owned()),
+                4,
+            )]
+            .into_iter()
+            .collect(),
+            destination_breaker_state: [(
+                "udp_renderer".to_owned(),
+                rosc_telemetry::BreakerStateSnapshot::HalfOpen,
+            )]
+            .into_iter()
+            .collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let report = proxy_operator_report(&status, ProxyRuntimeSafetyPolicy::default());
+    let filtered = proxy_operator_signals_view(&report, ProxyOperatorSignalScope::Problematic);
+
+    assert_eq!(filtered.scope, ProxyOperatorSignalScope::Problematic);
+    assert!(
+        filtered
+            .route_signals
+            .iter()
+            .all(|signal| signal.is_problematic())
+    );
+    assert!(
+        filtered
+            .route_signals
+            .iter()
+            .any(|signal| signal.route_id == "camera" && signal.isolated)
+    );
+    assert!(
+        filtered
+            .destination_signals
+            .iter()
+            .all(|signal| signal.is_problematic())
+    );
+    assert!(
+        filtered
+            .destination_signals
+            .iter()
+            .any(|signal| signal.destination_id == "udp_renderer" && signal.drops_total == 4)
+    );
 }
 
 #[test]

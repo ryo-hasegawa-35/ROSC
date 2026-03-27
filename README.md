@@ -52,6 +52,7 @@ curl http://127.0.0.1:19292/status
 curl http://127.0.0.1:19292/report
 curl http://127.0.0.1:19292/overrides
 curl http://127.0.0.1:19292/signals
+curl http://127.0.0.1:19292/signals?scope=problematic
 curl http://127.0.0.1:19292/blockers
 curl http://127.0.0.1:19292/history/operator-actions
 curl http://127.0.0.1:19292/history/config-events
@@ -98,6 +99,7 @@ Current Phase 01 runtime coverage:
 - runtime status and control history endpoints now expose bounded recent operator actions and config transitions for post-incident tracing
 - CLI reports and control-plane `/report` / `/blockers` now share the same structured operator safety evaluation
 - control-plane `/report` now also exposes structured override/runtime-signal/route-signal/destination-signal sections, with `/overrides` and `/signals` endpoints for direct consumption
+- `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
 - config rejection / block / reload-failure history now retains reason details instead of only counters
 
 ## Documentation Entry Points

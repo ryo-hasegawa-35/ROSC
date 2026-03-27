@@ -1,5 +1,6 @@
 mod config_supervisor;
 mod config_telemetry;
+mod control_http;
 mod control_plane;
 mod control_service;
 mod health_service;
@@ -28,9 +29,10 @@ pub use launch_profile::{
 pub use managed_proxy::{FrozenStartupBehavior, ManagedProxyStartupOptions, ManagedUdpProxy};
 pub use operator_policy::{
     ProxyOperatorDestinationSignal, ProxyOperatorHighlights, ProxyOperatorOverrides,
-    ProxyOperatorReport, ProxyOperatorRouteSignal, ProxyOperatorRuntimeSignals, ProxyOperatorState,
+    ProxyOperatorReport, ProxyOperatorRouteSignal, ProxyOperatorRuntimeSignals,
+    ProxyOperatorSignalScope, ProxyOperatorSignalsView, ProxyOperatorState,
     ProxyRuntimeSafetyPolicy, evaluate_proxy_runtime_policy, proxy_operator_report,
-    proxy_startup_report_lines,
+    proxy_operator_signals_view, proxy_startup_report_lines,
 };
 pub use proxy_app::UdpProxyApp;
 pub use proxy_reload_supervisor::{ManagedProxyFileSupervisor, ProxyReloadOutcome};

@@ -50,6 +50,7 @@ curl http://127.0.0.1:19292/status
 curl http://127.0.0.1:19292/report
 curl http://127.0.0.1:19292/overrides
 curl http://127.0.0.1:19292/signals
+curl http://127.0.0.1:19292/signals?scope=problematic
 curl http://127.0.0.1:19292/blockers
 curl http://127.0.0.1:19292/history/operator-actions
 curl http://127.0.0.1:19292/history/config-events
@@ -96,6 +97,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - runtime status と control history endpoint から bounded な recent operator action / config transition を追えるようになり、インシデント後の追跡がしやすくなった
 - CLI の report 表示と control-plane の `/report` `/blockers` が同じ safety evaluation を共有するようになり、運用判断のズレを減らした
 - control-plane の `/report` から structured な override / runtime signal / route signal / destination signal を読めるようにし、`/overrides` `/signals` から個別取得もできるようにした
+- `/signals?scope=problematic` で、operator が今見るべき route / destination signal だけに payload を絞れるようにした
 - config の reject / block / reload failure も counters だけでなく reason 付きの recent history として残るようになった
 
 ## ドキュメント入口
