@@ -28,9 +28,22 @@ pub struct OscMessage {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct OscMessageView<'a> {
+    pub address: &'a str,
+    pub type_tag_source: TypeTagSource,
+    pub arguments: Vec<OscArgumentView<'a>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct LegacyUntypedMessage {
     pub address: String,
     pub raw_argument_bytes: Vec<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct LegacyUntypedMessageView<'a> {
+    pub address: &'a str,
+    pub raw_argument_bytes: &'a [u8],
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -39,10 +52,22 @@ pub struct OscBundle {
     pub elements: Vec<ParsedOscPacket>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct OscBundleView<'a> {
+    pub timetag: u64,
+    pub elements: Vec<ParsedOscPacketView<'a>>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OpaqueReason {
     UnsupportedTypeTag(char),
     UnsupportedExtension(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum OpaqueReasonView<'a> {
+    UnsupportedTypeTag(char),
+    UnsupportedExtension(&'a str),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -53,11 +78,26 @@ pub struct OpaqueOscPacket {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct OpaqueOscPacketView<'a> {
+    pub address: &'a str,
+    pub type_tag_text: Option<&'a str>,
+    pub reason: OpaqueReasonView<'a>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParsedOscPacket {
     Message(OscMessage),
     Bundle(OscBundle),
     LegacyUntypedMessage(LegacyUntypedMessage),
     Opaque(OpaqueOscPacket),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ParsedOscPacketView<'a> {
+    Message(OscMessageView<'a>),
+    Bundle(OscBundleView<'a>),
+    LegacyUntypedMessage(LegacyUntypedMessageView<'a>),
+    Opaque(OpaqueOscPacketView<'a>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -78,6 +118,26 @@ pub enum OscArgument {
     Nil,
     Impulse,
     Array(Vec<OscArgument>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum OscArgumentView<'a> {
+    Int32(i32),
+    Float32(f32),
+    String(&'a str),
+    Blob(&'a [u8]),
+    Int64(i64),
+    Timetag(u64),
+    Double64(f64),
+    Symbol(&'a str),
+    Char(char),
+    Rgba(u32),
+    Midi4([u8; 4]),
+    True,
+    False,
+    Nil,
+    Impulse,
+    Array(Vec<OscArgumentView<'a>>),
 }
 
 impl OscArgument {
@@ -121,6 +181,111 @@ impl ParsedOscPacket {
     }
 }
 
+impl<'a> ParsedOscPacketView<'a> {
+    pub fn address(&self) -> Option<&'a str> {
+        match self {
+            Self::Message(message) => Some(message.address),
+            Self::LegacyUntypedMessage(message) => Some(message.address),
+            Self::Opaque(message) => Some(message.address),
+            Self::Bundle(_) => None,
+        }
+    }
+
+    pub fn into_owned(self) -> ParsedOscPacket {
+        match self {
+            Self::Message(message) => ParsedOscPacket::Message(message.into_owned()),
+            Self::Bundle(bundle) => ParsedOscPacket::Bundle(bundle.into_owned()),
+            Self::LegacyUntypedMessage(message) => {
+                ParsedOscPacket::LegacyUntypedMessage(message.into_owned())
+            }
+            Self::Opaque(packet) => ParsedOscPacket::Opaque(packet.into_owned()),
+        }
+    }
+}
+
+impl<'a> OscMessageView<'a> {
+    pub fn into_owned(self) -> OscMessage {
+        OscMessage {
+            address: self.address.to_owned(),
+            type_tag_source: self.type_tag_source,
+            arguments: self
+                .arguments
+                .into_iter()
+                .map(OscArgumentView::into_owned)
+                .collect(),
+        }
+    }
+}
+
+impl<'a> LegacyUntypedMessageView<'a> {
+    pub fn into_owned(self) -> LegacyUntypedMessage {
+        LegacyUntypedMessage {
+            address: self.address.to_owned(),
+            raw_argument_bytes: self.raw_argument_bytes.to_vec(),
+        }
+    }
+}
+
+impl<'a> OscBundleView<'a> {
+    pub fn into_owned(self) -> OscBundle {
+        OscBundle {
+            timetag: self.timetag,
+            elements: self
+                .elements
+                .into_iter()
+                .map(ParsedOscPacketView::into_owned)
+                .collect(),
+        }
+    }
+}
+
+impl<'a> OpaqueOscPacketView<'a> {
+    pub fn into_owned(self) -> OpaqueOscPacket {
+        OpaqueOscPacket {
+            address: self.address.to_owned(),
+            type_tag_text: self.type_tag_text.map(str::to_owned),
+            reason: self.reason.into_owned(),
+        }
+    }
+}
+
+impl<'a> OpaqueReasonView<'a> {
+    fn into_owned(self) -> OpaqueReason {
+        match self {
+            Self::UnsupportedTypeTag(tag) => OpaqueReason::UnsupportedTypeTag(tag),
+            Self::UnsupportedExtension(text) => OpaqueReason::UnsupportedExtension(text.to_owned()),
+        }
+    }
+}
+
+impl<'a> OscArgumentView<'a> {
+    fn into_owned(self) -> OscArgument {
+        match self {
+            Self::Int32(value) => OscArgument::Int32(value),
+            Self::Float32(value) => OscArgument::Float32(value),
+            Self::String(value) => OscArgument::String(value.to_owned()),
+            Self::Blob(value) => OscArgument::Blob(value.to_vec()),
+            Self::Int64(value) => OscArgument::Int64(value),
+            Self::Timetag(value) => OscArgument::Timetag(value),
+            Self::Double64(value) => OscArgument::Double64(value),
+            Self::Symbol(value) => OscArgument::Symbol(value.to_owned()),
+            Self::Char(value) => OscArgument::Char(value),
+            Self::Rgba(value) => OscArgument::Rgba(value),
+            Self::Midi4(value) => OscArgument::Midi4(value),
+            Self::True => OscArgument::True,
+            Self::False => OscArgument::False,
+            Self::Nil => OscArgument::Nil,
+            Self::Impulse => OscArgument::Impulse,
+            Self::Array(values) => OscArgument::Array(
+                values
+                    .into_iter()
+                    .map(OscArgumentView::into_owned)
+                    .collect(),
+            ),
+        }
+    }
+}
+
 #[derive(Debug, Error, PartialEq)]
 pub enum ParseError {
     #[error("packet is shorter than required for the requested structure")]
@@ -146,10 +311,17 @@ pub enum EncodeError {
 }
 
 pub fn parse_packet(bytes: &[u8], mode: CompatibilityMode) -> Result<ParsedOscPacket, ParseError> {
+    parse_packet_view(bytes, mode).map(ParsedOscPacketView::into_owned)
+}
+
+pub fn parse_packet_view<'a>(
+    bytes: &'a [u8],
+    mode: CompatibilityMode,
+) -> Result<ParsedOscPacketView<'a>, ParseError> {
     if bytes.starts_with(BUNDLE_HEADER) {
-        parse_bundle(bytes, mode)
+        parse_bundle_view(bytes, mode)
     } else {
-        parse_message(bytes, mode)
+        parse_message_view(bytes, mode)
     }
 }
 
@@ -192,7 +364,10 @@ pub fn encode_bundle(bundle: &OscBundle) -> Result<Vec<u8>, EncodeError> {
     Ok(bytes)
 }
 
-fn parse_bundle(bytes: &[u8], mode: CompatibilityMode) -> Result<ParsedOscPacket, ParseError> {
+fn parse_bundle_view<'a>(
+    bytes: &'a [u8],
+    mode: CompatibilityMode,
+) -> Result<ParsedOscPacketView<'a>, ParseError> {
     if bytes.len() < 16 {
         return Err(ParseError::UnexpectedEof);
     }
@@ -221,28 +396,34 @@ fn parse_bundle(bytes: &[u8], mode: CompatibilityMode) -> Result<ParsedOscPacket
             return Err(ParseError::UnexpectedEof);
         }
 
-        elements.push(parse_packet(&bytes[cursor..end], mode)?);
+        elements.push(parse_packet_view(&bytes[cursor..end], mode)?);
         cursor = end;
     }
 
-    Ok(ParsedOscPacket::Bundle(OscBundle { timetag, elements }))
+    Ok(ParsedOscPacketView::Bundle(OscBundleView {
+        timetag,
+        elements,
+    }))
 }
 
-fn parse_message(bytes: &[u8], mode: CompatibilityMode) -> Result<ParsedOscPacket, ParseError> {
-    let (address, cursor) = parse_osc_string(bytes, 0)?;
+fn parse_message_view<'a>(
+    bytes: &'a [u8],
+    mode: CompatibilityMode,
+) -> Result<ParsedOscPacketView<'a>, ParseError> {
+    let (address, cursor) = parse_osc_string_view(bytes, 0)?;
     if cursor >= bytes.len() || bytes[cursor] != b',' {
         return match mode {
             CompatibilityMode::Osc1_0Strict => Err(ParseError::MissingTypeTag),
             CompatibilityMode::Osc1_0LegacyTolerant | CompatibilityMode::Osc1_1Extended => Ok(
-                ParsedOscPacket::LegacyUntypedMessage(LegacyUntypedMessage {
+                ParsedOscPacketView::LegacyUntypedMessage(LegacyUntypedMessageView {
                     address,
-                    raw_argument_bytes: bytes[cursor..].to_vec(),
+                    raw_argument_bytes: &bytes[cursor..],
                 }),
             ),
         };
     }
 
-    let (type_tag_text, mut cursor) = parse_osc_string(bytes, cursor)?;
+    let (type_tag_text, mut cursor) = parse_osc_string_view(bytes, cursor)?;
     if !type_tag_text.starts_with(',') {
         return Err(ParseError::Malformed(
             "type tag string must start with a comma",
@@ -252,17 +433,19 @@ fn parse_message(bytes: &[u8], mode: CompatibilityMode) -> Result<ParsedOscPacke
     let type_tags = type_tag_text.as_bytes();
     if let Some(unsupported) = first_unsupported_tag(type_tags) {
         return match mode {
-            CompatibilityMode::Osc1_1Extended => Ok(ParsedOscPacket::Opaque(OpaqueOscPacket {
-                address,
-                type_tag_text: Some(type_tag_text),
-                reason: OpaqueReason::UnsupportedTypeTag(unsupported),
-            })),
+            CompatibilityMode::Osc1_1Extended => {
+                Ok(ParsedOscPacketView::Opaque(OpaqueOscPacketView {
+                    address,
+                    type_tag_text: Some(type_tag_text),
+                    reason: OpaqueReasonView::UnsupportedTypeTag(unsupported),
+                }))
+            }
             _ => Err(ParseError::UnsupportedTypeTag(unsupported)),
         };
     }
 
     let mut tag_cursor = 1usize;
-    let arguments = parse_arguments(type_tags, &mut tag_cursor, &mut cursor, bytes, false)?;
+    let arguments = parse_arguments_view(type_tags, &mut tag_cursor, &mut cursor, bytes, false)?;
     if tag_cursor != type_tags.len() {
         return Err(ParseError::Malformed(
             "type tag parser did not consume the full tag string",
@@ -274,20 +457,20 @@ fn parse_message(bytes: &[u8], mode: CompatibilityMode) -> Result<ParsedOscPacke
         ));
     }
 
-    Ok(ParsedOscPacket::Message(OscMessage {
+    Ok(ParsedOscPacketView::Message(OscMessageView {
         address,
         type_tag_source: TypeTagSource::Explicit,
         arguments,
     }))
 }
 
-fn parse_arguments(
+fn parse_arguments_view<'a>(
     type_tags: &[u8],
     tag_cursor: &mut usize,
     cursor: &mut usize,
-    bytes: &[u8],
+    bytes: &'a [u8],
     in_array: bool,
-) -> Result<Vec<OscArgument>, ParseError> {
+) -> Result<Vec<OscArgumentView<'a>>, ParseError> {
     let mut arguments = Vec::new();
 
     while *tag_cursor < type_tags.len() {
@@ -295,41 +478,41 @@ fn parse_arguments(
         *tag_cursor += 1;
 
         match tag {
-            'i' => arguments.push(OscArgument::Int32(read_i32(bytes, cursor)?)),
-            'f' => arguments.push(OscArgument::Float32(f32::from_bits(read_u32(
+            'i' => arguments.push(OscArgumentView::Int32(read_i32(bytes, cursor)?)),
+            'f' => arguments.push(OscArgumentView::Float32(f32::from_bits(read_u32(
                 bytes, cursor,
             )?))),
             's' => {
-                let (value, next_cursor) = parse_osc_string(bytes, *cursor)?;
+                let (value, next_cursor) = parse_osc_string_view(bytes, *cursor)?;
                 *cursor = next_cursor;
-                arguments.push(OscArgument::String(value));
+                arguments.push(OscArgumentView::String(value));
             }
-            'b' => arguments.push(OscArgument::Blob(parse_blob(bytes, cursor)?)),
-            'h' => arguments.push(OscArgument::Int64(read_i64(bytes, cursor)?)),
-            't' => arguments.push(OscArgument::Timetag(read_u64(bytes, cursor)?)),
-            'd' => arguments.push(OscArgument::Double64(f64::from_bits(read_u64(
+            'b' => arguments.push(OscArgumentView::Blob(parse_blob_view(bytes, cursor)?)),
+            'h' => arguments.push(OscArgumentView::Int64(read_i64(bytes, cursor)?)),
+            't' => arguments.push(OscArgumentView::Timetag(read_u64(bytes, cursor)?)),
+            'd' => arguments.push(OscArgumentView::Double64(f64::from_bits(read_u64(
                 bytes, cursor,
             )?))),
             'S' => {
-                let (value, next_cursor) = parse_osc_string(bytes, *cursor)?;
+                let (value, next_cursor) = parse_osc_string_view(bytes, *cursor)?;
                 *cursor = next_cursor;
-                arguments.push(OscArgument::Symbol(value));
+                arguments.push(OscArgumentView::Symbol(value));
             }
             'c' => {
                 let scalar = read_u32(bytes, cursor)?;
                 let value = char::from_u32(scalar)
                     .ok_or(ParseError::Malformed("invalid char scalar value"))?;
-                arguments.push(OscArgument::Char(value));
+                arguments.push(OscArgumentView::Char(value));
             }
-            'r' => arguments.push(OscArgument::Rgba(read_u32(bytes, cursor)?)),
-            'm' => arguments.push(OscArgument::Midi4(read_midi(bytes, cursor)?)),
-            'T' => arguments.push(OscArgument::True),
-            'F' => arguments.push(OscArgument::False),
-            'N' => arguments.push(OscArgument::Nil),
-            'I' => arguments.push(OscArgument::Impulse),
+            'r' => arguments.push(OscArgumentView::Rgba(read_u32(bytes, cursor)?)),
+            'm' => arguments.push(OscArgumentView::Midi4(read_midi(bytes, cursor)?)),
+            'T' => arguments.push(OscArgumentView::True),
+            'F' => arguments.push(OscArgumentView::False),
+            'N' => arguments.push(OscArgumentView::Nil),
+            'I' => arguments.push(OscArgumentView::Impulse),
             '[' => {
-                let nested = parse_arguments(type_tags, tag_cursor, cursor, bytes, true)?;
-                arguments.push(OscArgument::Array(nested));
+                let nested = parse_arguments_view(type_tags, tag_cursor, cursor, bytes, true)?;
+                arguments.push(OscArgumentView::Array(nested));
             }
             ']' => {
                 if in_array {
@@ -376,7 +559,7 @@ fn first_unsupported_tag(type_tags: &[u8]) -> Option<char> {
         })
 }
 
-fn parse_blob(bytes: &[u8], cursor: &mut usize) -> Result<Vec<u8>, ParseError> {
+fn parse_blob_view<'a>(bytes: &'a [u8], cursor: &mut usize) -> Result<&'a [u8], ParseError> {
     let len = read_i32(bytes, cursor)?;
     if len < 0 {
         return Err(ParseError::Malformed("blob length must be non-negative"));
@@ -385,7 +568,7 @@ fn parse_blob(bytes: &[u8], cursor: &mut usize) -> Result<Vec<u8>, ParseError> {
     if end > bytes.len() {
         return Err(ParseError::UnexpectedEof);
     }
-    let blob = bytes[*cursor..end].to_vec();
+    let blob = &bytes[*cursor..end];
     *cursor = align_four(end);
     if *cursor > bytes.len() {
         return Err(ParseError::UnexpectedEof);
@@ -393,7 +576,10 @@ fn parse_blob(bytes: &[u8], cursor: &mut usize) -> Result<Vec<u8>, ParseError> {
     Ok(blob)
 }
 
-fn parse_osc_string(bytes: &[u8], cursor: usize) -> Result<(String, usize), ParseError> {
+fn parse_osc_string_view<'a>(
+    bytes: &'a [u8],
+    cursor: usize,
+) -> Result<(&'a str, usize), ParseError> {
     let Some(relative_end) = bytes[cursor..].iter().position(|byte| *byte == 0) else {
         return Err(ParseError::UnexpectedEof);
     };
@@ -408,7 +594,7 @@ fn parse_osc_string(bytes: &[u8], cursor: usize) -> Result<(String, usize), Pars
         ));
     }
     let text = std::str::from_utf8(&bytes[cursor..end]).map_err(|_| ParseError::InvalidUtf8)?;
-    Ok((text.to_owned(), padded_end))
+    Ok((text, padded_end))
 }
 
 fn encode_argument(argument: &OscArgument, bytes: &mut Vec<u8>) -> Result<(), EncodeError> {
