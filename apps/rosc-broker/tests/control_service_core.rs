@@ -206,6 +206,7 @@ async fn control_service_serves_dashboard_assets() {
     assert!(js.contains("HTTP/1.1 200 OK"));
     assert!(js.contains("Content-Type: application/javascript; charset=utf-8"));
     assert!(js.contains("fetchDashboardData"));
+    assert!(js.contains("retryDelayMs"));
 
     let state_js = request(
         service.listen_addr(),
@@ -224,6 +225,8 @@ async fn control_service_serves_dashboard_assets() {
     assert!(render_js.contains("HTTP/1.1 200 OK"));
     assert!(render_js.contains("Content-Type: application/javascript; charset=utf-8"));
     assert!(render_js.contains("renderDashboard"));
+    assert!(render_js.contains("Disconnected (stale)"));
+    assert!(render_js.contains("operator isolation active"));
 
     let dashboard_data = json_body(
         &request(

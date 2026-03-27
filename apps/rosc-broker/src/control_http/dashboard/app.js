@@ -4,6 +4,7 @@ import {
   globalActionRequest,
   normalizeFocusState,
   postControlAction,
+  retryDelayMs,
   routeActionRequest,
 } from "/dashboard/dashboard-state.js";
 import {
@@ -23,6 +24,15 @@ let lastTrafficSample = null;
 let refreshTimer = null;
 let refreshIntervalMs = 2500;
 let lastRenderContext = null;
+let refreshInFlight = null;
+let connectionState = {
+  connected: false,
+  stale: false,
+  retryAttempt: 0,
+  nextRetryDelayMs: refreshIntervalMs,
+  lastError: null,
+  lastSuccessAt: null,
+};
 let focusState = {
   routeId: null,
   destinationId: null,
@@ -90,26 +100,61 @@ syncActiveSection(elements);
 refreshDashboard();
 
 async function refreshDashboard() {
-  try {
-    const dashboard = await fetchDashboardData(HISTORY_LIMIT);
-    const refreshedAt = new Date();
-    const trafficPulse = buildTrafficPulse(
-      dashboard.traffic,
-      lastTrafficSample,
-      refreshedAt.getTime(),
-    );
-
-    lastDashboard = dashboard;
-    lastTrafficSample = trafficPulse.sample;
-    refreshIntervalMs = dashboard.refresh_interval_ms || refreshIntervalMs;
-    focusState = normalizeFocusState(dashboard, focusState);
-    lastRenderContext = { refreshedAt, trafficPulse };
-    renderCurrentDashboard();
-    scheduleRefresh();
-  } catch (error) {
-    console.error(error);
-    renderConnectionError(elements, error);
+  if (refreshInFlight) {
+    return refreshInFlight;
   }
+  if (refreshTimer) {
+    window.clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+  refreshInFlight = (async () => {
+    try {
+      const dashboard = await fetchDashboardData(HISTORY_LIMIT);
+      const refreshedAt = new Date();
+      const trafficPulse = buildTrafficPulse(
+        dashboard.traffic,
+        lastTrafficSample,
+        refreshedAt.getTime(),
+      );
+
+      lastDashboard = dashboard;
+      lastTrafficSample = trafficPulse.sample;
+      refreshIntervalMs = dashboard.refresh_interval_ms || refreshIntervalMs;
+      connectionState = {
+        connected: true,
+        stale: false,
+        retryAttempt: 0,
+        nextRetryDelayMs: refreshIntervalMs,
+        lastError: null,
+        lastSuccessAt: refreshedAt,
+      };
+      focusState = normalizeFocusState(dashboard, focusState);
+      lastRenderContext = { refreshedAt, trafficPulse };
+      renderCurrentDashboard();
+      scheduleRefresh(refreshIntervalMs);
+    } catch (error) {
+      console.error(error);
+      const retryAttempt = connectionState.retryAttempt + 1;
+      const nextRetryDelayMs = retryDelayMs(refreshIntervalMs, retryAttempt);
+      connectionState = {
+        connected: false,
+        stale: Boolean(lastDashboard),
+        retryAttempt,
+        nextRetryDelayMs,
+        lastError: String(error.message || error),
+        lastSuccessAt: connectionState.lastSuccessAt,
+      };
+      if (lastDashboard) {
+        renderCurrentDashboard();
+      } else {
+        renderConnectionError(elements, error, connectionState);
+      }
+      scheduleRefresh(nextRetryDelayMs);
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
 }
 
 function renderCurrentDashboard() {
@@ -122,6 +167,7 @@ function renderCurrentDashboard() {
   };
   renderDashboard(elements, lastDashboard, {
     ...context,
+    connectionState,
     focusState,
   });
 }
@@ -156,9 +202,13 @@ async function runAction(request) {
   }
 }
 
-function scheduleRefresh() {
+function scheduleRefresh(delayMs) {
   if (refreshTimer) {
-    window.clearInterval(refreshTimer);
+    window.clearTimeout(refreshTimer);
   }
-  refreshTimer = window.setInterval(refreshDashboard, refreshIntervalMs);
+  const delay = typeof delayMs === "number" ? delayMs : refreshIntervalMs;
+  refreshTimer = window.setTimeout(() => {
+    refreshTimer = null;
+    refreshDashboard();
+  }, delay);
 }

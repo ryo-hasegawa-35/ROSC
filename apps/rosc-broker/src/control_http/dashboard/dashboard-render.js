@@ -1,6 +1,7 @@
 export function collectDashboardElements() {
   return {
     connectionStatus: document.getElementById("connection-status"),
+    connectionMeta: document.getElementById("connection-meta"),
     actionFeedback: document.getElementById("action-feedback"),
     heroTitle: document.getElementById("hero-title"),
     heroSubtitle: document.getElementById("hero-subtitle"),
@@ -45,7 +46,7 @@ export function renderDashboard(elements, dashboard, context) {
   const stateText = humanizeState(overview.report.state);
   elements.heroTitle.textContent = `${stateText} broker state`;
   elements.heroSubtitle.textContent = describeHero(readiness, attention);
-  applyStateBadge(elements.connectionStatus, "healthy", "Connected");
+  applyConnectionState(elements, context.connectionState);
   applyStateBadge(elements.heroState, overview.report.state, stateText);
   applyStateBadge(elements.overviewState, overview.report.state, stateText);
   elements.heroRefresh.textContent = context.refreshedAt.toLocaleTimeString("ja-JP");
@@ -67,8 +68,8 @@ export function renderDashboard(elements, dashboard, context) {
   renderConfig(elements, dashboard, snapshot);
 }
 
-export function renderConnectionError(elements, error) {
-  applyStateBadge(elements.connectionStatus, "blocked", "Disconnected");
+export function renderConnectionError(elements, error, connectionState = null) {
+  applyConnectionState(elements, connectionState);
   applyStateBadge(elements.heroState, "blocked", "Unavailable");
   applyStateBadge(elements.overviewState, "blocked", "Unavailable");
   elements.heroTitle.textContent = "Control plane unavailable";
@@ -316,13 +317,17 @@ function renderRoutes(elements, status, diagnostics) {
       if (transformFailures.has(assessment.route_id)) {
         warnings.push("transform failures observed");
       }
+      const isolated = isolatedRoutes.has(assessment.route_id);
+      if (isolated && !warnings.includes("operator isolation active")) {
+        warnings.unshift("operator isolation active");
+      }
       row.innerHTML = `
         <td>
           <button class="mini-button is-secondary" data-focus-route-id="${escapeHtml(assessment.route_id)}">
             ${escapeHtml(assessment.route_id)}
           </button>
         </td>
-        <td><span class="entity-state" data-level="${escapeHtml(routeStateLevel(assessment, warnings))}">${escapeHtml(routeStateLabel(assessment, warnings))}</span></td>
+        <td><span class="entity-state" data-level="${escapeHtml(routeStateLevel(assessment, warnings, isolated))}">${escapeHtml(routeStateLabel(assessment, warnings, isolated))}</span></td>
         <td>${escapeHtml(route?.mode || "--")}</td>
         <td>${escapeHtml(route?.traffic_class || "--")}</td>
         <td>${escapeHtml(warnings.join(" | ") || "none")}</td>
@@ -741,16 +746,22 @@ function describeHero(readiness, attention) {
   return "No active readiness blockers or operator overrides.";
 }
 
-function routeStateLevel(assessment, warnings) {
+function routeStateLevel(assessment, warnings, isolated) {
   if (!assessment.active) {
     return "warning";
+  }
+  if (isolated) {
+    return "degraded";
   }
   return warnings.length > 0 ? "degraded" : "healthy";
 }
 
-function routeStateLabel(assessment, warnings) {
+function routeStateLabel(assessment, warnings, isolated) {
   if (!assessment.active) {
     return "Disabled";
+  }
+  if (isolated) {
+    return "Isolated";
   }
   return warnings.length > 0 ? "Needs attention" : "Healthy";
 }
@@ -814,6 +825,32 @@ function destinationDetailLabel(state) {
 function applyStateBadge(element, level, label) {
   element.dataset.level = String(level).toLowerCase();
   element.textContent = label;
+}
+
+function applyConnectionState(elements, connectionState) {
+  if (!connectionState || connectionState.connected) {
+    applyStateBadge(elements.connectionStatus, "healthy", "Connected");
+    const lastSuccess = connectionState?.lastSuccessAt
+      ? formatTimestamp(connectionState.lastSuccessAt.getTime?.() || connectionState.lastSuccessAt)
+      : "live polling active";
+    elements.connectionMeta.textContent = `Last success: ${lastSuccess}`;
+    return;
+  }
+
+  if (connectionState.stale) {
+    applyStateBadge(elements.connectionStatus, "warning", "Disconnected (stale)");
+  } else {
+    applyStateBadge(elements.connectionStatus, "blocked", "Disconnected");
+  }
+  const retrySeconds = Math.max(
+    1,
+    Math.round((connectionState.nextRetryDelayMs || 0) / 1000),
+  );
+  const lastSuccess = connectionState.lastSuccessAt
+    ? ` last success ${formatTimestamp(connectionState.lastSuccessAt.getTime?.() || connectionState.lastSuccessAt)}.`
+    : "";
+  elements.connectionMeta.textContent =
+    `Retry ${connectionState.retryAttempt} in ${retrySeconds}s.${lastSuccess}`;
 }
 
 function humanizeState(value) {

@@ -142,6 +142,12 @@ export function buildTrafficPulse(traffic, previousSample, recordedAtUnixMs) {
   };
 }
 
+export function retryDelayMs(baseDelayMs, retryAttempt) {
+  const safeBase = Number.isFinite(baseDelayMs) && baseDelayMs > 0 ? baseDelayMs : 2500;
+  const attempt = Math.max(0, retryAttempt || 0);
+  return Math.min(15_000, safeBase * 2 ** attempt);
+}
+
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, {
     cache: "no-store",
