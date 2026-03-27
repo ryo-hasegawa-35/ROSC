@@ -188,6 +188,7 @@ async fn control_service_serves_dashboard_assets() {
     assert!(dashboard.contains("Content-Type: text/html; charset=utf-8"));
     assert!(dashboard.contains("ROSC Operator Console"));
     assert!(dashboard.contains("/dashboard/app.js"));
+    assert!(dashboard.contains("Route next steps"));
 
     let css = request(
         service.listen_addr(),
@@ -227,6 +228,7 @@ async fn control_service_serves_dashboard_assets() {
     assert!(render_js.contains("renderDashboard"));
     assert!(render_js.contains("Disconnected (stale)"));
     assert!(render_js.contains("operator isolation active"));
+    assert!(render_js.contains("Focused route handoff"));
 
     let dashboard_data = json_body(
         &request(
@@ -260,6 +262,16 @@ async fn control_service_serves_dashboard_assets() {
     );
     assert!(
         dashboard_data["dashboard"]["trace"]["destinations"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["snapshot"]["handoff"]["route_handoffs"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["snapshot"]["handoff"]["destination_handoffs"]
             .as_array()
             .is_some()
     );
@@ -552,6 +564,48 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .unwrap()
             .len(),
         1
+    );
+
+    let handoff = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /handoff?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(handoff["ok"], true);
+    assert!(
+        handoff["handoff"]["route_handoffs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["route_id"] == "camera")
+    );
+
+    let route_handoff = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/handoff?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_handoff["ok"], true);
+    assert_eq!(
+        route_handoff["handoff"]["route_handoffs"][0]["route_id"],
+        "camera"
+    );
+
+    let destination_handoff = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/handoff?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_handoff["ok"], true);
+    assert_eq!(
+        destination_handoff["handoff"]["destination_handoffs"][0]["destination_id"],
+        "udp_renderer"
     );
 
     let overrides = json_body(

@@ -1,13 +1,13 @@
 use serde::Serialize;
 
 use crate::{
-    ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorIncidentDigest,
-    ProxyOperatorIncidents, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorRecovery,
-    ProxyOperatorWorklist, ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot,
-    proxy_operator_attention, proxy_operator_diagnostics_from_overview,
-    proxy_operator_incident_digest, proxy_operator_incidents_from_histories,
-    proxy_operator_overview, proxy_operator_readiness_from_overview, proxy_operator_recovery,
-    proxy_operator_worklist,
+    ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorHandoffCatalog,
+    ProxyOperatorIncidentDigest, ProxyOperatorIncidents, ProxyOperatorOverview,
+    ProxyOperatorReadiness, ProxyOperatorRecovery, ProxyOperatorWorklist, ProxyRuntimeSafetyPolicy,
+    UdpProxyStatusSnapshot, proxy_operator_attention, proxy_operator_diagnostics_from_overview,
+    proxy_operator_handoff, proxy_operator_incident_digest,
+    proxy_operator_incidents_from_histories, proxy_operator_overview,
+    proxy_operator_readiness_from_overview, proxy_operator_recovery, proxy_operator_worklist,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -20,6 +20,7 @@ pub struct ProxyOperatorSnapshot {
     pub incident_digest: ProxyOperatorIncidentDigest,
     pub recovery: ProxyOperatorRecovery,
     pub worklist: ProxyOperatorWorklist,
+    pub handoff: ProxyOperatorHandoffCatalog,
 }
 
 pub fn proxy_operator_snapshot(
@@ -71,15 +72,18 @@ pub fn proxy_operator_snapshot_from_overview(
         incident_digest: ProxyOperatorIncidentDigest::default(),
         recovery: ProxyOperatorRecovery::default(),
         worklist: ProxyOperatorWorklist::default(),
+        handoff: ProxyOperatorHandoffCatalog::default(),
     };
     let incident_digest = proxy_operator_incident_digest(&provisional_snapshot);
     let recovery = proxy_operator_recovery(&provisional_snapshot);
     let worklist = proxy_operator_worklist(&provisional_snapshot);
+    let handoff = proxy_operator_handoff(&provisional_snapshot);
 
     ProxyOperatorSnapshot {
         incident_digest,
         recovery,
         worklist,
+        handoff,
         ..provisional_snapshot
     }
 }

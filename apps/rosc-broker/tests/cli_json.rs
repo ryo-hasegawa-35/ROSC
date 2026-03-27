@@ -172,3 +172,19 @@ fn proxy_incidents_stdout_is_json_only() {
     assert!(value.get("recent_operator_actions").is_some());
     assert!(value.get("recent_config_issues").is_some());
 }
+
+#[test]
+fn proxy_handoff_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-handoff",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("route_handoffs").is_some());
+    assert!(value.get("destination_handoffs").is_some());
+}

@@ -4,10 +4,10 @@ use common::broad_scope_config;
 use rosc_broker::{
     ProxyOperatorSignalScope, ProxyOperatorState, ProxyOperatorTimelineCategory,
     ProxyRuntimeSafetyPolicy, attach_runtime_status, proxy_operator_attention,
-    proxy_operator_dashboard, proxy_operator_diagnostics, proxy_operator_incidents_from_histories,
-    proxy_operator_overview, proxy_operator_readiness, proxy_operator_report,
-    proxy_operator_signals_view, proxy_operator_snapshot, proxy_operator_trace,
-    proxy_status_from_config,
+    proxy_operator_dashboard, proxy_operator_diagnostics, proxy_operator_handoff,
+    proxy_operator_incidents_from_histories, proxy_operator_overview, proxy_operator_readiness,
+    proxy_operator_recovery, proxy_operator_report, proxy_operator_signals_view,
+    proxy_operator_snapshot, proxy_operator_trace, proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -577,6 +577,14 @@ fn operator_dashboard_bundles_snapshot_traffic_and_timeline() {
             .iter()
             .any(|trace| trace.destination_id == "udp_renderer")
     );
+    assert!(
+        dashboard
+            .snapshot
+            .handoff
+            .destination_handoffs
+            .iter()
+            .any(|handoff| handoff.destination_id == "udp_renderer")
+    );
     assert!(dashboard.snapshot.worklist.immediate_actions >= 1);
     assert!(
         dashboard
@@ -717,6 +725,91 @@ fn operator_trace_links_runtime_actions_and_config_events_to_entities() {
                 .iter()
                 .any(|detail| detail == "destination_id=udp_renderer")
     }));
+}
+
+#[test]
+fn operator_handoff_derives_next_steps_from_trace_and_snapshot() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            destination_drops_total: [(
+                ("udp_renderer".to_owned(), "queue_overflow".to_owned()),
+                4,
+            )]
+            .into_iter()
+            .collect(),
+            destination_breaker_state: [(
+                "udp_renderer".to_owned(),
+                rosc_telemetry::BreakerStateSnapshot::HalfOpen,
+            )]
+            .into_iter()
+            .collect(),
+            recent_operator_actions: vec![RecentOperatorAction {
+                sequence: 7,
+                recorded_at_unix_ms: 700,
+                action: "freeze_traffic".to_owned(),
+                details: vec!["applied=true".to_owned()],
+            }],
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let snapshot = proxy_operator_snapshot(&status, ProxyRuntimeSafetyPolicy::default(), Some(8));
+    let handoff = proxy_operator_handoff(&snapshot);
+
+    let route_handoff = handoff
+        .route_handoffs
+        .iter()
+        .find(|handoff| handoff.route_id == "camera")
+        .expect("route handoff should exist");
+    assert!(
+        route_handoff
+            .next_steps
+            .iter()
+            .any(|step| step.contains("restore") || step.contains("forwarding"))
+    );
+
+    let destination_handoff = handoff
+        .destination_handoffs
+        .iter()
+        .find(|handoff| handoff.destination_id == "udp_renderer")
+        .expect("destination handoff should exist");
+    assert!(
+        destination_handoff
+            .next_steps
+            .iter()
+            .any(|step| step.contains("breaker") || step.contains("queue"))
+    );
+}
+
+#[test]
+fn operator_recovery_ignores_closed_breakers_without_other_pressure() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            destination_breaker_state: [(
+                "udp_renderer".to_owned(),
+                rosc_telemetry::BreakerStateSnapshot::Closed,
+            )]
+            .into_iter()
+            .collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let snapshot = proxy_operator_snapshot(&status, ProxyRuntimeSafetyPolicy::default(), Some(4));
+    let recovery = proxy_operator_recovery(&snapshot);
+
+    assert!(
+        recovery
+            .destination_candidates
+            .iter()
+            .all(|candidate| candidate.destination_id != "udp_renderer")
+    );
 }
 
 #[test]

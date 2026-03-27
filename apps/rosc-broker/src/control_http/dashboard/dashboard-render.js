@@ -27,9 +27,11 @@ export function collectDashboardElements() {
     routeFocusSelect: document.getElementById("route-focus-select"),
     routeFocusDetail: document.getElementById("route-focus-detail"),
     routeTraceDetail: document.getElementById("route-trace-detail"),
+    routeHandoffDetail: document.getElementById("route-handoff-detail"),
     destinationFocusSelect: document.getElementById("destination-focus-select"),
     destinationFocusDetail: document.getElementById("destination-focus-detail"),
     destinationTraceDetail: document.getElementById("destination-trace-detail"),
+    destinationHandoffDetail: document.getElementById("destination-handoff-detail"),
     routesTable: document.getElementById("routes-table"),
     destinationsTable: document.getElementById("destinations-table"),
     overridesList: document.getElementById("overrides-list"),
@@ -71,6 +73,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderRecoveryCandidates(elements, snapshot.recovery);
   renderFocus(elements, dashboard, context.focusState);
   renderTrace(elements, dashboard, context.focusState);
+  renderHandoff(elements, snapshot.handoff, context.focusState);
   renderRoutes(elements, status, diagnostics);
   renderDestinations(elements, dashboard.destination_details);
   renderRecovery(elements, snapshot);
@@ -381,6 +384,17 @@ function renderTrace(elements, dashboard, focusState) {
   );
   renderRouteTrace(elements, routeTrace);
   renderDestinationTrace(elements, destinationTrace);
+}
+
+function renderHandoff(elements, handoff, focusState) {
+  const routeHandoff = (handoff?.route_handoffs || []).find(
+    (entry) => entry.route_id === focusState?.routeId,
+  );
+  const destinationHandoff = (handoff?.destination_handoffs || []).find(
+    (entry) => entry.destination_id === focusState?.destinationId,
+  );
+  renderRouteHandoff(elements, routeHandoff);
+  renderDestinationHandoff(elements, destinationHandoff);
 }
 
 function renderRoutes(elements, status, diagnostics) {
@@ -816,6 +830,62 @@ function renderDestinationTrace(elements, trace) {
   }
   wrapper.appendChild(traceEventsBlock(trace.recent_events));
   elements.destinationTraceDetail.replaceChildren(wrapper);
+}
+
+function renderRouteHandoff(elements, handoff) {
+  if (!handoff) {
+    fillList(elements, elements.routeHandoffDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused route handoff</p>
+        <h4>${escapeHtml(handoff.route_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(String(handoff.level).toLowerCase())}">${escapeHtml(humanizeState(handoff.level))}</span>
+    </div>
+    <p class="summary">${escapeHtml(handoff.summary)}</p>
+  `;
+  wrapper.appendChild(traceSummaryBlock("Next steps", handoff.next_steps));
+  if (handoff.actions?.length > 0) {
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    actions.replaceChildren(...handoff.actions.map((action) => worklistActionButton(action)));
+    wrapper.appendChild(actions);
+  }
+  wrapper.appendChild(traceEventsBlock(handoff.recent_events));
+  elements.routeHandoffDetail.replaceChildren(wrapper);
+}
+
+function renderDestinationHandoff(elements, handoff) {
+  if (!handoff) {
+    fillList(elements, elements.destinationHandoffDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused destination handoff</p>
+        <h4>${escapeHtml(handoff.destination_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(String(handoff.level).toLowerCase())}">${escapeHtml(humanizeState(handoff.level))}</span>
+    </div>
+    <p class="summary">${escapeHtml(handoff.summary)}</p>
+  `;
+  wrapper.appendChild(traceSummaryBlock("Next steps", handoff.next_steps));
+  if (handoff.actions?.length > 0) {
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    actions.replaceChildren(...handoff.actions.map((action) => worklistActionButton(action)));
+    wrapper.appendChild(actions);
+  }
+  wrapper.appendChild(traceEventsBlock(handoff.recent_events));
+  elements.destinationHandoffDetail.replaceChildren(wrapper);
 }
 
 function traceSummaryBlock(title, reasons) {

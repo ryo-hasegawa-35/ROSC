@@ -5,10 +5,10 @@ use serde::Serialize;
 
 use crate::{
     ProxyOperatorAttention, ProxyOperatorDashboard, ProxyOperatorDestinationTrace,
-    ProxyOperatorDiagnostics, ProxyOperatorIncidents, ProxyOperatorOverrides,
-    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace,
-    ProxyOperatorSignalScope, ProxyOperatorSnapshot, ProxyOperatorTraceCatalog,
-    UdpProxyStatusSnapshot,
+    ProxyOperatorDiagnostics, ProxyOperatorHandoffCatalog, ProxyOperatorIncidents,
+    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
+    ProxyOperatorRouteTrace, ProxyOperatorSignalScope, ProxyOperatorSnapshot,
+    ProxyOperatorTraceCatalog, UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -105,6 +105,12 @@ pub(crate) struct OperatorDestinationTraceResponse {
 }
 
 #[derive(Serialize)]
+pub(crate) struct OperatorHandoffResponse {
+    pub(crate) ok: bool,
+    pub(crate) handoff: ProxyOperatorHandoffCatalog,
+}
+
+#[derive(Serialize)]
 pub(crate) struct OperatorOverridesResponse {
     pub(crate) ok: bool,
     pub(crate) overrides: ProxyOperatorOverrides,
@@ -142,6 +148,7 @@ pub(crate) enum ResponseBody {
     OperatorDiagnostics(Box<OperatorDiagnosticsResponse>),
     OperatorAttention(OperatorAttentionResponse),
     OperatorIncidents(OperatorIncidentsResponse),
+    OperatorHandoff(OperatorHandoffResponse),
     OperatorTrace(OperatorTraceResponse),
     OperatorRouteTrace(OperatorRouteTraceResponse),
     OperatorDestinationTrace(OperatorDestinationTraceResponse),
@@ -179,6 +186,7 @@ impl ResponseBody {
             Self::OperatorDiagnostics(body) => json_payload(body),
             Self::OperatorAttention(body) => json_payload(body),
             Self::OperatorIncidents(body) => json_payload(body),
+            Self::OperatorHandoff(body) => json_payload(body),
             Self::OperatorTrace(body) => json_payload(body),
             Self::OperatorRouteTrace(body) => json_payload(body),
             Self::OperatorDestinationTrace(body) => json_payload(body),

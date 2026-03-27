@@ -45,6 +45,7 @@ cargo run -p rosc-broker -- proxy-snapshot examples/phase-01-basic.toml --fail-o
 cargo run -p rosc-broker -- proxy-diagnostics examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- proxy-attention examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
 cargo run -p rosc-broker -- proxy-incidents examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
+cargo run -p rosc-broker -- proxy-handoff examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
@@ -66,8 +67,11 @@ curl http://127.0.0.1:19292/snapshot?limit=10
 curl http://127.0.0.1:19292/diagnostics?limit=10
 curl http://127.0.0.1:19292/attention
 curl http://127.0.0.1:19292/incidents?limit=10
+curl http://127.0.0.1:19292/handoff?limit=10
 curl http://127.0.0.1:19292/trace?limit=10
+curl http://127.0.0.1:19292/routes/camera/handoff?limit=10
 curl http://127.0.0.1:19292/routes/camera/trace?limit=10
+curl http://127.0.0.1:19292/destinations/udp_renderer/handoff?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/trace?limit=10
 curl http://127.0.0.1:19292/overrides
 curl http://127.0.0.1:19292/signals
@@ -80,7 +84,7 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` is intentionally loopback-only. Bind it to `127.0.0.1`, `::1`, or another
 local-only alias such as `localhost`; wildcard or externally reachable addresses are rejected.
 
-`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-assert-ready`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, and `proxy-incidents`
+`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-assert-ready`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, `proxy-incidents`, and `proxy-handoff`
 intentionally write JSON only to stdout so they can be piped directly into tools such as `jq`
 without stripping summary lines first.
 
@@ -136,6 +140,8 @@ Current Phase 01 runtime coverage:
 - snapshot and dashboard payloads now also include an incident digest plus structured recovery candidates, so operators can move from grouped incident cards into concrete route/destination recovery actions without stitching extra control-plane calls
 - snapshot and dashboard payloads now also include per-route and per-destination trace catalogs that connect current runtime pressure with related operator actions and config incidents
 - control-plane `/trace`, `/routes/{id}/trace`, and `/destinations/{id}/trace` now expose those linked traces directly for external tooling, not only the embedded dashboard
+- snapshot now also includes a machine-readable handoff catalog, and `proxy-handoff` plus control-plane `/handoff`, `/routes/{id}/handoff`, `/destinations/{id}/handoff` expose next-step guidance for route/destination recovery work
+- the embedded dashboard now renders focused route/destination handoff panels so operators can move from trace history to concrete next actions without leaving the focus workflow
 - `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
 - config rejection / block / reload-failure history now retains reason details instead of only counters
 

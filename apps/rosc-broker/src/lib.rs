@@ -9,6 +9,7 @@ mod managed_proxy;
 mod operator_attention;
 mod operator_dashboard;
 mod operator_diagnostics;
+mod operator_handoff;
 mod operator_history;
 mod operator_incident_digest;
 mod operator_incidents;
@@ -49,6 +50,10 @@ pub use operator_dashboard::{
 };
 pub use operator_diagnostics::{
     ProxyOperatorDiagnostics, proxy_operator_diagnostics, proxy_operator_diagnostics_from_overview,
+};
+pub use operator_handoff::{
+    ProxyOperatorDestinationHandoff, ProxyOperatorHandoffCatalog, ProxyOperatorRouteHandoff,
+    proxy_operator_handoff, proxy_operator_handoff_from_trace,
 };
 pub use operator_incident_digest::{
     ProxyOperatorIncidentCluster, ProxyOperatorIncidentDigest, ProxyOperatorIncidentLevel,

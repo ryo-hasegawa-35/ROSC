@@ -11,10 +11,11 @@ use super::response::{
     HttpResponse, blockers_response, config_events_response, dashboard_css_response,
     dashboard_data_response, dashboard_html_response, dashboard_js_response,
     dashboard_render_js_response, dashboard_state_js_response, destination_trace_response,
-    diagnostics_response, incidents_response, invalid_component_error, invalid_query_error,
-    map_action_result, operator_actions_response, operator_signals_response, overrides_response,
-    overview_response, readiness_response, report_response, route_trace_response,
-    snapshot_response, status_response, trace_response, unsupported_route_error,
+    diagnostics_response, handoff_response, incidents_response, invalid_component_error,
+    invalid_query_error, map_action_result, operator_actions_response, operator_signals_response,
+    overrides_response, overview_response, readiness_response, report_response,
+    route_trace_response, snapshot_response, status_response, trace_response,
+    unsupported_route_error,
 };
 
 pub(crate) async fn route_request(
@@ -73,6 +74,13 @@ pub(crate) async fn route_request(
             };
             incidents_response(control.operator_incidents(limit).await)
         }
+        ("GET", "/handoff") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            let snapshot = control.operator_snapshot(limit).await;
+            handoff_response(snapshot.handoff)
+        }
         ("GET", "/trace") => {
             let Ok(limit) = history_limit(query) else {
                 return invalid_query_error("limit");
@@ -128,6 +136,35 @@ async fn route_nested_request(
 ) -> HttpResponse {
     if let Some(destination_id) = path
         .strip_prefix("/destinations/")
+        .and_then(|path| path.strip_suffix("/handoff"))
+    {
+        if request.method != "GET" || destination_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(destination_id) = decode_uri_component(destination_id) else {
+            return invalid_component_error("destination id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let snapshot = control.operator_snapshot(limit).await;
+        let Some(destination_handoff) = snapshot
+            .handoff
+            .destination_handoffs
+            .into_iter()
+            .find(|handoff| handoff.destination_id == destination_id)
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        return handoff_response(crate::ProxyOperatorHandoffCatalog {
+            state: snapshot.handoff.state,
+            route_handoffs: Vec::new(),
+            destination_handoffs: vec![destination_handoff],
+        });
+    }
+
+    if let Some(destination_id) = path
+        .strip_prefix("/destinations/")
         .and_then(|path| path.strip_suffix("/trace"))
     {
         if request.method != "GET" || destination_id.is_empty() {
@@ -170,6 +207,32 @@ async fn route_nested_request(
     let Some(route_path) = path.strip_prefix("/routes/") else {
         return unsupported_route_error(&request.path);
     };
+
+    if let Some(route_id) = route_path.strip_suffix("/handoff") {
+        if request.method != "GET" || route_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let snapshot = control.operator_snapshot(limit).await;
+        let Some(route_handoff) = snapshot
+            .handoff
+            .route_handoffs
+            .into_iter()
+            .find(|handoff| handoff.route_id == route_id)
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        return handoff_response(crate::ProxyOperatorHandoffCatalog {
+            state: snapshot.handoff.state,
+            route_handoffs: vec![route_handoff],
+            destination_handoffs: Vec::new(),
+        });
+    }
 
     if let Some(route_id) = route_path.strip_suffix("/trace") {
         if request.method != "GET" || route_id.is_empty() {

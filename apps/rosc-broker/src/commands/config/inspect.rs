@@ -160,3 +160,18 @@ pub(crate) async fn proxy_incidents(
     print_json_pretty(&incidents)?;
     Ok(())
 }
+
+pub(crate) async fn proxy_handoff(
+    path: &Path,
+    resolve_bindings: bool,
+    history_limit: Option<usize>,
+    options: ProxyCommandOptions,
+) -> Result<()> {
+    let config = load_config(path)?;
+    let status =
+        status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
+    let snapshot =
+        rosc_broker::proxy_operator_snapshot(&status, safety_policy(options), history_limit);
+    print_json_pretty(&snapshot.handoff)?;
+    Ok(())
+}

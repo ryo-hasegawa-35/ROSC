@@ -3,6 +3,7 @@ use serde::Serialize;
 use crate::{
     ProxyOperatorSnapshot, ProxyOperatorSuggestedAction, ProxyOperatorSuggestedActionKind,
 };
+use rosc_telemetry::BreakerStateSnapshot;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ProxyOperatorRecoveryRoute {
@@ -113,10 +114,14 @@ pub fn proxy_operator_recovery(snapshot: &ProxyOperatorSnapshot) -> ProxyOperato
                 .unwrap_or_default();
             let drops_total = signal.map(|signal| signal.drops_total).unwrap_or_default();
             let breaker_state = runtime.and_then(|runtime| runtime.breaker_state.clone());
+            let breaker_requires_recovery = matches!(
+                breaker_state,
+                Some(BreakerStateSnapshot::Open | BreakerStateSnapshot::HalfOpen)
+            );
             if queue_depth == 0
                 && send_failures_total == 0
                 && drops_total == 0
-                && breaker_state.is_none()
+                && !breaker_requires_recovery
             {
                 return None;
             }

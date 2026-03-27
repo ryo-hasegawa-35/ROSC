@@ -4,20 +4,21 @@ use crate::control_http::dashboard::{
 use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError};
 use crate::{
     ProxyOperatorAttention, ProxyOperatorDashboard, ProxyOperatorDestinationTrace,
-    ProxyOperatorDiagnostics, ProxyOperatorIncidents, ProxyOperatorOverrides,
-    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace,
-    ProxyOperatorSignalsView, ProxyOperatorSnapshot, ProxyOperatorTraceCatalog,
-    UdpProxyStatusSnapshot,
+    ProxyOperatorDiagnostics, ProxyOperatorHandoffCatalog, ProxyOperatorIncidents,
+    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
+    ProxyOperatorRouteTrace, ProxyOperatorSignalsView, ProxyOperatorSnapshot,
+    ProxyOperatorTraceCatalog, UdpProxyStatusSnapshot,
 };
 use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 
 use super::payloads::{
     ActionResponse, BlockersResponse, HttpResponse, OperatorAttentionResponse,
     OperatorDashboardResponse, OperatorDestinationTraceResponse, OperatorDiagnosticsResponse,
-    OperatorIncidentsResponse, OperatorOverridesResponse, OperatorOverviewResponse,
-    OperatorReadinessResponse, OperatorReportResponse, OperatorRouteTraceResponse,
-    OperatorSignalsResponse, OperatorSnapshotResponse, OperatorTraceResponse,
-    RecentConfigEventsResponse, RecentOperatorActionsResponse, ResponseBody, StatusResponse,
+    OperatorHandoffResponse, OperatorIncidentsResponse, OperatorOverridesResponse,
+    OperatorOverviewResponse, OperatorReadinessResponse, OperatorReportResponse,
+    OperatorRouteTraceResponse, OperatorSignalsResponse, OperatorSnapshotResponse,
+    OperatorTraceResponse, RecentConfigEventsResponse, RecentOperatorActionsResponse, ResponseBody,
+    StatusResponse,
 };
 
 pub(crate) fn status_response(status: UdpProxyStatusSnapshot) -> HttpResponse {
@@ -168,6 +169,13 @@ pub(crate) fn incidents_response(incidents: ProxyOperatorIncidents) -> HttpRespo
             ok: true,
             incidents,
         }),
+    }
+}
+
+pub(crate) fn handoff_response(handoff: ProxyOperatorHandoffCatalog) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorHandoff(OperatorHandoffResponse { ok: true, handoff }),
     }
 }
 
