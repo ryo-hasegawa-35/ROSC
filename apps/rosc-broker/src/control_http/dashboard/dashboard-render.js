@@ -19,6 +19,9 @@ export function collectDashboardElements() {
     trafficHotspots: document.getElementById("traffic-hotspots"),
     worklistSummary: document.getElementById("worklist-summary"),
     worklistItems: document.getElementById("worklist-items"),
+    boardBlockedItems: document.getElementById("board-blocked-items"),
+    boardDegradedItems: document.getElementById("board-degraded-items"),
+    boardWatchItems: document.getElementById("board-watch-items"),
     incidentDigestSummary: document.getElementById("incident-digest-summary"),
     incidentDigestItems: document.getElementById("incident-digest-items"),
     recoverySummary: document.getElementById("recovery-summary"),
@@ -76,6 +79,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderTopology(elements, status);
   renderTraffic(elements, dashboard.traffic, context.trafficPulse, snapshot);
   renderWorklist(elements, snapshot.worklist);
+  renderBoard(elements, snapshot.board);
   renderIncidentDigest(elements, snapshot.incident_digest);
   renderRecoveryCandidates(elements, snapshot.recovery);
   renderFocus(elements, dashboard, context.focusState);
@@ -270,6 +274,37 @@ function renderWorklist(elements, worklist) {
         operatorCard(item, {
           label: "Operator work item",
         }),
+      ),
+    ),
+  );
+}
+
+function renderBoard(elements, board) {
+  renderBoardLane(elements, elements.boardBlockedItems, board?.blocked_items, "Blocked board");
+  renderBoardLane(
+    elements,
+    elements.boardDegradedItems,
+    board?.degraded_items,
+    "Degraded board",
+  );
+  renderBoardLane(elements, elements.boardWatchItems, board?.watch_items, "Watch board");
+}
+
+function renderBoardLane(elements, container, items, label) {
+  container.replaceChildren(
+    ...emptyAware(
+      elements,
+      (items || []).map((item) =>
+        operatorCard(
+          {
+            level: String(item.level || "info").toLowerCase(),
+            title: item.title,
+            summary: item.summary,
+            reasons: item.reasons,
+            action: item.actions?.[0] || null,
+          },
+          { label },
+        ),
       ),
     ),
   );

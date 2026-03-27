@@ -3,24 +3,24 @@ use crate::control_http::dashboard::{
 };
 use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError};
 use crate::{
-    ProxyOperatorAttention, ProxyOperatorCasebookCatalog, ProxyOperatorDashboard,
-    ProxyOperatorDestinationTrace, ProxyOperatorDiagnostics, ProxyOperatorHandoffCatalog,
-    ProxyOperatorIncidents, ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness,
-    ProxyOperatorReport, ProxyOperatorRouteTrace, ProxyOperatorSignalsView, ProxyOperatorSnapshot,
-    ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog,
-    UdpProxyStatusSnapshot,
+    ProxyOperatorAttention, ProxyOperatorBoard, ProxyOperatorCasebookCatalog,
+    ProxyOperatorDashboard, ProxyOperatorDestinationTrace, ProxyOperatorDiagnostics,
+    ProxyOperatorHandoffCatalog, ProxyOperatorIncidents, ProxyOperatorOverrides,
+    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace,
+    ProxyOperatorSignalsView, ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog,
+    ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog, UdpProxyStatusSnapshot,
 };
 use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 
 use super::payloads::{
     ActionResponse, BlockersResponse, HttpResponse, OperatorAttentionResponse,
-    OperatorCasebookResponse, OperatorDashboardResponse, OperatorDestinationTraceResponse,
-    OperatorDiagnosticsResponse, OperatorHandoffResponse, OperatorIncidentsResponse,
-    OperatorOverridesResponse, OperatorOverviewResponse, OperatorReadinessResponse,
-    OperatorReportResponse, OperatorRouteTraceResponse, OperatorSignalsResponse,
-    OperatorSnapshotResponse, OperatorTimelineResponse, OperatorTraceResponse,
-    OperatorTriageResponse, RecentConfigEventsResponse, RecentOperatorActionsResponse,
-    ResponseBody, StatusResponse,
+    OperatorBoardResponse, OperatorCasebookResponse, OperatorDashboardResponse,
+    OperatorDestinationTraceResponse, OperatorDiagnosticsResponse, OperatorHandoffResponse,
+    OperatorIncidentsResponse, OperatorOverridesResponse, OperatorOverviewResponse,
+    OperatorReadinessResponse, OperatorReportResponse, OperatorRouteTraceResponse,
+    OperatorSignalsResponse, OperatorSnapshotResponse, OperatorTimelineResponse,
+    OperatorTraceResponse, OperatorTriageResponse, RecentConfigEventsResponse,
+    RecentOperatorActionsResponse, ResponseBody, StatusResponse,
 };
 
 pub(crate) fn status_response(status: UdpProxyStatusSnapshot) -> HttpResponse {
@@ -199,6 +199,13 @@ pub(crate) fn casebook_response(casebook: ProxyOperatorCasebookCatalog) -> HttpR
     HttpResponse {
         status: "200 OK",
         body: ResponseBody::OperatorCasebook(OperatorCasebookResponse { ok: true, casebook }),
+    }
+}
+
+pub(crate) fn board_response(board: ProxyOperatorBoard) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorBoard(OperatorBoardResponse { ok: true, board }),
     }
 }
 

@@ -7,6 +7,7 @@ mod health_service;
 mod launch_profile;
 mod managed_proxy;
 mod operator_attention;
+mod operator_board;
 mod operator_casebook;
 mod operator_dashboard;
 mod operator_diagnostics;
@@ -45,6 +46,9 @@ pub use launch_profile::{
 };
 pub use managed_proxy::{FrozenStartupBehavior, ManagedProxyStartupOptions, ManagedUdpProxy};
 pub use operator_attention::{ProxyOperatorAttention, proxy_operator_attention};
+pub use operator_board::{
+    ProxyOperatorBoard, ProxyOperatorBoardItem, ProxyOperatorBoardScope, proxy_operator_board,
+};
 pub use operator_casebook::{
     ProxyOperatorCasebookCatalog, ProxyOperatorDestinationCasebook, ProxyOperatorRouteCasebook,
     proxy_operator_casebook,

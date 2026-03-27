@@ -11,7 +11,7 @@ use super::request::{
     replay_limit, split_query,
 };
 use super::response::{
-    HttpResponse, blockers_response, casebook_response, config_events_response,
+    HttpResponse, blockers_response, board_response, casebook_response, config_events_response,
     dashboard_css_response, dashboard_data_response, dashboard_html_response,
     dashboard_js_response, dashboard_render_js_response, dashboard_state_js_response,
     destination_trace_response, diagnostics_response, handoff_response, incidents_response,
@@ -98,6 +98,13 @@ pub(crate) async fn route_request(
             let snapshot = control.operator_snapshot(limit).await;
             casebook_response(snapshot.casebook)
         }
+        ("GET", "/board") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            let snapshot = control.operator_snapshot(limit).await;
+            board_response(snapshot.board)
+        }
         ("GET", "/timeline") => {
             let Ok(limit) = history_limit(query) else {
                 return invalid_query_error("limit");
@@ -158,6 +165,33 @@ async fn route_nested_request(
     query: Option<&str>,
     control: Arc<dyn ProxyControlPlane>,
 ) -> HttpResponse {
+    if let Some(destination_id) = path
+        .strip_prefix("/destinations/")
+        .and_then(|path| path.strip_suffix("/board"))
+    {
+        if request.method != "GET" || destination_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(destination_id) = decode_uri_component(destination_id) else {
+            return invalid_component_error("destination id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let snapshot = control.operator_snapshot(limit).await;
+        let mut board = snapshot.board;
+        board
+            .blocked_items
+            .retain(|item| item.destination_id.as_deref() == Some(destination_id.as_str()));
+        board
+            .degraded_items
+            .retain(|item| item.destination_id.as_deref() == Some(destination_id.as_str()));
+        board
+            .watch_items
+            .retain(|item| item.destination_id.as_deref() == Some(destination_id.as_str()));
+        return board_response(board);
+    }
+
     if let Some(destination_id) = path
         .strip_prefix("/destinations/")
         .and_then(|path| path.strip_suffix("/casebook"))
@@ -320,6 +354,30 @@ async fn route_nested_request(
     let Some(route_path) = path.strip_prefix("/routes/") else {
         return unsupported_route_error(&request.path);
     };
+
+    if let Some(route_id) = route_path.strip_suffix("/board") {
+        if request.method != "GET" || route_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let snapshot = control.operator_snapshot(limit).await;
+        let mut board = snapshot.board;
+        board
+            .blocked_items
+            .retain(|item| item.route_id.as_deref() == Some(route_id.as_str()));
+        board
+            .degraded_items
+            .retain(|item| item.route_id.as_deref() == Some(route_id.as_str()));
+        board
+            .watch_items
+            .retain(|item| item.route_id.as_deref() == Some(route_id.as_str()));
+        return board_response(board);
+    }
 
     if let Some(route_id) = route_path.strip_suffix("/handoff") {
         if request.method != "GET" || route_id.is_empty() {

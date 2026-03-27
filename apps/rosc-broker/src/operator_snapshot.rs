@@ -1,12 +1,12 @@
 use serde::Serialize;
 
 use crate::{
-    ProxyOperatorAttention, ProxyOperatorCasebookCatalog, ProxyOperatorDiagnostics,
-    ProxyOperatorHandoffCatalog, ProxyOperatorIncidentDigest, ProxyOperatorIncidents,
-    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorRecovery,
+    ProxyOperatorAttention, ProxyOperatorBoard, ProxyOperatorCasebookCatalog,
+    ProxyOperatorDiagnostics, ProxyOperatorHandoffCatalog, ProxyOperatorIncidentDigest,
+    ProxyOperatorIncidents, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorRecovery,
     ProxyOperatorTriageCatalog, ProxyOperatorWorklist, ProxyRuntimeSafetyPolicy,
-    UdpProxyStatusSnapshot, proxy_operator_attention, proxy_operator_casebook,
-    proxy_operator_diagnostics_from_overview, proxy_operator_handoff,
+    UdpProxyStatusSnapshot, proxy_operator_attention, proxy_operator_board,
+    proxy_operator_casebook, proxy_operator_diagnostics_from_overview, proxy_operator_handoff,
     proxy_operator_incident_digest, proxy_operator_incidents_from_histories,
     proxy_operator_overview, proxy_operator_readiness_from_overview, proxy_operator_recovery,
     proxy_operator_triage, proxy_operator_worklist,
@@ -25,6 +25,7 @@ pub struct ProxyOperatorSnapshot {
     pub handoff: ProxyOperatorHandoffCatalog,
     pub triage: ProxyOperatorTriageCatalog,
     pub casebook: ProxyOperatorCasebookCatalog,
+    pub board: ProxyOperatorBoard,
 }
 
 pub fn proxy_operator_snapshot(
@@ -79,6 +80,7 @@ pub fn proxy_operator_snapshot_from_overview(
         handoff: ProxyOperatorHandoffCatalog::default(),
         triage: ProxyOperatorTriageCatalog::default(),
         casebook: ProxyOperatorCasebookCatalog::default(),
+        board: ProxyOperatorBoard::default(),
     };
     let incident_digest = proxy_operator_incident_digest(&provisional_snapshot);
     let recovery = proxy_operator_recovery(&provisional_snapshot);
@@ -99,11 +101,18 @@ pub fn proxy_operator_snapshot_from_overview(
         triage: triage.clone(),
         ..post_recovery_snapshot.clone()
     });
+    let board = proxy_operator_board(&ProxyOperatorSnapshot {
+        handoff: handoff.clone(),
+        triage: triage.clone(),
+        casebook: casebook.clone(),
+        ..post_recovery_snapshot.clone()
+    });
 
     ProxyOperatorSnapshot {
         handoff,
         triage,
         casebook,
+        board,
         ..post_recovery_snapshot
     }
 }

@@ -4,12 +4,12 @@ use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 use serde::Serialize;
 
 use crate::{
-    ProxyOperatorAttention, ProxyOperatorCasebookCatalog, ProxyOperatorDashboard,
-    ProxyOperatorDestinationTrace, ProxyOperatorDiagnostics, ProxyOperatorHandoffCatalog,
-    ProxyOperatorIncidents, ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness,
-    ProxyOperatorReport, ProxyOperatorRouteTrace, ProxyOperatorSignalScope, ProxyOperatorSnapshot,
-    ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog,
-    UdpProxyStatusSnapshot,
+    ProxyOperatorAttention, ProxyOperatorBoard, ProxyOperatorCasebookCatalog,
+    ProxyOperatorDashboard, ProxyOperatorDestinationTrace, ProxyOperatorDiagnostics,
+    ProxyOperatorHandoffCatalog, ProxyOperatorIncidents, ProxyOperatorOverrides,
+    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace,
+    ProxyOperatorSignalScope, ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog,
+    ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog, UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -130,6 +130,12 @@ pub(crate) struct OperatorCasebookResponse {
 }
 
 #[derive(Serialize)]
+pub(crate) struct OperatorBoardResponse {
+    pub(crate) ok: bool,
+    pub(crate) board: ProxyOperatorBoard,
+}
+
+#[derive(Serialize)]
 pub(crate) struct OperatorOverridesResponse {
     pub(crate) ok: bool,
     pub(crate) overrides: ProxyOperatorOverrides,
@@ -171,6 +177,7 @@ pub(crate) enum ResponseBody {
     OperatorTimeline(OperatorTimelineResponse),
     OperatorTriage(OperatorTriageResponse),
     OperatorCasebook(OperatorCasebookResponse),
+    OperatorBoard(OperatorBoardResponse),
     OperatorTrace(OperatorTraceResponse),
     OperatorRouteTrace(OperatorRouteTraceResponse),
     OperatorDestinationTrace(OperatorDestinationTraceResponse),
@@ -212,6 +219,7 @@ impl ResponseBody {
             Self::OperatorTimeline(body) => json_payload(body),
             Self::OperatorTriage(body) => json_payload(body),
             Self::OperatorCasebook(body) => json_payload(body),
+            Self::OperatorBoard(body) => json_payload(body),
             Self::OperatorTrace(body) => json_payload(body),
             Self::OperatorRouteTrace(body) => json_payload(body),
             Self::OperatorDestinationTrace(body) => json_payload(body),

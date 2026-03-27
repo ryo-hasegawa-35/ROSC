@@ -4,11 +4,11 @@ use common::broad_scope_config;
 use rosc_broker::{
     ProxyOperatorSignalScope, ProxyOperatorState, ProxyOperatorTimelineCategory,
     ProxyRuntimeSafetyPolicy, attach_runtime_status, proxy_operator_attention,
-    proxy_operator_casebook, proxy_operator_dashboard, proxy_operator_diagnostics,
-    proxy_operator_handoff, proxy_operator_incidents_from_histories, proxy_operator_overview,
-    proxy_operator_readiness, proxy_operator_recovery, proxy_operator_report,
-    proxy_operator_signals_view, proxy_operator_snapshot, proxy_operator_timeline,
-    proxy_operator_trace, proxy_status_from_config,
+    proxy_operator_board, proxy_operator_casebook, proxy_operator_dashboard,
+    proxy_operator_diagnostics, proxy_operator_handoff, proxy_operator_incidents_from_histories,
+    proxy_operator_overview, proxy_operator_readiness, proxy_operator_recovery,
+    proxy_operator_report, proxy_operator_signals_view, proxy_operator_snapshot,
+    proxy_operator_timeline, proxy_operator_trace, proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -353,6 +353,13 @@ fn operator_snapshot_bundles_readiness_diagnostics_attention_and_incidents() {
             .route_casebooks
             .iter()
             .any(|casebook| casebook.route_id == "camera")
+    );
+    assert!(
+        snapshot
+            .board
+            .degraded_items
+            .iter()
+            .any(|item| item.route_id.as_deref() == Some("camera"))
     );
 }
 
@@ -1080,6 +1087,46 @@ fn operator_casebook_bundles_incident_recovery_and_handoff_context() {
             .recent_events
             .iter()
             .any(|event| event.title.contains("Traffic override"))
+    );
+}
+
+#[test]
+fn operator_board_groups_casebooks_into_triage_lanes() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            queue_depth: [("udp_renderer".to_owned(), 2)].into_iter().collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let snapshot = proxy_operator_snapshot(&status, ProxyRuntimeSafetyPolicy::default(), Some(3));
+    let board = proxy_operator_board(&snapshot);
+
+    assert!(
+        board
+            .degraded_items
+            .iter()
+            .any(|item| item.title.contains("Traffic frozen"))
+    );
+    assert!(
+        board
+            .degraded_items
+            .iter()
+            .any(|item| item.route_id.as_deref() == Some("camera"))
+    );
+    assert!(
+        board
+            .degraded_items
+            .iter()
+            .any(|item| item.destination_id.as_deref() == Some("udp_renderer"))
+            || board
+                .watch_items
+                .iter()
+                .any(|item| item.destination_id.as_deref() == Some("udp_renderer"))
     );
 }
 

@@ -302,6 +302,11 @@ async fn control_service_serves_dashboard_assets() {
             .is_some()
     );
     assert!(
+        dashboard_data["dashboard"]["snapshot"]["board"]["degraded_items"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
         dashboard_data["dashboard"]["snapshot"]["worklist"]["items"]
             .as_array()
             .is_some()
@@ -640,6 +645,22 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|entry| entry["route_id"] == "camera")
     );
 
+    let board = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /board?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(board["ok"], true);
+    assert!(
+        board["board"]["degraded_items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["route_id"] == "camera")
+    );
+
     let timeline = json_body(
         &request(
             service.listen_addr(),
@@ -695,6 +716,22 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
         "camera"
     );
 
+    let route_board = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/board?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_board["ok"], true);
+    assert!(
+        route_board["board"]["degraded_items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["route_id"] == "camera")
+    );
+
     let route_timeline = json_body(
         &request(
             service.listen_addr(),
@@ -745,6 +782,27 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert_eq!(
         destination_casebook["casebook"]["destination_casebooks"][0]["destination_id"],
         "udp_renderer"
+    );
+
+    let destination_board = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/board?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_board["ok"], true);
+    assert!(
+        destination_board["board"]["watch_items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["destination_id"] == "udp_renderer")
+            || destination_board["board"]["degraded_items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|entry| entry["destination_id"] == "udp_renderer")
     );
 
     let destination_timeline = json_body(

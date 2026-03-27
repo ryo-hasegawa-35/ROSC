@@ -170,6 +170,23 @@ pub enum Command {
         #[arg(long)]
         destination_id: Option<String>,
     },
+    ProxyBoard {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
     WatchConfig {
         path: PathBuf,
         #[arg(long, default_value_t = 1000)]

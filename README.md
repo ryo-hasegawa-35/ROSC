@@ -49,6 +49,7 @@ cargo run -p rosc-broker -- proxy-handoff examples/phase-01-basic.toml --fail-on
 cargo run -p rosc-broker -- proxy-timeline examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- proxy-triage examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- proxy-casebook examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
+cargo run -p rosc-broker -- proxy-board examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
@@ -73,16 +74,19 @@ curl http://127.0.0.1:19292/incidents?limit=10
 curl http://127.0.0.1:19292/handoff?limit=10
 curl http://127.0.0.1:19292/triage?limit=10
 curl http://127.0.0.1:19292/casebook?limit=10
+curl http://127.0.0.1:19292/board?limit=10
 curl http://127.0.0.1:19292/timeline?limit=10
 curl http://127.0.0.1:19292/trace?limit=10
 curl http://127.0.0.1:19292/routes/camera/handoff?limit=10
 curl http://127.0.0.1:19292/routes/camera/triage?limit=10
 curl http://127.0.0.1:19292/routes/camera/casebook?limit=10
+curl http://127.0.0.1:19292/routes/camera/board?limit=10
 curl http://127.0.0.1:19292/routes/camera/timeline?limit=10
 curl http://127.0.0.1:19292/routes/camera/trace?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/handoff?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/triage?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/casebook?limit=10
+curl http://127.0.0.1:19292/destinations/udp_renderer/board?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/timeline?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/trace?limit=10
 curl http://127.0.0.1:19292/overrides
@@ -96,7 +100,7 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` is intentionally loopback-only. Bind it to `127.0.0.1`, `::1`, or another
 local-only alias such as `localhost`; wildcard or externally reachable addresses are rejected.
 
-`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-assert-ready`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, `proxy-incidents`, `proxy-handoff`, `proxy-timeline`, `proxy-triage`, and `proxy-casebook`
+`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-assert-ready`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, `proxy-incidents`, `proxy-handoff`, `proxy-timeline`, `proxy-triage`, `proxy-casebook`, and `proxy-board`
 intentionally write JSON only to stdout so they can be piped directly into tools such as `jq`
 without stripping summary lines first.
 
@@ -160,6 +164,8 @@ Current Phase 01 runtime coverage:
 - handoff and triage guidance now treat `traffic_frozen` as a first-class global override, so focused recovery guidance tells the operator to thaw traffic before trusting apparently stable routes or destinations
 - snapshot now also includes a casebook catalog, and `proxy-casebook` plus control-plane `/casebook`, `/routes/{id}/casebook`, `/destinations/{id}/casebook` expose a focused route/destination recovery packet that bundles incident titles, next steps, recommended actions, recovery surface, recent trace, and recorded timeline in one machine-readable slice
 - the embedded dashboard now renders focused route/destination casebook panels so an operator can move from focus selection straight into incident, recovery, and handoff context without jumping across multiple sections
+- snapshot now also includes a board catalog, and `proxy-board` plus control-plane `/board`, `/routes/{id}/board`, `/destinations/{id}/board` expose blocked/degraded/watch lanes so operators and external tooling can sort what needs action before drilling into a casebook
+- the embedded dashboard now renders a board section that groups the current operator workload into blocked, degraded, and watch lists with direct focus/recovery actions
 - `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
 - config rejection / block / reload-failure history now retains reason details instead of only counters
 

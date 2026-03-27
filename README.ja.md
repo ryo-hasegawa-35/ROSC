@@ -47,6 +47,7 @@ cargo run -p rosc-broker -- proxy-handoff examples/phase-01-basic.toml --fail-on
 cargo run -p rosc-broker -- proxy-timeline examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- proxy-triage examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- proxy-casebook examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
+cargo run -p rosc-broker -- proxy-board examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
@@ -71,16 +72,19 @@ curl http://127.0.0.1:19292/incidents?limit=10
 curl http://127.0.0.1:19292/handoff?limit=10
 curl http://127.0.0.1:19292/triage?limit=10
 curl http://127.0.0.1:19292/casebook?limit=10
+curl http://127.0.0.1:19292/board?limit=10
 curl http://127.0.0.1:19292/timeline?limit=10
 curl http://127.0.0.1:19292/trace?limit=10
 curl http://127.0.0.1:19292/routes/camera/handoff?limit=10
 curl http://127.0.0.1:19292/routes/camera/triage?limit=10
 curl http://127.0.0.1:19292/routes/camera/casebook?limit=10
+curl http://127.0.0.1:19292/routes/camera/board?limit=10
 curl http://127.0.0.1:19292/routes/camera/timeline?limit=10
 curl http://127.0.0.1:19292/routes/camera/trace?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/handoff?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/triage?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/casebook?limit=10
+curl http://127.0.0.1:19292/destinations/udp_renderer/board?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/timeline?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/trace?limit=10
 curl http://127.0.0.1:19292/overrides
@@ -94,7 +98,7 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` は意図的に loopback 専用です。`127.0.0.1`、`::1`、`localhost` のような
 ローカル専用アドレスだけを使い、wildcard や外部から到達できる bind は拒否されます。
 
-`proxy-status`、`proxy-overview`、`proxy-readiness`、`proxy-assert-ready`、`proxy-snapshot`、`proxy-diagnostics`、`proxy-attention`、`proxy-incidents`、`proxy-handoff`、`proxy-timeline`、`proxy-triage`、`proxy-casebook`
+`proxy-status`、`proxy-overview`、`proxy-readiness`、`proxy-assert-ready`、`proxy-snapshot`、`proxy-diagnostics`、`proxy-attention`、`proxy-incidents`、`proxy-handoff`、`proxy-timeline`、`proxy-triage`、`proxy-casebook`、`proxy-board`
 は、`jq` などへそのまま流せるように stdout へ JSON だけを出す契約にそろえています。
 
 Docker 経由で同じ確認を行う場合:
@@ -157,6 +161,8 @@ docker compose run --rm rosc-dev cargo test --workspace
 - handoff と triage の next step では `traffic_frozen` を first-class な global override として扱い、見かけ上 stable な route / destination でも thaw を先に促すようにした
 - snapshot に casebook catalog も追加し、`proxy-casebook` と control-plane の `/casebook`、`/routes/{id}/casebook`、`/destinations/{id}/casebook` から、incident title、next step、推奨 action、recovery surface、recent trace、recorded timeline をまとめた focused recovery packet を取得できるようにした
 - 埋め込み dashboard に focused route / destination casebook panel も追加し、focus 選択から incident / recovery / handoff の文脈までを section をまたがずに続けて見られるようにした
+- snapshot に board catalog も追加し、`proxy-board` と control-plane の `/board`、`/routes/{id}/board`、`/destinations/{id}/board` から、blocked / degraded / watch の lane を使って「何から見るべきか」を機械可読に取れるようにした
+- 埋め込み dashboard にも board section を追加し、現在の operator workload を blocked / degraded / watch ごとに並べつつ、そのまま focus / recovery action に進めるようにした
 - `/signals?scope=problematic` で、operator が今見るべき route / destination signal だけに payload を絞れるようにした
 - config の reject / block / reload failure も counters だけでなく reason 付きの recent history として残るようになった
 

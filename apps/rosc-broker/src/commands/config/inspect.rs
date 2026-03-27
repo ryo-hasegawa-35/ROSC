@@ -316,3 +316,48 @@ pub(crate) async fn proxy_casebook(
     print_json_pretty(&casebook)?;
     Ok(())
 }
+
+pub(crate) async fn proxy_board(
+    path: &Path,
+    resolve_bindings: bool,
+    history_limit: Option<usize>,
+    route_id: Option<&str>,
+    destination_id: Option<&str>,
+    options: ProxyCommandOptions,
+) -> Result<()> {
+    if route_id.is_some() && destination_id.is_some() {
+        bail!("proxy-board accepts only one of --route-id or --destination-id");
+    }
+
+    let config = load_config(path)?;
+    let status =
+        status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
+    let snapshot =
+        rosc_broker::proxy_operator_snapshot(&status, safety_policy(options), history_limit);
+    let mut board = snapshot.board;
+
+    if let Some(route_id) = route_id {
+        board
+            .blocked_items
+            .retain(|item| item.route_id.as_deref() == Some(route_id));
+        board
+            .degraded_items
+            .retain(|item| item.route_id.as_deref() == Some(route_id));
+        board
+            .watch_items
+            .retain(|item| item.route_id.as_deref() == Some(route_id));
+    } else if let Some(destination_id) = destination_id {
+        board
+            .blocked_items
+            .retain(|item| item.destination_id.as_deref() == Some(destination_id));
+        board
+            .degraded_items
+            .retain(|item| item.destination_id.as_deref() == Some(destination_id));
+        board
+            .watch_items
+            .retain(|item| item.destination_id.as_deref() == Some(destination_id));
+    }
+
+    print_json_pretty(&board)?;
+    Ok(())
+}
