@@ -4,9 +4,11 @@ use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 use serde::Serialize;
 
 use crate::{
-    ProxyOperatorAttention, ProxyOperatorDashboard, ProxyOperatorDiagnostics,
-    ProxyOperatorIncidents, ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness,
-    ProxyOperatorReport, ProxyOperatorSignalScope, ProxyOperatorSnapshot, UdpProxyStatusSnapshot,
+    ProxyOperatorAttention, ProxyOperatorDashboard, ProxyOperatorDestinationTrace,
+    ProxyOperatorDiagnostics, ProxyOperatorIncidents, ProxyOperatorOverrides,
+    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace,
+    ProxyOperatorSignalScope, ProxyOperatorSnapshot, ProxyOperatorTraceCatalog,
+    UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -85,6 +87,24 @@ pub(crate) struct OperatorIncidentsResponse {
 }
 
 #[derive(Serialize)]
+pub(crate) struct OperatorTraceResponse {
+    pub(crate) ok: bool,
+    pub(crate) trace: ProxyOperatorTraceCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorRouteTraceResponse {
+    pub(crate) ok: bool,
+    pub(crate) route_trace: ProxyOperatorRouteTrace,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorDestinationTraceResponse {
+    pub(crate) ok: bool,
+    pub(crate) destination_trace: ProxyOperatorDestinationTrace,
+}
+
+#[derive(Serialize)]
 pub(crate) struct OperatorOverridesResponse {
     pub(crate) ok: bool,
     pub(crate) overrides: ProxyOperatorOverrides,
@@ -122,6 +142,9 @@ pub(crate) enum ResponseBody {
     OperatorDiagnostics(Box<OperatorDiagnosticsResponse>),
     OperatorAttention(OperatorAttentionResponse),
     OperatorIncidents(OperatorIncidentsResponse),
+    OperatorTrace(OperatorTraceResponse),
+    OperatorRouteTrace(OperatorRouteTraceResponse),
+    OperatorDestinationTrace(OperatorDestinationTraceResponse),
     OperatorOverrides(OperatorOverridesResponse),
     OperatorSignals(OperatorSignalsResponse),
     Blockers(BlockersResponse),
@@ -156,6 +179,9 @@ impl ResponseBody {
             Self::OperatorDiagnostics(body) => json_payload(body),
             Self::OperatorAttention(body) => json_payload(body),
             Self::OperatorIncidents(body) => json_payload(body),
+            Self::OperatorTrace(body) => json_payload(body),
+            Self::OperatorRouteTrace(body) => json_payload(body),
+            Self::OperatorDestinationTrace(body) => json_payload(body),
             Self::OperatorOverrides(body) => json_payload(body),
             Self::OperatorSignals(body) => json_payload(body),
             Self::Blockers(body) => json_payload(body),

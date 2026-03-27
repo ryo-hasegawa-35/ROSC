@@ -64,6 +64,9 @@ curl http://127.0.0.1:19292/snapshot?limit=10
 curl http://127.0.0.1:19292/diagnostics?limit=10
 curl http://127.0.0.1:19292/attention
 curl http://127.0.0.1:19292/incidents?limit=10
+curl http://127.0.0.1:19292/trace?limit=10
+curl http://127.0.0.1:19292/routes/camera/trace?limit=10
+curl http://127.0.0.1:19292/destinations/udp_renderer/trace?limit=10
 curl http://127.0.0.1:19292/overrides
 curl http://127.0.0.1:19292/signals
 curl http://127.0.0.1:19292/signals?scope=problematic
@@ -128,6 +131,8 @@ docker compose run --rm rosc-dev cargo test --workspace
 - snapshot と dashboard payload に machine-readable な operator worklist を追加し、thaw / restore-route / rehydrate-destination / focus-only investigation の次アクション候補をそのまま扱えるようにした
 - 埋め込み dashboard は一時的な control-plane 断でも polling を継続し、最後の成功 snapshot を stale な operator context として保持しつつ、isolated route を runtime table 上でも isolated と明示するようにした
 - snapshot と dashboard payload に incident digest と structured recovery candidate も追加し、grouped incident card から route / destination ごとの具体的な recovery action へそのまま進めるようにした
+- snapshot と dashboard payload に route / destination ごとの trace catalog も追加し、現在の runtime pressure と関連する operator action / config incident をその場で結び付けて見られるようにした
+- control-plane の `/trace`、`/routes/{id}/trace`、`/destinations/{id}/trace` から、その linked trace を埋め込み dashboard 以外の外部 tooling でも直接取得できるようにした
 - `/signals?scope=problematic` で、operator が今見るべき route / destination signal だけに payload を絞れるようにした
 - config の reject / block / reload failure も counters だけでなく reason 付きの recent history として残るようになった
 

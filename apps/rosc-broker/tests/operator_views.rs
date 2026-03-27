@@ -6,7 +6,8 @@ use rosc_broker::{
     ProxyRuntimeSafetyPolicy, attach_runtime_status, proxy_operator_attention,
     proxy_operator_dashboard, proxy_operator_diagnostics, proxy_operator_incidents_from_histories,
     proxy_operator_overview, proxy_operator_readiness, proxy_operator_report,
-    proxy_operator_signals_view, proxy_operator_snapshot, proxy_status_from_config,
+    proxy_operator_signals_view, proxy_operator_snapshot, proxy_operator_trace,
+    proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -562,6 +563,20 @@ fn operator_dashboard_bundles_snapshot_traffic_and_timeline() {
     );
     assert_eq!(dashboard.snapshot.recovery.cached_routes, 0);
     assert_eq!(dashboard.snapshot.recovery.rehydrate_ready_destinations, 1);
+    assert!(
+        dashboard
+            .trace
+            .routes
+            .iter()
+            .any(|trace| trace.route_id == "camera")
+    );
+    assert!(
+        dashboard
+            .trace
+            .destinations
+            .iter()
+            .any(|trace| trace.destination_id == "udp_renderer")
+    );
     assert!(dashboard.snapshot.worklist.immediate_actions >= 1);
     assert!(
         dashboard
@@ -589,6 +604,119 @@ fn operator_dashboard_bundles_snapshot_traffic_and_timeline() {
         ProxyOperatorTimelineCategory::OperatorAction
     );
     assert_eq!(dashboard.timeline[1].label, "freeze_traffic");
+}
+
+#[test]
+fn operator_trace_links_runtime_actions_and_config_events_to_entities() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            dispatch_failures_total: [(
+                (
+                    "camera".to_owned(),
+                    "udp_renderer".to_owned(),
+                    "breaker_open".to_owned(),
+                ),
+                3,
+            )]
+            .into_iter()
+            .collect(),
+            destination_send_failures_total: [(
+                ("udp_renderer".to_owned(), "socket_error".to_owned()),
+                5,
+            )]
+            .into_iter()
+            .collect(),
+            destination_breaker_state: [(
+                "udp_renderer".to_owned(),
+                rosc_telemetry::BreakerStateSnapshot::Open,
+            )]
+            .into_iter()
+            .collect(),
+            recent_operator_actions: vec![
+                RecentOperatorAction {
+                    sequence: 1,
+                    recorded_at_unix_ms: 100,
+                    action: "freeze_traffic".to_owned(),
+                    details: vec!["applied=true".to_owned()],
+                },
+                RecentOperatorAction {
+                    sequence: 2,
+                    recorded_at_unix_ms: 200,
+                    action: "rehydrate_destination".to_owned(),
+                    details: vec![
+                        "destination_id=udp_renderer".to_owned(),
+                        "applied=true".to_owned(),
+                    ],
+                },
+            ],
+            recent_config_events: vec![RecentConfigEvent {
+                sequence: 3,
+                recorded_at_unix_ms: 300,
+                kind: RecentConfigEventKind::Blocked,
+                revision: Some(4),
+                details: vec![
+                    "route_id=camera".to_owned(),
+                    "unsafe wildcard route".to_owned(),
+                ],
+                added_ingresses: 0,
+                removed_ingresses: 0,
+                changed_ingresses: 0,
+                added_destinations: 0,
+                removed_destinations: 0,
+                changed_destinations: 0,
+                added_routes: 0,
+                removed_routes: 0,
+                changed_routes: 1,
+                launch_profile_mode: Some("safe_mode".to_owned()),
+                disabled_capture_routes: 1,
+                disabled_replay_routes: 1,
+                disabled_restart_rehydrate_routes: 1,
+            }],
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let snapshot = proxy_operator_snapshot(&status, ProxyRuntimeSafetyPolicy::default(), Some(8));
+    let trace = proxy_operator_trace(&snapshot);
+
+    let route_trace = trace
+        .routes
+        .iter()
+        .find(|route| route.route_id == "camera")
+        .expect("route trace should exist");
+    assert!(
+        route_trace
+            .open_reasons
+            .iter()
+            .any(|reason| reason.contains("operator isolation"))
+    );
+    assert!(route_trace.recent_events.iter().any(|event| event.kind
+        == rosc_broker::ProxyOperatorTraceEventKind::OperatorAction
+        && event.title == "freeze traffic"));
+    assert!(route_trace.recent_events.iter().any(|event| event.kind
+        == rosc_broker::ProxyOperatorTraceEventKind::ConfigEvent
+        && event.details.iter().any(|detail| detail == "revision=4")));
+
+    let destination_trace = trace
+        .destinations
+        .iter()
+        .find(|destination| destination.destination_id == "udp_renderer")
+        .expect("destination trace should exist");
+    assert_eq!(
+        destination_trace.level,
+        rosc_broker::ProxyOperatorTraceEventLevel::Blocked
+    );
+    assert!(destination_trace.recent_events.iter().any(|event| {
+        event.kind == rosc_broker::ProxyOperatorTraceEventKind::OperatorAction
+            && event
+                .details
+                .iter()
+                .any(|detail| detail == "destination_id=udp_renderer")
+    }));
 }
 
 #[test]

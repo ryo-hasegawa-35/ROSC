@@ -3,17 +3,20 @@ use crate::control_http::dashboard::{
 };
 use crate::control_plane::{ControlPlaneActionResult, ControlPlaneError};
 use crate::{
-    ProxyOperatorAttention, ProxyOperatorDashboard, ProxyOperatorDiagnostics,
-    ProxyOperatorIncidents, ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness,
-    ProxyOperatorReport, ProxyOperatorSignalsView, ProxyOperatorSnapshot, UdpProxyStatusSnapshot,
+    ProxyOperatorAttention, ProxyOperatorDashboard, ProxyOperatorDestinationTrace,
+    ProxyOperatorDiagnostics, ProxyOperatorIncidents, ProxyOperatorOverrides,
+    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace,
+    ProxyOperatorSignalsView, ProxyOperatorSnapshot, ProxyOperatorTraceCatalog,
+    UdpProxyStatusSnapshot,
 };
 use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 
 use super::payloads::{
     ActionResponse, BlockersResponse, HttpResponse, OperatorAttentionResponse,
-    OperatorDashboardResponse, OperatorDiagnosticsResponse, OperatorIncidentsResponse,
-    OperatorOverridesResponse, OperatorOverviewResponse, OperatorReadinessResponse,
-    OperatorReportResponse, OperatorSignalsResponse, OperatorSnapshotResponse,
+    OperatorDashboardResponse, OperatorDestinationTraceResponse, OperatorDiagnosticsResponse,
+    OperatorIncidentsResponse, OperatorOverridesResponse, OperatorOverviewResponse,
+    OperatorReadinessResponse, OperatorReportResponse, OperatorRouteTraceResponse,
+    OperatorSignalsResponse, OperatorSnapshotResponse, OperatorTraceResponse,
     RecentConfigEventsResponse, RecentOperatorActionsResponse, ResponseBody, StatusResponse,
 };
 
@@ -164,6 +167,35 @@ pub(crate) fn incidents_response(incidents: ProxyOperatorIncidents) -> HttpRespo
         body: ResponseBody::OperatorIncidents(OperatorIncidentsResponse {
             ok: true,
             incidents,
+        }),
+    }
+}
+
+pub(crate) fn trace_response(trace: ProxyOperatorTraceCatalog) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorTrace(OperatorTraceResponse { ok: true, trace }),
+    }
+}
+
+pub(crate) fn route_trace_response(route_trace: ProxyOperatorRouteTrace) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorRouteTrace(OperatorRouteTraceResponse {
+            ok: true,
+            route_trace,
+        }),
+    }
+}
+
+pub(crate) fn destination_trace_response(
+    destination_trace: ProxyOperatorDestinationTrace,
+) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorDestinationTrace(OperatorDestinationTraceResponse {
+            ok: true,
+            destination_trace,
         }),
     }
 }

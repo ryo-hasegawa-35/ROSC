@@ -13,8 +13,8 @@ pub use details::{
 pub use traffic::{ProxyOperatorCounterEntry, ProxyOperatorTrafficSummary};
 
 use crate::{
-    ProxyOperatorSnapshot, ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot,
-    proxy_operator_snapshot,
+    ProxyOperatorSnapshot, ProxyOperatorTraceCatalog, ProxyRuntimeSafetyPolicy,
+    UdpProxyStatusSnapshot, proxy_operator_snapshot, proxy_operator_trace,
 };
 
 use self::details::{destination_details_from_snapshot, route_details_from_snapshot};
@@ -30,6 +30,7 @@ pub struct ProxyOperatorDashboard {
     pub timeline: Vec<ProxyOperatorTimelineEntry>,
     pub route_details: Vec<ProxyOperatorRouteDetail>,
     pub destination_details: Vec<ProxyOperatorDestinationDetail>,
+    pub trace: ProxyOperatorTraceCatalog,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -69,6 +70,7 @@ pub fn proxy_operator_dashboard_from_snapshot(
     let timeline = timeline_from_snapshot(&snapshot);
     let route_details = route_details_from_snapshot(&snapshot);
     let destination_details = destination_details_from_snapshot(&snapshot);
+    let trace = proxy_operator_trace(&snapshot);
 
     ProxyOperatorDashboard {
         refresh_interval_ms: DASHBOARD_REFRESH_INTERVAL_MS,
@@ -77,6 +79,7 @@ pub fn proxy_operator_dashboard_from_snapshot(
         timeline,
         route_details,
         destination_details,
+        trace,
     }
 }
 

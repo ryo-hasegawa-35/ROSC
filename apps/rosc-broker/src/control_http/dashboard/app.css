@@ -224,7 +224,10 @@ body {
 
 .state-pill[data-level="healthy"],
 .inline-state[data-level="healthy"],
-.entity-state[data-level="healthy"] {
+.entity-state[data-level="healthy"],
+.state-pill[data-level="info"],
+.inline-state[data-level="info"],
+.entity-state[data-level="info"] {
   color: var(--ok);
   background: var(--ok-soft);
 }
@@ -473,6 +476,11 @@ td code {
   gap: 14px;
 }
 
+.trace-card {
+  display: grid;
+  gap: 14px;
+}
+
 .detail-shell {
   border-radius: 18px;
   padding: 18px;
@@ -531,6 +539,65 @@ td code {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.trace-shell {
+  border-radius: 18px;
+  padding: 18px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 16px;
+}
+
+.trace-summary {
+  display: grid;
+  gap: 12px;
+}
+
+.trace-events {
+  display: grid;
+  gap: 12px;
+}
+
+.trace-event {
+  border-radius: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  background: rgba(24, 32, 37, 0.03);
+}
+
+.trace-event[data-level="blocked"] {
+  border-color: rgba(165, 59, 42, 0.28);
+}
+
+.trace-event[data-level="degraded"] {
+  border-color: rgba(194, 107, 30, 0.28);
+}
+
+.trace-event[data-level="info"] {
+  border-color: rgba(39, 117, 78, 0.18);
+}
+
+.trace-event h5 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.trace-event .summary {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.trace-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trace-timestamp {
+  color: var(--muted);
+  font-size: 0.84rem;
 }
 
 .worklist-stack {

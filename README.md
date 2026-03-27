@@ -66,6 +66,9 @@ curl http://127.0.0.1:19292/snapshot?limit=10
 curl http://127.0.0.1:19292/diagnostics?limit=10
 curl http://127.0.0.1:19292/attention
 curl http://127.0.0.1:19292/incidents?limit=10
+curl http://127.0.0.1:19292/trace?limit=10
+curl http://127.0.0.1:19292/routes/camera/trace?limit=10
+curl http://127.0.0.1:19292/destinations/udp_renderer/trace?limit=10
 curl http://127.0.0.1:19292/overrides
 curl http://127.0.0.1:19292/signals
 curl http://127.0.0.1:19292/signals?scope=problematic
@@ -131,6 +134,8 @@ Current Phase 01 runtime coverage:
 - snapshot and dashboard payloads now include a machine-readable operator worklist with recommended next actions such as thaw, restore-route, rehydrate-destination, and focus-only investigation jumps
 - the embedded dashboard now keeps polling through transient control-plane failures, preserves the last successful snapshot as stale operator context, and marks isolated routes as isolated in the runtime table instead of silently healthy
 - snapshot and dashboard payloads now also include an incident digest plus structured recovery candidates, so operators can move from grouped incident cards into concrete route/destination recovery actions without stitching extra control-plane calls
+- snapshot and dashboard payloads now also include per-route and per-destination trace catalogs that connect current runtime pressure with related operator actions and config incidents
+- control-plane `/trace`, `/routes/{id}/trace`, and `/destinations/{id}/trace` now expose those linked traces directly for external tooling, not only the embedded dashboard
 - `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
 - config rejection / block / reload-failure history now retains reason details instead of only counters
 

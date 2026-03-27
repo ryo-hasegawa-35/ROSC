@@ -254,6 +254,16 @@ async fn control_service_serves_dashboard_assets() {
         "udp_renderer"
     );
     assert!(
+        dashboard_data["dashboard"]["trace"]["routes"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["trace"]["destinations"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
         dashboard_data["dashboard"]["snapshot"]["worklist"]["items"]
             .as_array()
             .is_some()
@@ -449,6 +459,59 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .unwrap()
             .len(),
         1
+    );
+
+    let trace = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /trace?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(trace["ok"], true);
+    assert!(
+        trace["trace"]["routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|route| route["route_id"] == "camera")
+    );
+    assert!(
+        trace["trace"]["destinations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|destination| destination["destination_id"] == "udp_renderer")
+    );
+
+    let route_trace = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/trace?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_trace["ok"], true);
+    assert_eq!(route_trace["route_trace"]["route_id"], "camera");
+    assert!(
+        route_trace["route_trace"]["recent_events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|event| event["kind"] == "override")
+    );
+
+    let destination_trace = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/trace?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_trace["ok"], true);
+    assert_eq!(
+        destination_trace["destination_trace"]["destination_id"],
+        "udp_renderer"
     );
 
     let attention = json_body(

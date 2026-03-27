@@ -18,6 +18,7 @@ mod operator_readiness;
 mod operator_recovery;
 mod operator_runtime_summary;
 mod operator_snapshot;
+mod operator_trace;
 mod operator_worklist;
 mod proxy_app;
 mod proxy_reload_supervisor;
@@ -75,6 +76,11 @@ pub use operator_recovery::{
 pub use operator_runtime_summary::{ProxyOperatorRuntimeSummary, proxy_operator_runtime_summary};
 pub use operator_snapshot::{
     ProxyOperatorSnapshot, proxy_operator_snapshot, proxy_operator_snapshot_from_overview,
+};
+pub use operator_trace::{
+    ProxyOperatorDestinationTrace, ProxyOperatorRouteTrace, ProxyOperatorTraceCatalog,
+    ProxyOperatorTraceEvent, ProxyOperatorTraceEventKind, ProxyOperatorTraceEventLevel,
+    proxy_operator_trace,
 };
 pub use operator_worklist::{
     ProxyOperatorSuggestedAction, ProxyOperatorSuggestedActionKind, ProxyOperatorWorkItem,

@@ -26,8 +26,10 @@ export function collectDashboardElements() {
     recoveryDestinationCandidates: document.getElementById("recovery-destination-candidates"),
     routeFocusSelect: document.getElementById("route-focus-select"),
     routeFocusDetail: document.getElementById("route-focus-detail"),
+    routeTraceDetail: document.getElementById("route-trace-detail"),
     destinationFocusSelect: document.getElementById("destination-focus-select"),
     destinationFocusDetail: document.getElementById("destination-focus-detail"),
+    destinationTraceDetail: document.getElementById("destination-trace-detail"),
     routesTable: document.getElementById("routes-table"),
     destinationsTable: document.getElementById("destinations-table"),
     overridesList: document.getElementById("overrides-list"),
@@ -68,6 +70,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderIncidentDigest(elements, snapshot.incident_digest);
   renderRecoveryCandidates(elements, snapshot.recovery);
   renderFocus(elements, dashboard, context.focusState);
+  renderTrace(elements, dashboard, context.focusState);
   renderRoutes(elements, status, diagnostics);
   renderDestinations(elements, dashboard.destination_details);
   renderRecovery(elements, snapshot);
@@ -367,6 +370,17 @@ function renderFocus(elements, dashboard, focusState) {
   );
   renderRouteDetail(elements, routeDetail);
   renderDestinationDetail(elements, destinationDetail);
+}
+
+function renderTrace(elements, dashboard, focusState) {
+  const routeTrace = (dashboard.trace?.routes || []).find(
+    (trace) => trace.route_id === focusState?.routeId,
+  );
+  const destinationTrace = (dashboard.trace?.destinations || []).find(
+    (trace) => trace.destination_id === focusState?.destinationId,
+  );
+  renderRouteTrace(elements, routeTrace);
+  renderDestinationTrace(elements, destinationTrace);
 }
 
 function renderRoutes(elements, status, diagnostics) {
@@ -734,6 +748,140 @@ function renderDestinationDetail(elements, detail) {
   elements.destinationFocusDetail.replaceChildren(wrapper);
 }
 
+function renderRouteTrace(elements, trace) {
+  if (!trace) {
+    fillList(elements, elements.routeTraceDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused route trace</p>
+        <h4>${escapeHtml(trace.route_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(trace.level.toLowerCase())}">${escapeHtml(humanizeState(trace.level))}</span>
+    </div>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Destinations", trace.related_destination_ids.length],
+      ["Fallback targets", trace.direct_udp_targets.length],
+      ["Open reasons", trace.open_reasons.length],
+      ["Recent events", trace.recent_events.length],
+    ]),
+  );
+  wrapper.appendChild(traceSummaryBlock("Current reasons", trace.open_reasons));
+  if (trace.actions?.length > 0) {
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    actions.replaceChildren(...trace.actions.map((action) => worklistActionButton(action)));
+    wrapper.appendChild(actions);
+  }
+  wrapper.appendChild(traceEventsBlock(trace.recent_events));
+  elements.routeTraceDetail.replaceChildren(wrapper);
+}
+
+function renderDestinationTrace(elements, trace) {
+  if (!trace) {
+    fillList(elements, elements.destinationTraceDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused destination trace</p>
+        <h4>${escapeHtml(trace.destination_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(trace.level.toLowerCase())}">${escapeHtml(humanizeState(trace.level))}</span>
+    </div>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Routes", trace.route_ids.length],
+      ["Open reasons", trace.open_reasons.length],
+      ["Recent events", trace.recent_events.length],
+      ["Target", trace.target],
+    ]),
+  );
+  wrapper.appendChild(traceSummaryBlock("Current reasons", trace.open_reasons));
+  if (trace.actions?.length > 0) {
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    actions.replaceChildren(...trace.actions.map((action) => worklistActionButton(action)));
+    wrapper.appendChild(actions);
+  }
+  wrapper.appendChild(traceEventsBlock(trace.recent_events));
+  elements.destinationTraceDetail.replaceChildren(wrapper);
+}
+
+function traceSummaryBlock(title, reasons) {
+  const block = document.createElement("div");
+  block.className = "trace-summary";
+  block.innerHTML = `<p class="panel-label">${escapeHtml(title)}</p>`;
+  const list = document.createElement("ul");
+  list.className = "detail-list";
+  list.replaceChildren(...emptyListItems(reasons));
+  block.appendChild(list);
+  return block;
+}
+
+function traceEventsBlock(events) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-events";
+  wrapper.appendChild(panelLabel("Recent related events"));
+  if (!events || events.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "No related events right now.";
+    wrapper.appendChild(empty);
+    return wrapper;
+  }
+  wrapper.replaceChildren(
+    panelLabel("Recent related events"),
+    ...events.map((event) => traceEventCard(event)),
+  );
+  return wrapper;
+}
+
+function traceEventCard(event) {
+  const card = document.createElement("article");
+  card.className = "trace-event";
+  card.dataset.level = String(event.level || "info").toLowerCase();
+  card.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">${escapeHtml(humanizeTraceKind(event.kind))}</p>
+        <h5>${escapeHtml(event.title)}</h5>
+      </div>
+      <span class="trace-timestamp">${escapeHtml(
+        event.recorded_at_unix_ms ? formatTimestamp(event.recorded_at_unix_ms) : "current state",
+      )}</span>
+    </div>
+    <p class="summary">${escapeHtml(event.summary)}</p>
+  `;
+  const meta = document.createElement("div");
+  meta.className = "trace-meta";
+  for (const detail of event.details || []) {
+    const token = document.createElement("span");
+    token.className = "token";
+    token.textContent = detail;
+    meta.appendChild(token);
+  }
+  card.appendChild(meta);
+  return card;
+}
+
+function panelLabel(text) {
+  const label = document.createElement("p");
+  label.className = "panel-label";
+  label.textContent = text;
+  return label;
+}
+
 function metricGrid(entries) {
   const grid = document.createElement("dl");
   grid.className = "detail-metrics";
@@ -957,6 +1105,8 @@ function humanizeState(value) {
   switch (normalized) {
     case "healthy":
       return "Healthy";
+    case "info":
+      return "Info";
     case "pressured":
       return "Pressured";
     case "degraded":
@@ -986,6 +1136,22 @@ function humanizeScope(value) {
       return "Destination";
     default:
       return value || "Unknown";
+  }
+}
+
+function humanizeTraceKind(value) {
+  const normalized = String(value || "").toLowerCase();
+  switch (normalized) {
+    case "runtime_signal":
+      return "Runtime signal";
+    case "operator_action":
+      return "Operator action";
+    case "config_event":
+      return "Config event";
+    case "override":
+      return "Override";
+    default:
+      return value || "Trace";
   }
 }
 
