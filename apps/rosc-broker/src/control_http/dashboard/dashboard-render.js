@@ -29,6 +29,7 @@ export function collectDashboardElements() {
     recoveryDestinationCandidates: document.getElementById("recovery-destination-candidates"),
     routeFocusSelect: document.getElementById("route-focus-select"),
     routeFocusDetail: document.getElementById("route-focus-detail"),
+    routeLensDetail: document.getElementById("route-lens-detail"),
     routeTraceDetail: document.getElementById("route-trace-detail"),
     routeTimelineDetail: document.getElementById("route-timeline-detail"),
     routeHandoffDetail: document.getElementById("route-handoff-detail"),
@@ -37,6 +38,7 @@ export function collectDashboardElements() {
     routeCasebookDetail: document.getElementById("route-casebook-detail"),
     destinationFocusSelect: document.getElementById("destination-focus-select"),
     destinationFocusDetail: document.getElementById("destination-focus-detail"),
+    destinationLensDetail: document.getElementById("destination-lens-detail"),
     destinationTraceDetail: document.getElementById("destination-trace-detail"),
     destinationTimelineDetail: document.getElementById("destination-timeline-detail"),
     destinationHandoffDetail: document.getElementById("destination-handoff-detail"),
@@ -83,6 +85,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderIncidentDigest(elements, snapshot.incident_digest);
   renderRecoveryCandidates(elements, snapshot.recovery);
   renderFocus(elements, dashboard, context.focusState);
+  renderLens(elements, dashboard, context.focusState);
   renderTrace(elements, dashboard, context.focusState);
   renderFocusedTimeline(elements, dashboard.timeline_catalog, context.focusState);
   renderHandoff(elements, snapshot.handoff, context.focusState);
@@ -422,6 +425,17 @@ function renderFocus(elements, dashboard, focusState) {
   );
   renderRouteFocusPacket(elements, routeFocus);
   renderDestinationFocusPacket(elements, destinationFocus);
+}
+
+function renderLens(elements, dashboard, focusState) {
+  const routeLens = (dashboard.lens?.routes || []).find(
+    (packet) => packet.route_id === focusState?.routeId,
+  );
+  const destinationLens = (dashboard.lens?.destinations || []).find(
+    (packet) => packet.destination_id === focusState?.destinationId,
+  );
+  renderRouteLens(elements, routeLens);
+  renderDestinationLens(elements, destinationLens);
 }
 
 function renderTrace(elements, dashboard, focusState) {
@@ -923,6 +937,94 @@ function renderDestinationFocusPacket(elements, packet) {
   `;
   wrapper.appendChild(actions);
   elements.destinationFocusDetail.replaceChildren(wrapper);
+}
+
+function renderRouteLens(elements, lens) {
+  if (!lens) {
+    fillList(elements, elements.routeLensDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused route lens</p>
+        <h4>${escapeHtml(lens.route_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(routeDetailLevel(lens.focus.detail.state))}">${escapeHtml(routeDetailLabel(lens.focus.detail.state))}</span>
+    </div>
+    <p class="summary">${escapeHtml(lens.focus.handoff?.summary || lens.focus.casebook?.summary || "Focused route context is available.")}</p>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Global blockers", lens.global_blockers.length],
+      ["Overrides", lens.global_overrides.length],
+      ["Incidents", lens.incident_titles.length],
+      ["Work items", lens.work_items.length],
+    ]),
+  );
+  wrapper.appendChild(traceSummaryBlock("Global blockers", lens.global_blockers));
+  wrapper.appendChild(traceSummaryBlock("Global overrides", lens.global_overrides));
+  wrapper.appendChild(traceSummaryBlock("Incident titles", lens.incident_titles));
+  wrapper.appendChild(traceSummaryBlock("Board lanes", lens.board_items.map((item) => item.title)));
+  if ((lens.work_items || []).length > 0) {
+    const actionBlock = document.createElement("div");
+    actionBlock.className = "detail-actions";
+    actionBlock.replaceChildren(
+      ...lens.work_items
+        .filter((item) => item.action)
+        .map((item) => worklistActionButton(item.action)),
+    );
+    if (actionBlock.childElementCount > 0) {
+      wrapper.appendChild(actionBlock);
+    }
+  }
+  elements.routeLensDetail.replaceChildren(wrapper);
+}
+
+function renderDestinationLens(elements, lens) {
+  if (!lens) {
+    fillList(elements, elements.destinationLensDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused destination lens</p>
+        <h4>${escapeHtml(lens.destination_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(destinationDetailLevel(lens.focus.detail.state))}">${escapeHtml(destinationDetailLabel(lens.focus.detail.state))}</span>
+    </div>
+    <p class="summary">${escapeHtml(lens.focus.handoff?.summary || lens.focus.casebook?.summary || "Focused destination context is available.")}</p>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Global blockers", lens.global_blockers.length],
+      ["Overrides", lens.global_overrides.length],
+      ["Incidents", lens.incident_titles.length],
+      ["Work items", lens.work_items.length],
+    ]),
+  );
+  wrapper.appendChild(traceSummaryBlock("Global blockers", lens.global_blockers));
+  wrapper.appendChild(traceSummaryBlock("Global overrides", lens.global_overrides));
+  wrapper.appendChild(traceSummaryBlock("Incident titles", lens.incident_titles));
+  wrapper.appendChild(traceSummaryBlock("Board lanes", lens.board_items.map((item) => item.title)));
+  if ((lens.work_items || []).length > 0) {
+    const actionBlock = document.createElement("div");
+    actionBlock.className = "detail-actions";
+    actionBlock.replaceChildren(
+      ...lens.work_items
+        .filter((item) => item.action)
+        .map((item) => worklistActionButton(item.action)),
+    );
+    if (actionBlock.childElementCount > 0) {
+      wrapper.appendChild(actionBlock);
+    }
+  }
+  elements.destinationLensDetail.replaceChildren(wrapper);
 }
 
 function renderRouteTrace(elements, trace) {

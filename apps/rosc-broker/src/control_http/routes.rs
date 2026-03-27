@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use crate::control_plane::ProxyControlPlane;
 use crate::{
-    ProxyOperatorSignalScope, ProxyOperatorTimelineCatalog, proxy_operator_attention,
-    proxy_operator_signals_view,
+    ProxyOperatorBoardScope, ProxyOperatorSignalScope, ProxyOperatorTimelineCatalog,
+    proxy_operator_attention, proxy_operator_signals_view,
 };
 
 use super::request::{
@@ -15,10 +15,11 @@ use super::response::{
     dashboard_css_response, dashboard_data_response, dashboard_html_response,
     dashboard_js_response, dashboard_render_js_response, dashboard_state_js_response,
     destination_trace_response, diagnostics_response, focus_response, handoff_response,
-    incidents_response, invalid_component_error, invalid_query_error, map_action_result,
-    operator_actions_response, operator_signals_response, overrides_response, overview_response,
-    readiness_response, report_response, route_trace_response, snapshot_response, status_response,
-    timeline_response, trace_response, triage_response, unsupported_route_error,
+    incidents_response, invalid_component_error, invalid_query_error, lens_response,
+    map_action_result, operator_actions_response, operator_signals_response, overrides_response,
+    overview_response, readiness_response, report_response, route_trace_response,
+    snapshot_response, status_response, timeline_response, trace_response, triage_response,
+    unsupported_route_error,
 };
 
 pub(crate) async fn route_request(
@@ -126,6 +127,13 @@ pub(crate) async fn route_request(
             let dashboard = control.operator_dashboard(limit).await;
             focus_response(dashboard.focus)
         }
+        ("GET", "/lens") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            let dashboard = control.operator_dashboard(limit).await;
+            lens_response(dashboard.lens)
+        }
         ("GET", "/overrides") => {
             let report = control.operator_report().await;
             overrides_response(report.overrides)
@@ -174,6 +182,34 @@ async fn route_nested_request(
 ) -> HttpResponse {
     if let Some(destination_id) = path
         .strip_prefix("/destinations/")
+        .and_then(|path| path.strip_suffix("/lens"))
+    {
+        if request.method != "GET" || destination_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(destination_id) = decode_uri_component(destination_id) else {
+            return invalid_component_error("destination id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let dashboard = control.operator_dashboard(limit).await;
+        let mut lens = dashboard.lens;
+        let Some(destination_lens) = lens
+            .destinations
+            .iter()
+            .find(|packet| packet.destination_id == destination_id)
+            .cloned()
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        lens.routes.clear();
+        lens.destinations = vec![destination_lens];
+        return lens_response(lens);
+    }
+
+    if let Some(destination_id) = path
+        .strip_prefix("/destinations/")
         .and_then(|path| path.strip_suffix("/focus"))
     {
         if request.method != "GET" || destination_id.is_empty() {
@@ -215,15 +251,18 @@ async fn route_nested_request(
         };
         let snapshot = control.operator_snapshot(limit).await;
         let mut board = snapshot.board;
-        board
-            .blocked_items
-            .retain(|item| item.destination_id.as_deref() == Some(destination_id.as_str()));
-        board
-            .degraded_items
-            .retain(|item| item.destination_id.as_deref() == Some(destination_id.as_str()));
-        board
-            .watch_items
-            .retain(|item| item.destination_id.as_deref() == Some(destination_id.as_str()));
+        board.blocked_items.retain(|item| {
+            item.scope == ProxyOperatorBoardScope::Global
+                || item.destination_id.as_deref() == Some(destination_id.as_str())
+        });
+        board.degraded_items.retain(|item| {
+            item.scope == ProxyOperatorBoardScope::Global
+                || item.destination_id.as_deref() == Some(destination_id.as_str())
+        });
+        board.watch_items.retain(|item| {
+            item.scope == ProxyOperatorBoardScope::Global
+                || item.destination_id.as_deref() == Some(destination_id.as_str())
+        });
         return board_response(board);
     }
 
@@ -390,6 +429,31 @@ async fn route_nested_request(
         return unsupported_route_error(&request.path);
     };
 
+    if let Some(route_id) = route_path.strip_suffix("/lens") {
+        if request.method != "GET" || route_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let dashboard = control.operator_dashboard(limit).await;
+        let mut lens = dashboard.lens;
+        let Some(route_lens) = lens
+            .routes
+            .iter()
+            .find(|packet| packet.route_id == route_id)
+            .cloned()
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        lens.routes = vec![route_lens];
+        lens.destinations.clear();
+        return lens_response(lens);
+    }
+
     if let Some(route_id) = route_path.strip_suffix("/focus") {
         if request.method != "GET" || route_id.is_empty() {
             return unsupported_route_error(&request.path);
@@ -427,15 +491,18 @@ async fn route_nested_request(
         };
         let snapshot = control.operator_snapshot(limit).await;
         let mut board = snapshot.board;
-        board
-            .blocked_items
-            .retain(|item| item.route_id.as_deref() == Some(route_id.as_str()));
-        board
-            .degraded_items
-            .retain(|item| item.route_id.as_deref() == Some(route_id.as_str()));
-        board
-            .watch_items
-            .retain(|item| item.route_id.as_deref() == Some(route_id.as_str()));
+        board.blocked_items.retain(|item| {
+            item.scope == ProxyOperatorBoardScope::Global
+                || item.route_id.as_deref() == Some(route_id.as_str())
+        });
+        board.degraded_items.retain(|item| {
+            item.scope == ProxyOperatorBoardScope::Global
+                || item.route_id.as_deref() == Some(route_id.as_str())
+        });
+        board.watch_items.retain(|item| {
+            item.scope == ProxyOperatorBoardScope::Global
+                || item.route_id.as_deref() == Some(route_id.as_str())
+        });
         return board_response(board);
     }
 

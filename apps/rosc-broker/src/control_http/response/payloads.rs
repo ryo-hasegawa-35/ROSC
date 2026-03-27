@@ -7,10 +7,10 @@ use crate::{
     ProxyOperatorAttention, ProxyOperatorBoard, ProxyOperatorCasebookCatalog,
     ProxyOperatorDashboard, ProxyOperatorDestinationTrace, ProxyOperatorDiagnostics,
     ProxyOperatorFocusCatalog, ProxyOperatorHandoffCatalog, ProxyOperatorIncidents,
-    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
-    ProxyOperatorRouteTrace, ProxyOperatorSignalScope, ProxyOperatorSnapshot,
-    ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog,
-    UdpProxyStatusSnapshot,
+    ProxyOperatorLensCatalog, ProxyOperatorOverrides, ProxyOperatorOverview,
+    ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace, ProxyOperatorSignalScope,
+    ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog,
+    ProxyOperatorTriageCatalog, UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -143,6 +143,12 @@ pub(crate) struct OperatorFocusResponse {
 }
 
 #[derive(Serialize)]
+pub(crate) struct OperatorLensResponse {
+    pub(crate) ok: bool,
+    pub(crate) lens: ProxyOperatorLensCatalog,
+}
+
+#[derive(Serialize)]
 pub(crate) struct OperatorOverridesResponse {
     pub(crate) ok: bool,
     pub(crate) overrides: ProxyOperatorOverrides,
@@ -186,6 +192,7 @@ pub(crate) enum ResponseBody {
     OperatorCasebook(OperatorCasebookResponse),
     OperatorBoard(OperatorBoardResponse),
     OperatorFocus(OperatorFocusResponse),
+    OperatorLens(OperatorLensResponse),
     OperatorTrace(OperatorTraceResponse),
     OperatorRouteTrace(OperatorRouteTraceResponse),
     OperatorDestinationTrace(OperatorDestinationTraceResponse),
@@ -229,6 +236,7 @@ impl ResponseBody {
             Self::OperatorCasebook(body) => json_payload(body),
             Self::OperatorBoard(body) => json_payload(body),
             Self::OperatorFocus(body) => json_payload(body),
+            Self::OperatorLens(body) => json_payload(body),
             Self::OperatorTrace(body) => json_payload(body),
             Self::OperatorRouteTrace(body) => json_payload(body),
             Self::OperatorDestinationTrace(body) => json_payload(body),

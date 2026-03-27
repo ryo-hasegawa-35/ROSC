@@ -51,6 +51,7 @@ cargo run -p rosc-broker -- proxy-triage examples/phase-01-basic.toml --fail-on-
 cargo run -p rosc-broker -- proxy-casebook examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- proxy-board examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- proxy-focus examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
+cargo run -p rosc-broker -- proxy-lens examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
@@ -77,9 +78,11 @@ curl http://127.0.0.1:19292/triage?limit=10
 curl http://127.0.0.1:19292/casebook?limit=10
 curl http://127.0.0.1:19292/board?limit=10
 curl http://127.0.0.1:19292/focus?limit=10
+curl http://127.0.0.1:19292/lens?limit=10
 curl http://127.0.0.1:19292/timeline?limit=10
 curl http://127.0.0.1:19292/trace?limit=10
 curl http://127.0.0.1:19292/routes/camera/focus?limit=10
+curl http://127.0.0.1:19292/routes/camera/lens?limit=10
 curl http://127.0.0.1:19292/routes/camera/handoff?limit=10
 curl http://127.0.0.1:19292/routes/camera/triage?limit=10
 curl http://127.0.0.1:19292/routes/camera/casebook?limit=10
@@ -91,6 +94,7 @@ curl http://127.0.0.1:19292/destinations/udp_renderer/triage?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/casebook?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/board?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/focus?limit=10
+curl http://127.0.0.1:19292/destinations/udp_renderer/lens?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/timeline?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/trace?limit=10
 curl http://127.0.0.1:19292/overrides
@@ -104,7 +108,7 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` is intentionally loopback-only. Bind it to `127.0.0.1`, `::1`, or another
 local-only alias such as `localhost`; wildcard or externally reachable addresses are rejected.
 
-`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-assert-ready`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, `proxy-incidents`, `proxy-handoff`, `proxy-timeline`, `proxy-triage`, `proxy-casebook`, `proxy-board`, and `proxy-focus`
+`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-assert-ready`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, `proxy-incidents`, `proxy-handoff`, `proxy-timeline`, `proxy-triage`, `proxy-casebook`, `proxy-board`, `proxy-focus`, and `proxy-lens`
 intentionally write JSON only to stdout so they can be piped directly into tools such as `jq`
 without stripping summary lines first.
 
@@ -172,6 +176,8 @@ Current Phase 01 runtime coverage:
 - the embedded dashboard now renders a board section that groups the current operator workload into blocked, degraded, and watch lists with direct focus/recovery actions
 - snapshot and dashboard payloads now also include a focus catalog, and `proxy-focus` plus control-plane `/focus`, `/routes/{id}/focus`, `/destinations/{id}/focus` expose a focused route/destination packet that bundles detail, trace, timeline, handoff, triage, casebook, and board lanes in one machine-readable slice
 - the embedded dashboard now upgrades its existing focus drill-down cards into richer focus packets, so route/destination selection becomes a one-stop operator summary instead of a bare detail view
+- snapshot and dashboard payloads now also include an operator lens catalog, and `proxy-lens` plus control-plane `/lens`, `/routes/{id}/lens`, `/destinations/{id}/lens` keep focused route/destination triage tied to global blockers, global overrides, work items, and board context
+- focused board slices now retain global blockers such as `traffic_frozen`, so route/destination-scoped investigation no longer hides the whole-system reason a path is still degraded
 - `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
 - config rejection / block / reload-failure history now retains reason details instead of only counters
 

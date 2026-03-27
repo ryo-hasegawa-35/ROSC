@@ -6,10 +6,10 @@ use rosc_broker::{
     ProxyRuntimeSafetyPolicy, attach_runtime_status, proxy_operator_attention,
     proxy_operator_board, proxy_operator_casebook, proxy_operator_dashboard,
     proxy_operator_diagnostics, proxy_operator_focus_from_dashboard, proxy_operator_handoff,
-    proxy_operator_incidents_from_histories, proxy_operator_overview, proxy_operator_readiness,
-    proxy_operator_recovery, proxy_operator_report, proxy_operator_signals_view,
-    proxy_operator_snapshot, proxy_operator_timeline, proxy_operator_trace,
-    proxy_status_from_config,
+    proxy_operator_incidents_from_histories, proxy_operator_lens_from_dashboard,
+    proxy_operator_overview, proxy_operator_readiness, proxy_operator_recovery,
+    proxy_operator_report, proxy_operator_signals_view, proxy_operator_snapshot,
+    proxy_operator_timeline, proxy_operator_trace, proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -759,6 +759,77 @@ fn operator_focus_catalog_bundles_linked_route_and_destination_context() {
 }
 
 #[test]
+fn operator_lens_preserves_global_blockers_alongside_focused_entities() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            queue_depth: [("udp_renderer".to_owned(), 3)].into_iter().collect(),
+            recent_operator_actions: vec![RecentOperatorAction {
+                sequence: 31,
+                recorded_at_unix_ms: 3_100,
+                action: "freeze_traffic".to_owned(),
+                details: vec!["applied=true".to_owned()],
+            }],
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let dashboard = proxy_operator_dashboard(&status, ProxyRuntimeSafetyPolicy::default(), Some(8));
+    let lens = proxy_operator_lens_from_dashboard(&dashboard);
+
+    let route_lens = lens
+        .routes
+        .iter()
+        .find(|entry| entry.route_id == "camera")
+        .expect("route lens should exist");
+    assert!(
+        route_lens
+            .global_overrides
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+    assert!(
+        route_lens
+            .board_items
+            .iter()
+            .any(|item| item.scope == rosc_broker::ProxyOperatorBoardScope::Global)
+    );
+    assert!(
+        route_lens
+            .work_items
+            .iter()
+            .any(|item| item.id == "traffic-frozen")
+    );
+
+    let destination_lens = lens
+        .destinations
+        .iter()
+        .find(|entry| entry.destination_id == "udp_renderer")
+        .expect("destination lens should exist");
+    assert!(
+        destination_lens
+            .global_overrides
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+    assert!(
+        destination_lens
+            .board_items
+            .iter()
+            .any(|item| item.scope == rosc_broker::ProxyOperatorBoardScope::Global)
+    );
+    assert!(
+        destination_lens
+            .work_items
+            .iter()
+            .any(|item| item.id == "traffic-frozen")
+    );
+}
+
+#[test]
 fn operator_trace_links_runtime_actions_and_config_events_to_entities() {
     let config = broad_scope_config();
     let status = attach_runtime_status(
@@ -1233,6 +1304,12 @@ fn operator_board_groups_casebooks_into_triage_lanes() {
                 .watch_items
                 .iter()
                 .any(|item| item.destination_id.as_deref() == Some("udp_renderer"))
+    );
+    assert!(
+        board
+            .degraded_items
+            .iter()
+            .any(|item| item.scope == rosc_broker::ProxyOperatorBoardScope::Global)
     );
 }
 

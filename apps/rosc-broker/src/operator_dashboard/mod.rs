@@ -10,10 +10,11 @@ pub use details::{
 pub use traffic::{ProxyOperatorCounterEntry, ProxyOperatorTrafficSummary};
 
 use crate::{
-    ProxyOperatorFocusCatalog, ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog,
-    ProxyOperatorTimelineEntry, ProxyOperatorTraceCatalog, ProxyRuntimeSafetyPolicy,
-    UdpProxyStatusSnapshot, proxy_operator_focus_from_dashboard, proxy_operator_snapshot,
-    proxy_operator_timeline, proxy_operator_trace,
+    ProxyOperatorFocusCatalog, ProxyOperatorLensCatalog, ProxyOperatorSnapshot,
+    ProxyOperatorTimelineCatalog, ProxyOperatorTimelineEntry, ProxyOperatorTraceCatalog,
+    ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot, proxy_operator_focus_from_dashboard,
+    proxy_operator_lens_from_dashboard, proxy_operator_snapshot, proxy_operator_timeline,
+    proxy_operator_trace,
 };
 
 use self::details::{destination_details_from_snapshot, route_details_from_snapshot};
@@ -32,6 +33,7 @@ pub struct ProxyOperatorDashboard {
     pub destination_details: Vec<ProxyOperatorDestinationDetail>,
     pub trace: ProxyOperatorTraceCatalog,
     pub focus: ProxyOperatorFocusCatalog,
+    pub lens: ProxyOperatorLensCatalog,
 }
 
 pub fn proxy_operator_dashboard(
@@ -69,7 +71,9 @@ pub fn proxy_operator_dashboard_from_snapshot(
         destination_details,
         trace,
         focus: ProxyOperatorFocusCatalog::default(),
+        lens: ProxyOperatorLensCatalog::default(),
     };
     dashboard.focus = proxy_operator_focus_from_dashboard(&dashboard);
+    dashboard.lens = proxy_operator_lens_from_dashboard(&dashboard);
     dashboard
 }

@@ -318,6 +318,16 @@ async fn control_service_serves_dashboard_assets() {
             .is_some()
     );
     assert!(
+        dashboard_data["dashboard"]["lens"]["routes"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["lens"]["destinations"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
         dashboard_data["dashboard"]["snapshot"]["worklist"]["items"]
             .as_array()
             .is_some()
@@ -671,6 +681,13 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .iter()
             .any(|entry| entry["route_id"] == "camera")
     );
+    assert!(
+        board["board"]["degraded_items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["scope"] == "global")
+    );
 
     let focus = json_body(
         &request(
@@ -689,6 +706,29 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     );
     assert!(
         focus["focus"]["destinations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["destination_id"] == "udp_renderer")
+    );
+
+    let lens = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /lens?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(lens["ok"], true);
+    assert!(
+        lens["lens"]["routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["route_id"] == "camera")
+    );
+    assert!(
+        lens["lens"]["destinations"]
             .as_array()
             .unwrap()
             .iter()
@@ -761,6 +801,24 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert_eq!(route_focus["focus"]["routes"][0]["route_id"], "camera");
     assert_eq!(route_focus["focus"]["destinations"], json!([]));
 
+    let route_lens = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/lens?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_lens["ok"], true);
+    assert_eq!(route_lens["lens"]["routes"][0]["route_id"], "camera");
+    assert_eq!(route_lens["lens"]["destinations"], json!([]));
+    assert!(
+        route_lens["lens"]["routes"][0]["global_overrides"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+
     let route_board = json_body(
         &request(
             service.listen_addr(),
@@ -775,6 +833,13 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .unwrap()
             .iter()
             .any(|entry| entry["route_id"] == "camera")
+    );
+    assert!(
+        route_board["board"]["degraded_items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["scope"] == "global")
     );
 
     let route_timeline = json_body(
@@ -843,6 +908,27 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     );
     assert_eq!(destination_focus["focus"]["routes"], json!([]));
 
+    let destination_lens = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/lens?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_lens["ok"], true);
+    assert_eq!(
+        destination_lens["lens"]["destinations"][0]["destination_id"],
+        "udp_renderer"
+    );
+    assert_eq!(destination_lens["lens"]["routes"], json!([]));
+    assert!(
+        destination_lens["lens"]["destinations"][0]["global_overrides"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+
     let destination_board = json_body(
         &request(
             service.listen_addr(),
@@ -862,6 +948,13 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
                 .unwrap()
                 .iter()
                 .any(|entry| entry["destination_id"] == "udp_renderer")
+    );
+    assert!(
+        destination_board["board"]["degraded_items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["scope"] == "global")
     );
 
     let destination_timeline = json_body(

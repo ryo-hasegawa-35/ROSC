@@ -16,6 +16,7 @@ mod operator_handoff;
 mod operator_history;
 mod operator_incident_digest;
 mod operator_incidents;
+mod operator_lens;
 mod operator_overview;
 mod operator_policy;
 mod operator_readiness;
@@ -77,6 +78,10 @@ pub use operator_incident_digest::{
 };
 pub use operator_incidents::{
     ProxyOperatorIncidents, proxy_operator_incidents, proxy_operator_incidents_from_histories,
+};
+pub use operator_lens::{
+    ProxyOperatorDestinationLens, ProxyOperatorLensCatalog, ProxyOperatorRouteLens,
+    proxy_operator_lens_from_dashboard,
 };
 pub use operator_overview::{ProxyOperatorOverview, proxy_operator_overview};
 pub use operator_policy::{

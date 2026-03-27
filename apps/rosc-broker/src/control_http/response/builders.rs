@@ -6,10 +6,10 @@ use crate::{
     ProxyOperatorAttention, ProxyOperatorBoard, ProxyOperatorCasebookCatalog,
     ProxyOperatorDashboard, ProxyOperatorDestinationTrace, ProxyOperatorDiagnostics,
     ProxyOperatorFocusCatalog, ProxyOperatorHandoffCatalog, ProxyOperatorIncidents,
-    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
-    ProxyOperatorRouteTrace, ProxyOperatorSignalsView, ProxyOperatorSnapshot,
-    ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog,
-    UdpProxyStatusSnapshot,
+    ProxyOperatorLensCatalog, ProxyOperatorOverrides, ProxyOperatorOverview,
+    ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace, ProxyOperatorSignalsView,
+    ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog,
+    ProxyOperatorTriageCatalog, UdpProxyStatusSnapshot,
 };
 use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 
@@ -17,11 +17,12 @@ use super::payloads::{
     ActionResponse, BlockersResponse, HttpResponse, OperatorAttentionResponse,
     OperatorBoardResponse, OperatorCasebookResponse, OperatorDashboardResponse,
     OperatorDestinationTraceResponse, OperatorDiagnosticsResponse, OperatorFocusResponse,
-    OperatorHandoffResponse, OperatorIncidentsResponse, OperatorOverridesResponse,
-    OperatorOverviewResponse, OperatorReadinessResponse, OperatorReportResponse,
-    OperatorRouteTraceResponse, OperatorSignalsResponse, OperatorSnapshotResponse,
-    OperatorTimelineResponse, OperatorTraceResponse, OperatorTriageResponse,
-    RecentConfigEventsResponse, RecentOperatorActionsResponse, ResponseBody, StatusResponse,
+    OperatorHandoffResponse, OperatorIncidentsResponse, OperatorLensResponse,
+    OperatorOverridesResponse, OperatorOverviewResponse, OperatorReadinessResponse,
+    OperatorReportResponse, OperatorRouteTraceResponse, OperatorSignalsResponse,
+    OperatorSnapshotResponse, OperatorTimelineResponse, OperatorTraceResponse,
+    OperatorTriageResponse, RecentConfigEventsResponse, RecentOperatorActionsResponse,
+    ResponseBody, StatusResponse,
 };
 
 pub(crate) fn status_response(status: UdpProxyStatusSnapshot) -> HttpResponse {
@@ -214,6 +215,13 @@ pub(crate) fn focus_response(focus: ProxyOperatorFocusCatalog) -> HttpResponse {
     HttpResponse {
         status: "200 OK",
         body: ResponseBody::OperatorFocus(OperatorFocusResponse { ok: true, focus }),
+    }
+}
+
+pub(crate) fn lens_response(lens: ProxyOperatorLensCatalog) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorLens(OperatorLensResponse { ok: true, lens }),
     }
 }
 
