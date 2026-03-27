@@ -60,6 +60,27 @@ pub async fn run(command: Command) -> Result<()> {
             )
             .await
         }
+        Command::ProxyAssertReady {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            allow_degraded,
+        } => {
+            config::proxy_assert_ready(
+                &config,
+                resolve_bindings,
+                allow_degraded,
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
         Command::ProxySnapshot {
             config,
             resolve_bindings,

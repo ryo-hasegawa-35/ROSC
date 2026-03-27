@@ -260,6 +260,27 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|reason| reason == "traffic is currently frozen by operator override")
     );
 
+    let readyz_blocked = request(
+        service.listen_addr(),
+        "GET /readyz HTTP/1.1\r\nHost: localhost\r\n\r\n",
+    )
+    .await;
+    assert!(readyz_blocked.contains("HTTP/1.1 503 Service Unavailable"));
+
+    let readyz_allowed = request(
+        service.listen_addr(),
+        "GET /readyz?allow_degraded=true HTTP/1.1\r\nHost: localhost\r\n\r\n",
+    )
+    .await;
+    assert!(readyz_allowed.contains("HTTP/1.1 200 OK"));
+
+    let invalid_readyz_query = request(
+        service.listen_addr(),
+        "GET /readyz?allow_degraded=maybe HTTP/1.1\r\nHost: localhost\r\n\r\n",
+    )
+    .await;
+    assert!(invalid_readyz_query.contains("HTTP/1.1 400 Bad Request"));
+
     let snapshot = json_body(
         &request(
             service.listen_addr(),

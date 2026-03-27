@@ -91,6 +91,15 @@ pub(crate) fn history_limit(query: Option<&str>) -> Result<Option<usize>, ()> {
     Ok(Some(limit))
 }
 
+pub(crate) fn allow_degraded(query: Option<&str>) -> Result<bool, ()> {
+    match query_parameter(query, "allow_degraded") {
+        None => Ok(false),
+        Some("true" | "1") => Ok(true),
+        Some("false" | "0") => Ok(false),
+        Some(_) => Err(()),
+    }
+}
+
 pub(crate) fn query_parameter<'a>(query: Option<&'a str>, key: &str) -> Option<&'a str> {
     query.and_then(|query| {
         query.split('&').find_map(|pair| {

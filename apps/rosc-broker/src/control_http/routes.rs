@@ -4,7 +4,8 @@ use crate::control_plane::ProxyControlPlane;
 use crate::{ProxyOperatorSignalScope, proxy_operator_attention, proxy_operator_signals_view};
 
 use super::request::{
-    HttpRequest, decode_uri_component, history_limit, query_parameter, replay_limit, split_query,
+    HttpRequest, allow_degraded, decode_uri_component, history_limit, query_parameter,
+    replay_limit, split_query,
 };
 use super::response::{
     HttpResponse, blockers_response, config_events_response, diagnostics_response,
@@ -26,6 +27,16 @@ pub(crate) async fn route_request(
         ("GET", "/readiness") => {
             let overview = control.operator_overview().await;
             readiness_response(crate::proxy_operator_readiness_from_overview(overview))
+        }
+        ("GET", "/readyz") => {
+            let Ok(allow_degraded) = allow_degraded(query) else {
+                return invalid_query_error("allow_degraded");
+            };
+            let overview = control.operator_overview().await;
+            super::response::readyz_response(
+                crate::proxy_operator_readiness_from_overview(overview),
+                allow_degraded,
+            )
         }
         ("GET", "/snapshot") => {
             let Ok(limit) = history_limit(query) else {

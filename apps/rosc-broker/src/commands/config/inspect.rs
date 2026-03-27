@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 
 use super::super::ProxyCommandOptions;
 use super::super::common::{
@@ -77,6 +77,29 @@ pub(crate) async fn proxy_snapshot(
         rosc_broker::proxy_operator_snapshot(&status, safety_policy(options), history_limit);
     print_json_pretty(&snapshot)?;
     Ok(())
+}
+
+pub(crate) async fn proxy_assert_ready(
+    path: &Path,
+    resolve_bindings: bool,
+    allow_degraded: bool,
+    options: ProxyCommandOptions,
+) -> Result<()> {
+    let config = load_config(path)?;
+    let status =
+        status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
+    let readiness = rosc_broker::proxy_operator_readiness(&status, safety_policy(options));
+    let acceptable = readiness.is_acceptable(allow_degraded);
+    print_json_pretty(&readiness)?;
+    if acceptable {
+        Ok(())
+    } else {
+        bail!(
+            "proxy readiness gate failed: level={} allow_degraded={}",
+            serde_json::to_string(&readiness.level)?,
+            allow_degraded
+        )
+    }
 }
 
 pub(crate) async fn proxy_diagnostics(

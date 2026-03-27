@@ -219,6 +219,23 @@ pub(crate) fn readiness_response(readiness: ProxyOperatorReadiness) -> HttpRespo
     }
 }
 
+pub(crate) fn readyz_response(
+    readiness: ProxyOperatorReadiness,
+    allow_degraded: bool,
+) -> HttpResponse {
+    HttpResponse {
+        status: if readiness.is_acceptable(allow_degraded) {
+            "200 OK"
+        } else {
+            "503 Service Unavailable"
+        },
+        body: ResponseBody::OperatorReadiness(Box::new(OperatorReadinessResponse {
+            ok: true,
+            readiness,
+        })),
+    }
+}
+
 pub(crate) fn snapshot_response(snapshot: ProxyOperatorSnapshot) -> HttpResponse {
     HttpResponse {
         status: "200 OK",

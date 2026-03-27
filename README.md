@@ -40,6 +40,7 @@ cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml --safe-mode
 cargo run -p rosc-broker -- proxy-overview examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
 cargo run -p rosc-broker -- proxy-readiness examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
+cargo run -p rosc-broker -- proxy-assert-ready examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
 cargo run -p rosc-broker -- proxy-snapshot examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- proxy-diagnostics examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- proxy-attention examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
@@ -58,6 +59,8 @@ curl http://127.0.0.1:19292/status
 curl http://127.0.0.1:19292/report
 curl http://127.0.0.1:19292/overview
 curl http://127.0.0.1:19292/readiness
+curl -i http://127.0.0.1:19292/readyz
+curl -i "http://127.0.0.1:19292/readyz?allow_degraded=true"
 curl http://127.0.0.1:19292/snapshot?limit=10
 curl http://127.0.0.1:19292/diagnostics?limit=10
 curl http://127.0.0.1:19292/attention
@@ -73,7 +76,7 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` is intentionally loopback-only. Bind it to `127.0.0.1`, `::1`, or another
 local-only alias such as `localhost`; wildcard or externally reachable addresses are rejected.
 
-`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, and `proxy-incidents`
+`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-assert-ready`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, and `proxy-incidents`
 intentionally write JSON only to stdout so they can be piped directly into tools such as `jq`
 without stripping summary lines first.
 
@@ -117,6 +120,7 @@ Current Phase 01 runtime coverage:
 - control-plane `/report` now also exposes structured override/runtime-signal/route-signal/destination-signal sections, with `/overrides` and `/signals` endpoints for direct consumption
 - `proxy-overview` and control-plane `/overview` now expose a one-shot operator snapshot with report + current status + problematic signal view for dashboard/bootstrap workflows
 - `proxy-readiness` and control-plane `/readiness` now expose a machine-readable readiness contract with `ready/degraded/blocked` level, operator-action reasons, and route/destination counts for automation and deployment gates
+- `proxy-assert-ready` and control-plane `/readyz` now expose gate-style readiness checks that return non-zero / HTTP 503 when the current proxy state is not acceptable for startup or deployment automation
 - `proxy-snapshot` and control-plane `/snapshot` now expose a full one-shot operator bundle with overview, readiness, diagnostics, attention, and incidents in one payload for dashboard/bootstrap and incident tooling
 - `proxy-diagnostics` and control-plane `/diagnostics` now expose the same operator snapshot bundled with bounded recent operator/config history for incident triage
 - `proxy-attention` and control-plane `/attention` now expose a compact triage view with active overrides, latest incident highlights, and only the route/destination ids that currently need attention

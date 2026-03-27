@@ -13,6 +13,12 @@ pub enum ProxyOperatorReadinessLevel {
     Blocked,
 }
 
+impl ProxyOperatorReadinessLevel {
+    pub fn is_acceptable(self, allow_degraded: bool) -> bool {
+        matches!(self, Self::Ready) || (allow_degraded && matches!(self, Self::Degraded))
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct ProxyOperatorReadinessFlags {
     pub control_plane_ready: bool,
@@ -48,6 +54,12 @@ pub struct ProxyOperatorReadiness {
     pub blockers: Vec<String>,
     pub warnings: Vec<String>,
     pub runtime_summary: ProxyOperatorRuntimeSummary,
+}
+
+impl ProxyOperatorReadiness {
+    pub fn is_acceptable(&self, allow_degraded: bool) -> bool {
+        self.level.is_acceptable(allow_degraded)
+    }
 }
 
 pub fn proxy_operator_readiness(
