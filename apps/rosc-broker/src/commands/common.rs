@@ -127,3 +127,19 @@ pub(crate) fn print_proxy_diagnostics_summary(diagnostics: &rosc_broker::ProxyOp
         overview.runtime_summary.destinations_with_open_breakers,
     );
 }
+
+pub(crate) fn print_proxy_attention_summary(attention: &rosc_broker::ProxyOperatorAttention) {
+    println!(
+        "proxy attention: state={} blockers={} warnings={} traffic_frozen={} isolated_routes={} problematic_routes={} problematic_destinations={} backlog_destinations={} open_breakers={} half_open_breakers={}",
+        attention.state.as_str(),
+        attention.blockers.len(),
+        attention.warnings.len(),
+        attention.traffic_frozen,
+        attention.isolated_route_ids.len(),
+        attention.problematic_route_ids.len(),
+        attention.problematic_destination_ids.len(),
+        attention.destinations_with_backlog.len(),
+        attention.destinations_with_open_breakers.len(),
+        attention.destinations_with_half_open_breakers.len(),
+    );
+}

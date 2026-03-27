@@ -40,6 +40,7 @@ cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml
 cargo run -p rosc-broker -- proxy-status examples/phase-01-basic.toml --safe-mode
 cargo run -p rosc-broker -- proxy-overview examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
 cargo run -p rosc-broker -- proxy-diagnostics examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
+cargo run -p rosc-broker -- proxy-attention examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
@@ -54,6 +55,7 @@ curl http://127.0.0.1:19292/status
 curl http://127.0.0.1:19292/report
 curl http://127.0.0.1:19292/overview
 curl http://127.0.0.1:19292/diagnostics?limit=10
+curl http://127.0.0.1:19292/attention
 curl http://127.0.0.1:19292/overrides
 curl http://127.0.0.1:19292/signals
 curl http://127.0.0.1:19292/signals?scope=problematic
@@ -105,6 +107,7 @@ Current Phase 01 runtime coverage:
 - control-plane `/report` now also exposes structured override/runtime-signal/route-signal/destination-signal sections, with `/overrides` and `/signals` endpoints for direct consumption
 - `proxy-overview` and control-plane `/overview` now expose a one-shot operator snapshot with report + current status + problematic signal view for dashboard/bootstrap workflows
 - `proxy-diagnostics` and control-plane `/diagnostics` now expose the same operator snapshot bundled with bounded recent operator/config history for incident triage
+- `proxy-attention` and control-plane `/attention` now expose a compact triage view with active overrides, latest incident highlights, and only the route/destination ids that currently need attention
 - `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
 - config rejection / block / reload-failure history now retains reason details instead of only counters
 

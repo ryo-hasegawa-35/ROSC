@@ -7,8 +7,9 @@ use rosc_telemetry::InMemoryTelemetry;
 
 use super::ProxyCommandOptions;
 use super::common::{
-    launch_profile_mode, load_config, print_applied_config, print_proxy_diagnostics_summary,
-    print_proxy_overview_summary, safety_policy, status_from_config,
+    launch_profile_mode, load_config, print_applied_config, print_proxy_attention_summary,
+    print_proxy_diagnostics_summary, print_proxy_overview_summary, safety_policy,
+    status_from_config,
 };
 
 pub(crate) async fn check_config(path: &Path) -> Result<()> {
@@ -69,6 +70,21 @@ pub(crate) async fn proxy_diagnostics(
         rosc_broker::proxy_operator_diagnostics(&status, safety_policy(options), history_limit);
     print_proxy_diagnostics_summary(&diagnostics);
     println!("{}", serde_json::to_string_pretty(&diagnostics)?);
+    Ok(())
+}
+
+pub(crate) async fn proxy_attention(
+    path: &Path,
+    resolve_bindings: bool,
+    options: ProxyCommandOptions,
+) -> Result<()> {
+    let config = load_config(path)?;
+    let status =
+        status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
+    let report = rosc_broker::proxy_operator_report(&status, safety_policy(options));
+    let attention = rosc_broker::proxy_operator_attention(&report);
+    print_proxy_attention_summary(&attention);
+    println!("{}", serde_json::to_string_pretty(&attention)?);
     Ok(())
 }
 

@@ -485,6 +485,25 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
         1
     );
 
+    let attention = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /attention HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(attention["ok"], true);
+    assert_eq!(attention["attention"]["state"], "warning");
+    assert_eq!(attention["attention"]["traffic_frozen"], true);
+    assert_eq!(
+        attention["attention"]["isolated_route_ids"],
+        serde_json::json!(["camera"])
+    );
+    assert_eq!(
+        attention["attention"]["latest_operator_action"]["action"],
+        "isolate_route"
+    );
+
     let overrides = json_body(
         &request(
             service.listen_addr(),
