@@ -190,6 +190,7 @@ async fn control_service_serves_dashboard_assets() {
     assert!(dashboard.contains("/dashboard/app.js"));
     assert!(dashboard.contains("Route next steps"));
     assert!(dashboard.contains("Route focus packet"));
+    assert!(dashboard.contains("Route operator brief"));
     assert!(dashboard.contains("Route-linked event history"));
 
     let css = request(
@@ -313,7 +314,17 @@ async fn control_service_serves_dashboard_assets() {
             .is_some()
     );
     assert!(
+        dashboard_data["dashboard"]["brief"]["routes"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
         dashboard_data["dashboard"]["focus"]["destinations"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["brief"]["destinations"]
             .as_array()
             .is_some()
     );
@@ -735,6 +746,30 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|entry| entry["destination_id"] == "udp_renderer")
     );
 
+    let brief = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /brief?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(brief["ok"], true);
+    assert!(brief["brief"]["global_next_steps"].as_array().is_some());
+    assert!(
+        brief["brief"]["routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["route_id"] == "camera")
+    );
+    assert!(
+        brief["brief"]["destinations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["destination_id"] == "udp_renderer")
+    );
+
     let timeline = json_body(
         &request(
             service.listen_addr(),
@@ -813,6 +848,24 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert_eq!(route_lens["lens"]["destinations"], json!([]));
     assert!(
         route_lens["lens"]["routes"][0]["global_overrides"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+
+    let route_brief = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/brief?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_brief["ok"], true);
+    assert_eq!(route_brief["brief"]["routes"][0]["route_id"], "camera");
+    assert_eq!(route_brief["brief"]["destinations"], json!([]));
+    assert!(
+        route_brief["brief"]["routes"][0]["global_overrides"]
             .as_array()
             .unwrap()
             .iter()
@@ -923,6 +976,27 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert_eq!(destination_lens["lens"]["routes"], json!([]));
     assert!(
         destination_lens["lens"]["destinations"][0]["global_overrides"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+
+    let destination_brief = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/brief?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_brief["ok"], true);
+    assert_eq!(
+        destination_brief["brief"]["destinations"][0]["destination_id"],
+        "udp_renderer"
+    );
+    assert_eq!(destination_brief["brief"]["routes"], json!([]));
+    assert!(
+        destination_brief["brief"]["destinations"][0]["global_overrides"]
             .as_array()
             .unwrap()
             .iter()

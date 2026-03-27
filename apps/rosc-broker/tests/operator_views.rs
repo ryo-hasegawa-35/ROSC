@@ -4,12 +4,13 @@ use common::broad_scope_config;
 use rosc_broker::{
     ProxyOperatorSignalScope, ProxyOperatorState, ProxyOperatorTimelineCategory,
     ProxyRuntimeSafetyPolicy, attach_runtime_status, proxy_operator_attention,
-    proxy_operator_board, proxy_operator_casebook, proxy_operator_dashboard,
-    proxy_operator_diagnostics, proxy_operator_focus_from_dashboard, proxy_operator_handoff,
-    proxy_operator_incidents_from_histories, proxy_operator_lens_from_dashboard,
-    proxy_operator_overview, proxy_operator_readiness, proxy_operator_recovery,
-    proxy_operator_report, proxy_operator_signals_view, proxy_operator_snapshot,
-    proxy_operator_timeline, proxy_operator_trace, proxy_status_from_config,
+    proxy_operator_board, proxy_operator_brief_from_dashboard, proxy_operator_casebook,
+    proxy_operator_dashboard, proxy_operator_diagnostics, proxy_operator_focus_from_dashboard,
+    proxy_operator_handoff, proxy_operator_incidents_from_histories,
+    proxy_operator_lens_from_dashboard, proxy_operator_overview, proxy_operator_readiness,
+    proxy_operator_recovery, proxy_operator_report, proxy_operator_signals_view,
+    proxy_operator_snapshot, proxy_operator_timeline, proxy_operator_trace,
+    proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -1519,4 +1520,104 @@ fn operator_incidents_filter_recent_issue_history_and_problematic_entities() {
             .iter()
             .any(|destination| destination.destination_id == "udp_renderer")
     );
+}
+
+#[test]
+fn operator_focus_packets_preserve_global_board_items() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let dashboard = proxy_operator_dashboard(&status, ProxyRuntimeSafetyPolicy::default(), Some(4));
+    let focus = proxy_operator_focus_from_dashboard(&dashboard);
+
+    let route_focus = focus
+        .routes
+        .iter()
+        .find(|entry| entry.route_id == "camera")
+        .expect("camera focus should exist");
+    assert!(route_focus.board_items.iter().any(|item| {
+        item.scope == rosc_broker::ProxyOperatorBoardScope::Global
+            && item.title.contains("Traffic frozen")
+    }));
+
+    let destination_focus = focus
+        .destinations
+        .iter()
+        .find(|entry| entry.destination_id == "udp_renderer")
+        .expect("destination focus should exist");
+    assert!(destination_focus.board_items.iter().any(|item| {
+        item.scope == rosc_broker::ProxyOperatorBoardScope::Global
+            && item.title.contains("Traffic frozen")
+    }));
+}
+
+#[test]
+fn operator_brief_bundles_global_context_and_focused_actions() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            queue_depth: [("udp_renderer".to_owned(), 3)].into_iter().collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let dashboard = proxy_operator_dashboard(&status, ProxyRuntimeSafetyPolicy::default(), Some(4));
+    let brief = proxy_operator_brief_from_dashboard(&dashboard);
+
+    assert_eq!(brief.state, "warning");
+    assert!(
+        brief
+            .global_overrides
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+    assert!(
+        brief
+            .global_next_steps
+            .iter()
+            .any(|step| step.contains("Thaw traffic"))
+    );
+
+    let route_brief = brief
+        .routes
+        .iter()
+        .find(|entry| entry.route_id == "camera")
+        .expect("route brief should exist");
+    assert!(
+        route_brief
+            .global_overrides
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+    assert!(
+        route_brief
+            .next_steps
+            .iter()
+            .any(|step| step.contains("Thaw traffic"))
+    );
+    assert!(!route_brief.recommended_actions.is_empty());
+    assert!(!route_brief.headline_timeline.is_empty());
+
+    let destination_brief = brief
+        .destinations
+        .iter()
+        .find(|entry| entry.destination_id == "udp_renderer")
+        .expect("destination brief should exist");
+    assert!(
+        destination_brief
+            .global_overrides
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+    assert!(!destination_brief.recommended_actions.is_empty());
 }

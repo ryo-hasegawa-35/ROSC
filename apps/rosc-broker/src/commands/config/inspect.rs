@@ -461,3 +461,50 @@ pub(crate) async fn proxy_lens(
     print_json_pretty(&lens)?;
     Ok(())
 }
+
+pub(crate) async fn proxy_brief(
+    path: &Path,
+    resolve_bindings: bool,
+    history_limit: Option<usize>,
+    route_id: Option<&str>,
+    destination_id: Option<&str>,
+    options: ProxyCommandOptions,
+) -> Result<()> {
+    if route_id.is_some() && destination_id.is_some() {
+        bail!("proxy-brief accepts only one of --route-id or --destination-id");
+    }
+
+    let config = load_config(path)?;
+    let status =
+        status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
+    let dashboard =
+        rosc_broker::proxy_operator_dashboard(&status, safety_policy(options), history_limit);
+    let mut brief = dashboard.brief;
+
+    if let Some(route_id) = route_id {
+        let Some(route_brief) = brief
+            .routes
+            .iter()
+            .find(|packet| packet.route_id == route_id)
+            .cloned()
+        else {
+            bail!("unknown route brief `{route_id}`");
+        };
+        brief.routes = vec![route_brief];
+        brief.destinations.clear();
+    } else if let Some(destination_id) = destination_id {
+        let Some(destination_brief) = brief
+            .destinations
+            .iter()
+            .find(|packet| packet.destination_id == destination_id)
+            .cloned()
+        else {
+            bail!("unknown destination brief `{destination_id}`");
+        };
+        brief.routes.clear();
+        brief.destinations = vec![destination_brief];
+    }
+
+    print_json_pretty(&brief)?;
+    Ok(())
+}

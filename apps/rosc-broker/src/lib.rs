@@ -8,6 +8,7 @@ mod launch_profile;
 mod managed_proxy;
 mod operator_attention;
 mod operator_board;
+mod operator_brief;
 mod operator_casebook;
 mod operator_dashboard;
 mod operator_diagnostics;
@@ -50,6 +51,10 @@ pub use managed_proxy::{FrozenStartupBehavior, ManagedProxyStartupOptions, Manag
 pub use operator_attention::{ProxyOperatorAttention, proxy_operator_attention};
 pub use operator_board::{
     ProxyOperatorBoard, ProxyOperatorBoardItem, ProxyOperatorBoardScope, proxy_operator_board,
+};
+pub use operator_brief::{
+    ProxyOperatorBriefCatalog, ProxyOperatorDestinationBrief, ProxyOperatorRouteBrief,
+    proxy_operator_brief_from_dashboard,
 };
 pub use operator_casebook::{
     ProxyOperatorCasebookCatalog, ProxyOperatorDestinationCasebook, ProxyOperatorRouteCasebook,

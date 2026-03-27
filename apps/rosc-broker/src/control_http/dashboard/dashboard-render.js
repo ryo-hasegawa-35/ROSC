@@ -29,6 +29,7 @@ export function collectDashboardElements() {
     recoveryDestinationCandidates: document.getElementById("recovery-destination-candidates"),
     routeFocusSelect: document.getElementById("route-focus-select"),
     routeFocusDetail: document.getElementById("route-focus-detail"),
+    routeBriefDetail: document.getElementById("route-brief-detail"),
     routeLensDetail: document.getElementById("route-lens-detail"),
     routeTraceDetail: document.getElementById("route-trace-detail"),
     routeTimelineDetail: document.getElementById("route-timeline-detail"),
@@ -38,6 +39,7 @@ export function collectDashboardElements() {
     routeCasebookDetail: document.getElementById("route-casebook-detail"),
     destinationFocusSelect: document.getElementById("destination-focus-select"),
     destinationFocusDetail: document.getElementById("destination-focus-detail"),
+    destinationBriefDetail: document.getElementById("destination-brief-detail"),
     destinationLensDetail: document.getElementById("destination-lens-detail"),
     destinationTraceDetail: document.getElementById("destination-trace-detail"),
     destinationTimelineDetail: document.getElementById("destination-timeline-detail"),
@@ -85,6 +87,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderIncidentDigest(elements, snapshot.incident_digest);
   renderRecoveryCandidates(elements, snapshot.recovery);
   renderFocus(elements, dashboard, context.focusState);
+  renderBrief(elements, dashboard, context.focusState);
   renderLens(elements, dashboard, context.focusState);
   renderTrace(elements, dashboard, context.focusState);
   renderFocusedTimeline(elements, dashboard.timeline_catalog, context.focusState);
@@ -436,6 +439,17 @@ function renderLens(elements, dashboard, focusState) {
   );
   renderRouteLens(elements, routeLens);
   renderDestinationLens(elements, destinationLens);
+}
+
+function renderBrief(elements, dashboard, focusState) {
+  const routeBrief = (dashboard.brief?.routes || []).find(
+    (packet) => packet.route_id === focusState?.routeId,
+  );
+  const destinationBrief = (dashboard.brief?.destinations || []).find(
+    (packet) => packet.destination_id === focusState?.destinationId,
+  );
+  renderRouteBrief(elements, routeBrief);
+  renderDestinationBrief(elements, destinationBrief);
 }
 
 function renderTrace(elements, dashboard, focusState) {
@@ -937,6 +951,86 @@ function renderDestinationFocusPacket(elements, packet) {
   `;
   wrapper.appendChild(actions);
   elements.destinationFocusDetail.replaceChildren(wrapper);
+}
+
+function renderRouteBrief(elements, brief) {
+  if (!brief) {
+    fillList(elements, elements.routeBriefDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused route brief</p>
+        <h4>${escapeHtml(brief.route_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(brief.state)}">${escapeHtml(humanizeState(brief.state))}</span>
+    </div>
+    <p class="summary">${escapeHtml(brief.summary)}</p>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Global blockers", (brief.global_blockers || []).length],
+      ["Overrides", (brief.global_overrides || []).length],
+      ["Timeline headlines", (brief.headline_timeline || []).length],
+      ["Actions", (brief.recommended_actions || []).length],
+    ]),
+  );
+  wrapper.appendChild(traceSummaryBlock("Global blockers", brief.global_blockers));
+  wrapper.appendChild(traceSummaryBlock("Global overrides", brief.global_overrides));
+  wrapper.appendChild(traceSummaryBlock("Next steps", brief.next_steps));
+  wrapper.appendChild(traceSummaryBlock("Headline timeline", brief.headline_timeline));
+  if (brief.recommended_actions?.length > 0) {
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    actions.replaceChildren(
+      ...brief.recommended_actions.map((action) => worklistActionButton(action)),
+    );
+    wrapper.appendChild(actions);
+  }
+  elements.routeBriefDetail.replaceChildren(wrapper);
+}
+
+function renderDestinationBrief(elements, brief) {
+  if (!brief) {
+    fillList(elements, elements.destinationBriefDetail, []);
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">Focused destination brief</p>
+        <h4>${escapeHtml(brief.destination_id)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(brief.state)}">${escapeHtml(humanizeState(brief.state))}</span>
+    </div>
+    <p class="summary">${escapeHtml(brief.summary)}</p>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Global blockers", (brief.global_blockers || []).length],
+      ["Overrides", (brief.global_overrides || []).length],
+      ["Timeline headlines", (brief.headline_timeline || []).length],
+      ["Actions", (brief.recommended_actions || []).length],
+    ]),
+  );
+  wrapper.appendChild(traceSummaryBlock("Global blockers", brief.global_blockers));
+  wrapper.appendChild(traceSummaryBlock("Global overrides", brief.global_overrides));
+  wrapper.appendChild(traceSummaryBlock("Next steps", brief.next_steps));
+  wrapper.appendChild(traceSummaryBlock("Headline timeline", brief.headline_timeline));
+  if (brief.recommended_actions?.length > 0) {
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    actions.replaceChildren(
+      ...brief.recommended_actions.map((action) => worklistActionButton(action)),
+    );
+    wrapper.appendChild(actions);
+  }
+  elements.destinationBriefDetail.replaceChildren(wrapper);
 }
 
 function renderRouteLens(elements, lens) {

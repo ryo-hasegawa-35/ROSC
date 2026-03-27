@@ -4,13 +4,13 @@ use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 use serde::Serialize;
 
 use crate::{
-    ProxyOperatorAttention, ProxyOperatorBoard, ProxyOperatorCasebookCatalog,
-    ProxyOperatorDashboard, ProxyOperatorDestinationTrace, ProxyOperatorDiagnostics,
-    ProxyOperatorFocusCatalog, ProxyOperatorHandoffCatalog, ProxyOperatorIncidents,
-    ProxyOperatorLensCatalog, ProxyOperatorOverrides, ProxyOperatorOverview,
-    ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace, ProxyOperatorSignalScope,
-    ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog,
-    ProxyOperatorTriageCatalog, UdpProxyStatusSnapshot,
+    ProxyOperatorAttention, ProxyOperatorBoard, ProxyOperatorBriefCatalog,
+    ProxyOperatorCasebookCatalog, ProxyOperatorDashboard, ProxyOperatorDestinationTrace,
+    ProxyOperatorDiagnostics, ProxyOperatorFocusCatalog, ProxyOperatorHandoffCatalog,
+    ProxyOperatorIncidents, ProxyOperatorLensCatalog, ProxyOperatorOverrides,
+    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace,
+    ProxyOperatorSignalScope, ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog,
+    ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog, UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -149,6 +149,12 @@ pub(crate) struct OperatorLensResponse {
 }
 
 #[derive(Serialize)]
+pub(crate) struct OperatorBriefResponse {
+    pub(crate) ok: bool,
+    pub(crate) brief: ProxyOperatorBriefCatalog,
+}
+
+#[derive(Serialize)]
 pub(crate) struct OperatorOverridesResponse {
     pub(crate) ok: bool,
     pub(crate) overrides: ProxyOperatorOverrides,
@@ -193,6 +199,7 @@ pub(crate) enum ResponseBody {
     OperatorBoard(OperatorBoardResponse),
     OperatorFocus(OperatorFocusResponse),
     OperatorLens(OperatorLensResponse),
+    OperatorBrief(OperatorBriefResponse),
     OperatorTrace(OperatorTraceResponse),
     OperatorRouteTrace(OperatorRouteTraceResponse),
     OperatorDestinationTrace(OperatorDestinationTraceResponse),
@@ -237,6 +244,7 @@ impl ResponseBody {
             Self::OperatorBoard(body) => json_payload(body),
             Self::OperatorFocus(body) => json_payload(body),
             Self::OperatorLens(body) => json_payload(body),
+            Self::OperatorBrief(body) => json_payload(body),
             Self::OperatorTrace(body) => json_payload(body),
             Self::OperatorRouteTrace(body) => json_payload(body),
             Self::OperatorDestinationTrace(body) => json_payload(body),

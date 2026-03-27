@@ -50,6 +50,7 @@ cargo run -p rosc-broker -- proxy-casebook examples/phase-01-basic.toml --fail-o
 cargo run -p rosc-broker -- proxy-board examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10
 cargo run -p rosc-broker -- proxy-focus examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- proxy-lens examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
+cargo run -p rosc-broker -- proxy-brief examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
@@ -76,6 +77,7 @@ curl http://127.0.0.1:19292/triage?limit=10
 curl http://127.0.0.1:19292/casebook?limit=10
 curl http://127.0.0.1:19292/board?limit=10
 curl http://127.0.0.1:19292/focus?limit=10
+curl http://127.0.0.1:19292/brief?limit=10
 curl http://127.0.0.1:19292/lens?limit=10
 curl http://127.0.0.1:19292/timeline?limit=10
 curl http://127.0.0.1:19292/trace?limit=10
@@ -87,12 +89,14 @@ curl http://127.0.0.1:19292/routes/camera/casebook?limit=10
 curl http://127.0.0.1:19292/routes/camera/board?limit=10
 curl http://127.0.0.1:19292/routes/camera/timeline?limit=10
 curl http://127.0.0.1:19292/routes/camera/trace?limit=10
+curl http://127.0.0.1:19292/routes/camera/brief?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/handoff?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/triage?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/casebook?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/board?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/focus?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/lens?limit=10
+curl http://127.0.0.1:19292/destinations/udp_renderer/brief?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/timeline?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/trace?limit=10
 curl http://127.0.0.1:19292/overrides
@@ -106,7 +110,7 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` は意図的に loopback 専用です。`127.0.0.1`、`::1`、`localhost` のような
 ローカル専用アドレスだけを使い、wildcard や外部から到達できる bind は拒否されます。
 
-`proxy-status`、`proxy-overview`、`proxy-readiness`、`proxy-assert-ready`、`proxy-snapshot`、`proxy-diagnostics`、`proxy-attention`、`proxy-incidents`、`proxy-handoff`、`proxy-timeline`、`proxy-triage`、`proxy-casebook`、`proxy-board`、`proxy-focus`、`proxy-lens`
+`proxy-status`、`proxy-overview`、`proxy-readiness`、`proxy-assert-ready`、`proxy-snapshot`、`proxy-diagnostics`、`proxy-attention`、`proxy-incidents`、`proxy-handoff`、`proxy-timeline`、`proxy-triage`、`proxy-casebook`、`proxy-board`、`proxy-focus`、`proxy-lens`、`proxy-brief`
 は、`jq` などへそのまま流せるように stdout へ JSON だけを出す契約にそろえています。
 
 Docker 経由で同じ確認を行う場合:
@@ -174,6 +178,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - snapshot と dashboard payload に focus catalog も追加し、`proxy-focus` と control-plane の `/focus`、`/routes/{id}/focus`、`/destinations/{id}/focus` から、detail・trace・timeline・handoff・triage・casebook・board lane を 1 つに束ねた focused packet を機械可読に取得できるようにした
 - 埋め込み dashboard の focus drill-down も richer な focus packet 表示に更新し、route / destination を選ぶだけで必要な運用文脈を 1 枚のカードで見られるようにした
 - snapshot と dashboard payload に operator lens catalog も追加し、`proxy-lens` と control-plane の `/lens`、`/routes/{id}/lens`、`/destinations/{id}/lens` から、focused route / destination を global blocker、global override、work item、board context ごと読めるようにした
+- snapshot と dashboard payload に operator brief catalog も追加し、`proxy-brief` と control-plane の `/brief`、`/routes/{id}/brief`、`/destinations/{id}/brief` から、focus と lens を headline timeline・next step・推奨 action 付きの compact な handoff packet として取得できるようにした
 - focused board slice でも `traffic_frozen` のような global blocker を保持するようにして、route / destination だけ見たときに全体要因を見落とさないようにした
 - `/signals?scope=problematic` で、operator が今見るべき route / destination signal だけに payload を絞れるようにした
 - config の reject / block / reload failure も counters だけでなく reason 付きの recent history として残るようになった

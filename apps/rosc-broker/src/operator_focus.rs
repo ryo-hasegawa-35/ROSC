@@ -1,12 +1,12 @@
 use serde::Serialize;
 
 use crate::{
-    ProxyOperatorBoardItem, ProxyOperatorDashboard, ProxyOperatorDestinationCasebook,
-    ProxyOperatorDestinationDetail, ProxyOperatorDestinationHandoff,
-    ProxyOperatorDestinationTimeline, ProxyOperatorDestinationTrace,
-    ProxyOperatorDestinationTriage, ProxyOperatorRouteCasebook, ProxyOperatorRouteDetail,
-    ProxyOperatorRouteHandoff, ProxyOperatorRouteTimeline, ProxyOperatorRouteTrace,
-    ProxyOperatorRouteTriage,
+    ProxyOperatorBoard, ProxyOperatorBoardItem, ProxyOperatorBoardScope, ProxyOperatorDashboard,
+    ProxyOperatorDestinationCasebook, ProxyOperatorDestinationDetail,
+    ProxyOperatorDestinationHandoff, ProxyOperatorDestinationTimeline,
+    ProxyOperatorDestinationTrace, ProxyOperatorDestinationTriage, ProxyOperatorRouteCasebook,
+    ProxyOperatorRouteDetail, ProxyOperatorRouteHandoff, ProxyOperatorRouteTimeline,
+    ProxyOperatorRouteTrace, ProxyOperatorRouteTriage,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -134,22 +134,22 @@ pub fn proxy_operator_focus_from_dashboard(
     }
 }
 
-fn route_board_items(
-    board: &crate::ProxyOperatorBoard,
-    route_id: &str,
-) -> Vec<ProxyOperatorBoardItem> {
+fn route_board_items(board: &ProxyOperatorBoard, route_id: &str) -> Vec<ProxyOperatorBoardItem> {
     board
         .blocked_items
         .iter()
         .chain(board.degraded_items.iter())
         .chain(board.watch_items.iter())
-        .filter(|item| item.route_id.as_deref() == Some(route_id))
+        .filter(|item| {
+            item.scope == ProxyOperatorBoardScope::Global
+                || item.route_id.as_deref() == Some(route_id)
+        })
         .cloned()
         .collect()
 }
 
 fn destination_board_items(
-    board: &crate::ProxyOperatorBoard,
+    board: &ProxyOperatorBoard,
     destination_id: &str,
 ) -> Vec<ProxyOperatorBoardItem> {
     board
@@ -157,7 +157,10 @@ fn destination_board_items(
         .iter()
         .chain(board.degraded_items.iter())
         .chain(board.watch_items.iter())
-        .filter(|item| item.destination_id.as_deref() == Some(destination_id))
+        .filter(|item| {
+            item.scope == ProxyOperatorBoardScope::Global
+                || item.destination_id.as_deref() == Some(destination_id)
+        })
         .cloned()
         .collect()
 }

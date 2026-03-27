@@ -10,9 +10,10 @@ pub use details::{
 pub use traffic::{ProxyOperatorCounterEntry, ProxyOperatorTrafficSummary};
 
 use crate::{
-    ProxyOperatorFocusCatalog, ProxyOperatorLensCatalog, ProxyOperatorSnapshot,
-    ProxyOperatorTimelineCatalog, ProxyOperatorTimelineEntry, ProxyOperatorTraceCatalog,
-    ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot, proxy_operator_focus_from_dashboard,
+    ProxyOperatorBriefCatalog, ProxyOperatorFocusCatalog, ProxyOperatorLensCatalog,
+    ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog, ProxyOperatorTimelineEntry,
+    ProxyOperatorTraceCatalog, ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot,
+    proxy_operator_brief_from_dashboard, proxy_operator_focus_from_dashboard,
     proxy_operator_lens_from_dashboard, proxy_operator_snapshot, proxy_operator_timeline,
     proxy_operator_trace,
 };
@@ -34,6 +35,7 @@ pub struct ProxyOperatorDashboard {
     pub trace: ProxyOperatorTraceCatalog,
     pub focus: ProxyOperatorFocusCatalog,
     pub lens: ProxyOperatorLensCatalog,
+    pub brief: ProxyOperatorBriefCatalog,
 }
 
 pub fn proxy_operator_dashboard(
@@ -72,8 +74,10 @@ pub fn proxy_operator_dashboard_from_snapshot(
         trace,
         focus: ProxyOperatorFocusCatalog::default(),
         lens: ProxyOperatorLensCatalog::default(),
+        brief: ProxyOperatorBriefCatalog::default(),
     };
     dashboard.focus = proxy_operator_focus_from_dashboard(&dashboard);
     dashboard.lens = proxy_operator_lens_from_dashboard(&dashboard);
+    dashboard.brief = proxy_operator_brief_from_dashboard(&dashboard);
     dashboard
 }
