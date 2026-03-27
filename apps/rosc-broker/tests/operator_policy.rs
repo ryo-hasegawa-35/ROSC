@@ -179,6 +179,7 @@ fn operator_report_surfaces_state_and_recent_highlights() {
         proxy_status_from_config(&config).expect("status should build"),
         &HealthSnapshot {
             traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
             recent_operator_actions: vec![RecentOperatorAction {
                 sequence: 9,
                 recorded_at_unix_ms: 1234,
@@ -234,6 +235,28 @@ fn operator_report_surfaces_state_and_recent_highlights() {
     let report = proxy_operator_report(&status, ProxyRuntimeSafetyPolicy::default());
 
     assert_eq!(report.state, ProxyOperatorState::Warning);
+    assert!(report.overrides.traffic_frozen);
+    assert_eq!(report.overrides.isolated_route_ids, vec!["camera"]);
+    assert_eq!(
+        report.runtime_signals.ingresses_with_drops,
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        report.runtime_signals.destinations_with_open_breakers,
+        Vec::<String>::new()
+    );
+    assert_eq!(report.route_signals.len(), 2);
+    assert!(report.route_signals.iter().any(|route| {
+        route.route_id == "camera"
+            && route.isolated
+            && route.dispatch_failures_total == 0
+            && route.transform_failures_total == 0
+    }));
+    assert!(report.destination_signals.iter().any(|destination| {
+        destination.destination_id == "udp_renderer"
+            && destination.send_failures_total == 0
+            && destination.drops_total == 0
+    }));
     assert_eq!(
         report
             .highlights
@@ -266,8 +289,101 @@ fn operator_report_surfaces_state_and_recent_highlights() {
         report
             .report_lines
             .iter()
+            .any(|line| line.contains("proxy overrides: launch_profile_mode=normal"))
+    );
+    assert!(
+        report
+            .report_lines
+            .iter()
+            .any(|line| line.contains("proxy runtime signals:"))
+    );
+    assert!(
+        report
+            .report_lines
+            .iter()
             .any(|line| line.contains("latest_config_issue=reload_failed"))
     );
+}
+
+#[test]
+fn operator_report_surfaces_runtime_failure_signals() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            ingress_drops_total: [(("udp_localhost_in".to_owned(), "queue_full".to_owned()), 2)]
+                .into_iter()
+                .collect(),
+            dispatch_failures_total: [(
+                (
+                    "camera".to_owned(),
+                    "udp_renderer".to_owned(),
+                    "breaker_open".to_owned(),
+                ),
+                3,
+            )]
+            .into_iter()
+            .collect(),
+            route_transform_failures_total: [("camera".to_owned(), 1)].into_iter().collect(),
+            destination_drops_total: [(
+                ("udp_renderer".to_owned(), "queue_overflow".to_owned()),
+                4,
+            )]
+            .into_iter()
+            .collect(),
+            destination_send_failures_total: [(
+                ("udp_renderer".to_owned(), "socket_error".to_owned()),
+                5,
+            )]
+            .into_iter()
+            .collect(),
+            destination_breaker_state: [(
+                "udp_renderer".to_owned(),
+                rosc_telemetry::BreakerStateSnapshot::Open,
+            )]
+            .into_iter()
+            .collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let report = proxy_operator_report(&status, ProxyRuntimeSafetyPolicy::default());
+
+    assert_eq!(
+        report.runtime_signals.ingresses_with_drops,
+        vec!["udp_localhost_in"]
+    );
+    assert_eq!(
+        report.runtime_signals.routes_with_dispatch_failures,
+        vec!["camera"]
+    );
+    assert_eq!(
+        report.runtime_signals.routes_with_transform_failures,
+        vec!["camera"]
+    );
+    assert_eq!(
+        report.runtime_signals.destinations_with_drops,
+        vec!["udp_renderer"]
+    );
+    assert_eq!(
+        report.runtime_signals.destinations_with_send_failures,
+        vec!["udp_renderer"]
+    );
+    assert_eq!(
+        report.runtime_signals.destinations_with_open_breakers,
+        vec!["udp_renderer"]
+    );
+    assert!(report.destination_signals.iter().any(|destination| {
+        destination.destination_id == "udp_renderer"
+            && destination.drops_total == 4
+            && destination.send_failures_total == 5
+            && destination.breaker_state == Some(rosc_telemetry::BreakerStateSnapshot::Open)
+    }));
+    assert!(report.route_signals.iter().any(|route| {
+        route.route_id == "camera"
+            && route.dispatch_failures_total == 3
+            && route.transform_failures_total == 1
+    }));
 }
 
 #[test]

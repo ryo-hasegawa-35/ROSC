@@ -159,6 +159,20 @@ struct OperatorReportResponse {
 }
 
 #[derive(Serialize)]
+struct OperatorOverridesResponse {
+    ok: bool,
+    overrides: crate::ProxyOperatorOverrides,
+}
+
+#[derive(Serialize)]
+struct OperatorSignalsResponse {
+    ok: bool,
+    runtime_signals: crate::ProxyOperatorRuntimeSignals,
+    route_signals: Vec<crate::ProxyOperatorRouteSignal>,
+    destination_signals: Vec<crate::ProxyOperatorDestinationSignal>,
+}
+
+#[derive(Serialize)]
 struct BlockersResponse {
     ok: bool,
     blockers: Vec<String>,
@@ -231,6 +245,28 @@ async fn route_request(request: HttpRequest, control: Arc<dyn ProxyControlPlane>
                 report: control.operator_report().await,
             }),
         },
+        ("GET", "/overrides") => {
+            let report = control.operator_report().await;
+            HttpResponse {
+                status: "200 OK",
+                body: ResponseBody::OperatorOverrides(OperatorOverridesResponse {
+                    ok: true,
+                    overrides: report.overrides,
+                }),
+            }
+        }
+        ("GET", "/signals") => {
+            let report = control.operator_report().await;
+            HttpResponse {
+                status: "200 OK",
+                body: ResponseBody::OperatorSignals(OperatorSignalsResponse {
+                    ok: true,
+                    runtime_signals: report.runtime_signals,
+                    route_signals: report.route_signals,
+                    destination_signals: report.destination_signals,
+                }),
+            }
+        }
         ("GET", "/blockers") => {
             let report = control.operator_report().await;
             HttpResponse {
@@ -637,6 +673,8 @@ enum ResponseBody {
     Status(StatusResponse),
     Action(ActionResponse),
     OperatorReport(OperatorReportResponse),
+    OperatorOverrides(OperatorOverridesResponse),
+    OperatorSignals(OperatorSignalsResponse),
     Blockers(BlockersResponse),
     RecentOperatorActions(RecentOperatorActionsResponse),
     RecentConfigEvents(RecentConfigEventsResponse),
@@ -654,6 +692,8 @@ impl ResponseBody {
             Self::Status(body) => serde_json::to_vec(body),
             Self::Action(body) => serde_json::to_vec(body),
             Self::OperatorReport(body) => serde_json::to_vec(body),
+            Self::OperatorOverrides(body) => serde_json::to_vec(body),
+            Self::OperatorSignals(body) => serde_json::to_vec(body),
             Self::Blockers(body) => serde_json::to_vec(body),
             Self::RecentOperatorActions(body) => serde_json::to_vec(body),
             Self::RecentConfigEvents(body) => serde_json::to_vec(body),
@@ -1094,9 +1134,30 @@ mod tests {
         assert_eq!(report["report"]["policy"]["fail_on_warnings"], true);
         assert_eq!(report["report"]["policy"]["require_fallback_ready"], true);
         assert_eq!(report["report"]["state"], "warning");
+        assert_eq!(report["report"]["overrides"]["traffic_frozen"], true);
+        assert_eq!(
+            report["report"]["runtime_signals"]["destinations_with_open_breakers"],
+            serde_json::json!([])
+        );
         assert_eq!(
             report["report"]["highlights"]["latest_operator_action"]["action"],
             "freeze_traffic"
+        );
+        assert!(
+            report["report"]["report_lines"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|line| line.as_str().unwrap().contains("proxy overrides:")),
+            "expected overrides line in report: {report:?}"
+        );
+        assert!(
+            report["report"]["report_lines"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|line| line.as_str().unwrap().contains("proxy runtime signals:")),
+            "expected runtime signals line in report: {report:?}"
         );
         assert!(
             report["report"]["report_lines"]
@@ -1129,6 +1190,49 @@ mod tests {
         assert!(
             blockers["blockers"].as_array().unwrap().is_empty(),
             "expected no blockers for healthy proxy: {blockers:?}"
+        );
+
+        let overrides = json_body(
+            &request(
+                service.listen_addr(),
+                "GET /overrides HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            )
+            .await,
+        );
+        assert_eq!(overrides["ok"], true);
+        assert_eq!(overrides["overrides"]["traffic_frozen"], true);
+        assert_eq!(
+            overrides["overrides"]["launch_profile_mode"],
+            serde_json::json!("normal")
+        );
+
+        let signals = json_body(
+            &request(
+                service.listen_addr(),
+                "GET /signals HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            )
+            .await,
+        );
+        assert_eq!(signals["ok"], true);
+        assert_eq!(
+            signals["runtime_signals"]["routes_with_dispatch_failures"],
+            serde_json::json!([])
+        );
+        assert!(
+            signals["route_signals"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|route| route["route_id"] == "camera"),
+            "expected route signal in /signals: {signals:?}"
+        );
+        assert!(
+            signals["destination_signals"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|destination| destination["destination_id"] == "udp_renderer"),
+            "expected destination signal in /signals: {signals:?}"
         );
 
         service.shutdown().await.unwrap();

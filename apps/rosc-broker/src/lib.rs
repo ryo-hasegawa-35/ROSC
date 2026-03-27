@@ -27,8 +27,10 @@ pub use launch_profile::{
 };
 pub use managed_proxy::{FrozenStartupBehavior, ManagedProxyStartupOptions, ManagedUdpProxy};
 pub use operator_policy::{
-    ProxyOperatorHighlights, ProxyOperatorReport, ProxyOperatorState, ProxyRuntimeSafetyPolicy,
-    evaluate_proxy_runtime_policy, proxy_operator_report, proxy_startup_report_lines,
+    ProxyOperatorDestinationSignal, ProxyOperatorHighlights, ProxyOperatorOverrides,
+    ProxyOperatorReport, ProxyOperatorRouteSignal, ProxyOperatorRuntimeSignals, ProxyOperatorState,
+    ProxyRuntimeSafetyPolicy, evaluate_proxy_runtime_policy, proxy_operator_report,
+    proxy_startup_report_lines,
 };
 pub use proxy_app::UdpProxyApp;
 pub use proxy_reload_supervisor::{ManagedProxyFileSupervisor, ProxyReloadOutcome};

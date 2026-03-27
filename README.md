@@ -50,6 +50,8 @@ curl -X POST http://127.0.0.1:19292/destinations/udp_renderer/rehydrate
 curl -X POST "http://127.0.0.1:19292/routes/camera/replay/sandbox_tap?limit=1"
 curl http://127.0.0.1:19292/status
 curl http://127.0.0.1:19292/report
+curl http://127.0.0.1:19292/overrides
+curl http://127.0.0.1:19292/signals
 curl http://127.0.0.1:19292/blockers
 curl http://127.0.0.1:19292/history/operator-actions
 curl http://127.0.0.1:19292/history/config-events
@@ -95,6 +97,7 @@ Current Phase 01 runtime coverage:
 - control endpoint also supports bulk route restore plus percent-decoded resource ids for safer operator recovery flows
 - runtime status and control history endpoints now expose bounded recent operator actions and config transitions for post-incident tracing
 - CLI reports and control-plane `/report` / `/blockers` now share the same structured operator safety evaluation
+- control-plane `/report` now also exposes structured override/runtime-signal/route-signal/destination-signal sections, with `/overrides` and `/signals` endpoints for direct consumption
 - config rejection / block / reload-failure history now retains reason details instead of only counters
 
 ## Documentation Entry Points
