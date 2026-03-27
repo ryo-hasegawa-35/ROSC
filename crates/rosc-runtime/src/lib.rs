@@ -166,6 +166,7 @@ pub struct Runtime<TTelemetry> {
 pub struct UdpIngressBinding {
     socket: UdpSocket,
     config: UdpIngressConfig,
+    recv_buffer: tokio::sync::Mutex<Vec<u8>>,
 }
 
 pub struct UdpEgressSink {
@@ -301,7 +302,12 @@ where
 impl UdpIngressBinding {
     pub async fn bind(address: &str, config: UdpIngressConfig) -> Result<Self, io::Error> {
         let socket = UdpSocket::bind(address).await?;
-        Ok(Self { socket, config })
+        let recv_buffer = vec![0u8; config.max_packet_size];
+        Ok(Self {
+            socket,
+            config,
+            recv_buffer: tokio::sync::Mutex::new(recv_buffer),
+        })
     }
 
     pub fn local_addr(&self) -> Result<SocketAddr, io::Error> {
@@ -309,11 +315,10 @@ impl UdpIngressBinding {
     }
 
     pub async fn recv_next(&self) -> Result<PacketEnvelope, UdpIngressError> {
-        let mut buffer = vec![0u8; self.config.max_packet_size];
-        let (size, source) = self.socket.recv_from(&mut buffer).await?;
-        buffer.truncate(size);
+        let mut buffer = self.recv_buffer.lock().await;
+        let (size, source) = self.socket.recv_from(buffer.as_mut_slice()).await?;
         Ok(PacketEnvelope::parse_osc(
-            buffer,
+            buffer[..size].to_vec(),
             IngressMetadata {
                 ingress_id: self.config.ingress_id.clone(),
                 transport: TransportKind::OscUdp,
