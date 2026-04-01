@@ -319,6 +319,11 @@ async fn control_service_serves_dashboard_assets() {
             .is_some()
     );
     assert!(
+        dashboard_data["dashboard"]["dossier"]["routes"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
         dashboard_data["dashboard"]["focus"]["destinations"]
             .as_array()
             .is_some()
@@ -770,6 +775,29 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|entry| entry["destination_id"] == "udp_renderer")
     );
 
+    let dossier = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /dossier?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(dossier["ok"], true);
+    assert!(
+        dossier["dossier"]["routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["route_id"] == "camera")
+    );
+    assert!(
+        dossier["dossier"]["destinations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["destination_id"] == "udp_renderer")
+    );
+
     let timeline = json_body(
         &request(
             service.listen_addr(),
@@ -871,6 +899,26 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .iter()
             .any(|entry| entry == "traffic_frozen")
     );
+    assert!(
+        route_brief["brief"]["routes"][0]["scoped_blockers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry.as_str().unwrap().contains("camera"))
+    );
+
+    let route_dossier = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/dossier?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_dossier["ok"], true);
+    assert_eq!(route_dossier["dossier"]["routes"][0]["route_id"], "camera");
+    assert_eq!(route_dossier["dossier"]["destinations"], json!([]));
+    assert!(route_dossier["dossier"]["routes"][0]["brief"].is_object());
+    assert!(route_dossier["dossier"]["routes"][0]["lens"].is_object());
 
     let route_board = json_body(
         &request(
@@ -1002,6 +1050,25 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .iter()
             .any(|entry| entry == "traffic_frozen")
     );
+    assert!(
+        destination_brief["brief"]["destinations"][0]["scoped_blockers"].is_array()
+    );
+
+    let destination_dossier = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/dossier?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_dossier["ok"], true);
+    assert_eq!(
+        destination_dossier["dossier"]["destinations"][0]["destination_id"],
+        "udp_renderer"
+    );
+    assert_eq!(destination_dossier["dossier"]["routes"], json!([]));
+    assert!(destination_dossier["dossier"]["destinations"][0]["brief"].is_object());
+    assert!(destination_dossier["dossier"]["destinations"][0]["lens"].is_object());
 
     let destination_board = json_body(
         &request(

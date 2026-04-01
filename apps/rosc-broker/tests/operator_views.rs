@@ -5,12 +5,12 @@ use rosc_broker::{
     ProxyOperatorSignalScope, ProxyOperatorState, ProxyOperatorTimelineCategory,
     ProxyRuntimeSafetyPolicy, attach_runtime_status, proxy_operator_attention,
     proxy_operator_board, proxy_operator_brief_from_dashboard, proxy_operator_casebook,
-    proxy_operator_dashboard, proxy_operator_diagnostics, proxy_operator_focus_from_dashboard,
-    proxy_operator_handoff, proxy_operator_incidents_from_histories,
-    proxy_operator_lens_from_dashboard, proxy_operator_overview, proxy_operator_readiness,
-    proxy_operator_recovery, proxy_operator_report, proxy_operator_signals_view,
-    proxy_operator_snapshot, proxy_operator_timeline, proxy_operator_trace,
-    proxy_status_from_config,
+    proxy_operator_dashboard, proxy_operator_diagnostics, proxy_operator_dossier_from_dashboard,
+    proxy_operator_focus_from_dashboard, proxy_operator_handoff,
+    proxy_operator_incidents_from_histories, proxy_operator_lens_from_dashboard,
+    proxy_operator_overview, proxy_operator_readiness, proxy_operator_recovery,
+    proxy_operator_report, proxy_operator_signals_view, proxy_operator_snapshot,
+    proxy_operator_timeline, proxy_operator_trace, proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -1620,4 +1620,112 @@ fn operator_brief_bundles_global_context_and_focused_actions() {
             .any(|entry| entry == "traffic_frozen")
     );
     assert!(!destination_brief.recommended_actions.is_empty());
+}
+
+#[test]
+fn operator_lens_scopes_blockers_to_related_entities() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            queue_depth: [("udp_renderer".to_owned(), 3)].into_iter().collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let dashboard = proxy_operator_dashboard(&status, ProxyRuntimeSafetyPolicy::default(), Some(4));
+    let lens = proxy_operator_lens_from_dashboard(&dashboard);
+
+    let route_lens = lens
+        .routes
+        .iter()
+        .find(|entry| entry.route_id == "camera")
+        .expect("route lens should exist");
+    assert!(
+        route_lens
+            .global_blockers
+            .iter()
+            .any(|entry| entry.contains("traffic"))
+    );
+    assert!(
+        route_lens
+            .scoped_blockers
+            .iter()
+            .any(|entry| entry.contains("camera"))
+    );
+
+    let unrelated_route = lens
+        .routes
+        .iter()
+        .find(|entry| entry.route_id == "unsafe")
+        .expect("unrelated route should exist");
+    assert!(
+        unrelated_route
+            .global_blockers
+            .iter()
+            .any(|entry| entry.contains("traffic"))
+    );
+    assert!(
+        unrelated_route
+            .scoped_blockers
+            .iter()
+            .all(|entry| !entry.contains("camera"))
+    );
+}
+
+#[test]
+fn operator_dossier_bundles_focus_brief_and_lens_with_scoped_context() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            queue_depth: [("udp_renderer".to_owned(), 3)].into_iter().collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let dashboard = proxy_operator_dashboard(&status, ProxyRuntimeSafetyPolicy::default(), Some(4));
+    let dossier = proxy_operator_dossier_from_dashboard(&dashboard);
+
+    assert_eq!(dossier.state, "warning");
+    let route = dossier
+        .routes
+        .iter()
+        .find(|entry| entry.route_id == "camera")
+        .expect("camera dossier should exist");
+    assert!(route.brief.is_some());
+    assert!(route.lens.is_some());
+    assert!(
+        route
+            .global_overrides
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+    assert!(
+        route
+            .scoped_blockers
+            .iter()
+            .any(|entry| entry.contains("camera"))
+    );
+    assert!(!route.headline_timeline.is_empty());
+    assert!(!route.next_steps.is_empty());
+
+    let destination = dossier
+        .destinations
+        .iter()
+        .find(|entry| entry.destination_id == "udp_renderer")
+        .expect("destination dossier should exist");
+    assert!(destination.brief.is_some());
+    assert!(destination.lens.is_some());
+    assert!(
+        destination
+            .scoped_blockers
+            .iter()
+            .any(|entry| entry.contains("udp_renderer"))
+    );
+    assert!(!destination.recommended_actions.is_empty());
 }

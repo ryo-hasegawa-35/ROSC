@@ -10,8 +10,10 @@ mod operator_attention;
 mod operator_board;
 mod operator_brief;
 mod operator_casebook;
+mod operator_context;
 mod operator_dashboard;
 mod operator_diagnostics;
+mod operator_dossier;
 mod operator_focus;
 mod operator_handoff;
 mod operator_history;
@@ -68,6 +70,10 @@ pub use operator_dashboard::{
 };
 pub use operator_diagnostics::{
     ProxyOperatorDiagnostics, proxy_operator_diagnostics, proxy_operator_diagnostics_from_overview,
+};
+pub use operator_dossier::{
+    ProxyOperatorDestinationDossier, ProxyOperatorDossierCatalog, ProxyOperatorRouteDossier,
+    proxy_operator_dossier_from_dashboard,
 };
 pub use operator_focus::{
     ProxyOperatorDestinationFocusPacket, ProxyOperatorFocusCatalog, ProxyOperatorRouteFocusPacket,

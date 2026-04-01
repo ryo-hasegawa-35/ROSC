@@ -6,6 +6,7 @@ use crate::{
     ProxyOperatorRouteCasebook, ProxyOperatorRouteFocusPacket, ProxyOperatorRouteHandoff,
     ProxyOperatorRouteLens, ProxyOperatorRouteTriage, ProxyOperatorState,
     ProxyOperatorSuggestedAction,
+    operator_context::{dashboard_context, scoped_destination_blockers, scoped_route_blockers},
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -14,6 +15,7 @@ pub struct ProxyOperatorRouteBrief {
     pub state: String,
     pub summary: String,
     pub global_blockers: Vec<String>,
+    pub scoped_blockers: Vec<String>,
     pub global_overrides: Vec<String>,
     pub headline_timeline: Vec<String>,
     pub next_steps: Vec<String>,
@@ -28,6 +30,7 @@ pub struct ProxyOperatorDestinationBrief {
     pub state: String,
     pub summary: String,
     pub global_blockers: Vec<String>,
+    pub scoped_blockers: Vec<String>,
     pub global_overrides: Vec<String>,
     pub headline_timeline: Vec<String>,
     pub next_steps: Vec<String>,
@@ -50,12 +53,7 @@ pub fn proxy_operator_brief_from_dashboard(
     dashboard: &ProxyOperatorDashboard,
 ) -> ProxyOperatorBriefCatalog {
     let snapshot = dashboard.snapshot.as_ref();
-    let global_blockers = if snapshot.readiness.ready {
-        Vec::new()
-    } else {
-        snapshot.readiness.reasons.clone()
-    };
-    let global_overrides = dashboard.lens.global_overrides.clone();
+    let context = dashboard_context(dashboard);
     let global_next_steps = snapshot.triage.global.next_steps.clone();
 
     let routes = dashboard
@@ -78,8 +76,9 @@ pub fn proxy_operator_brief_from_dashboard(
                 route_id: focus.route_id.clone(),
                 state: state_label(snapshot.overview.report.state.clone()).to_owned(),
                 summary: route_summary(&focus, handoff, triage, casebook),
-                global_blockers: global_blockers.clone(),
-                global_overrides: global_overrides.clone(),
+                global_blockers: context.global_blockers.clone(),
+                scoped_blockers: scoped_route_blockers(snapshot, &focus.route_id),
+                global_overrides: context.global_overrides.clone(),
                 headline_timeline: route_timeline_headlines(&focus),
                 next_steps: route_next_steps(handoff, triage, casebook),
                 recommended_actions: route_actions(handoff, triage, casebook),
@@ -109,8 +108,9 @@ pub fn proxy_operator_brief_from_dashboard(
                 destination_id: focus.destination_id.clone(),
                 state: state_label(snapshot.overview.report.state.clone()).to_owned(),
                 summary: destination_summary(&focus, handoff, triage, casebook),
-                global_blockers: global_blockers.clone(),
-                global_overrides: global_overrides.clone(),
+                global_blockers: context.global_blockers.clone(),
+                scoped_blockers: scoped_destination_blockers(snapshot, &focus.destination_id),
+                global_overrides: context.global_overrides.clone(),
                 headline_timeline: destination_timeline_headlines(&focus),
                 next_steps: destination_next_steps(handoff, triage, casebook),
                 recommended_actions: destination_actions(handoff, triage, casebook),
@@ -122,8 +122,8 @@ pub fn proxy_operator_brief_from_dashboard(
 
     ProxyOperatorBriefCatalog {
         state: state_label(snapshot.overview.report.state.clone()).to_owned(),
-        global_blockers,
-        global_overrides,
+        global_blockers: context.global_blockers,
+        global_overrides: context.global_overrides,
         global_next_steps,
         routes,
         destinations,

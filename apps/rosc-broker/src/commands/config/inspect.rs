@@ -508,3 +508,50 @@ pub(crate) async fn proxy_brief(
     print_json_pretty(&brief)?;
     Ok(())
 }
+
+pub(crate) async fn proxy_dossier(
+    path: &Path,
+    resolve_bindings: bool,
+    history_limit: Option<usize>,
+    route_id: Option<&str>,
+    destination_id: Option<&str>,
+    options: ProxyCommandOptions,
+) -> Result<()> {
+    if route_id.is_some() && destination_id.is_some() {
+        bail!("proxy-dossier accepts only one of --route-id or --destination-id");
+    }
+
+    let config = load_config(path)?;
+    let status =
+        status_from_config(&config, resolve_bindings, launch_profile_mode(options)).await?;
+    let dashboard =
+        rosc_broker::proxy_operator_dashboard(&status, safety_policy(options), history_limit);
+    let mut dossier = dashboard.dossier;
+
+    if let Some(route_id) = route_id {
+        let Some(route_dossier) = dossier
+            .routes
+            .iter()
+            .find(|packet| packet.route_id == route_id)
+            .cloned()
+        else {
+            bail!("unknown route dossier `{route_id}`");
+        };
+        dossier.routes = vec![route_dossier];
+        dossier.destinations.clear();
+    } else if let Some(destination_id) = destination_id {
+        let Some(destination_dossier) = dossier
+            .destinations
+            .iter()
+            .find(|packet| packet.destination_id == destination_id)
+            .cloned()
+        else {
+            bail!("unknown destination dossier `{destination_id}`");
+        };
+        dossier.routes.clear();
+        dossier.destinations = vec![destination_dossier];
+    }
+
+    print_json_pretty(&dossier)?;
+    Ok(())
+}

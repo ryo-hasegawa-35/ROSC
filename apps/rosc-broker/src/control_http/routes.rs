@@ -14,12 +14,12 @@ use super::response::{
     HttpResponse, blockers_response, board_response, brief_response, casebook_response,
     config_events_response, dashboard_css_response, dashboard_data_response,
     dashboard_html_response, dashboard_js_response, dashboard_render_js_response,
-    dashboard_state_js_response, destination_trace_response, diagnostics_response, focus_response,
-    handoff_response, incidents_response, invalid_component_error, invalid_query_error,
-    lens_response, map_action_result, operator_actions_response, operator_signals_response,
-    overrides_response, overview_response, readiness_response, report_response,
-    route_trace_response, snapshot_response, status_response, timeline_response, trace_response,
-    triage_response, unsupported_route_error,
+    dashboard_state_js_response, destination_trace_response, diagnostics_response,
+    dossier_response, focus_response, handoff_response, incidents_response,
+    invalid_component_error, invalid_query_error, lens_response, map_action_result,
+    operator_actions_response, operator_signals_response, overrides_response, overview_response,
+    readiness_response, report_response, route_trace_response, snapshot_response, status_response,
+    timeline_response, trace_response, triage_response, unsupported_route_error,
 };
 
 pub(crate) async fn route_request(
@@ -141,6 +141,13 @@ pub(crate) async fn route_request(
             let dashboard = control.operator_dashboard(limit).await;
             brief_response(dashboard.brief)
         }
+        ("GET", "/dossier") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            let dashboard = control.operator_dashboard(limit).await;
+            dossier_response(dashboard.dossier)
+        }
         ("GET", "/overrides") => {
             let report = control.operator_report().await;
             overrides_response(report.overrides)
@@ -187,6 +194,34 @@ async fn route_nested_request(
     query: Option<&str>,
     control: Arc<dyn ProxyControlPlane>,
 ) -> HttpResponse {
+    if let Some(destination_id) = path
+        .strip_prefix("/destinations/")
+        .and_then(|path| path.strip_suffix("/dossier"))
+    {
+        if request.method != "GET" || destination_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(destination_id) = decode_uri_component(destination_id) else {
+            return invalid_component_error("destination id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let dashboard = control.operator_dashboard(limit).await;
+        let mut dossier = dashboard.dossier;
+        let Some(destination_dossier) = dossier
+            .destinations
+            .iter()
+            .find(|packet| packet.destination_id == destination_id)
+            .cloned()
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        dossier.routes.clear();
+        dossier.destinations = vec![destination_dossier];
+        return dossier_response(dossier);
+    }
+
     if let Some(destination_id) = path
         .strip_prefix("/destinations/")
         .and_then(|path| path.strip_suffix("/brief"))
@@ -487,6 +522,31 @@ async fn route_nested_request(
         brief.routes = vec![route_brief];
         brief.destinations.clear();
         return brief_response(brief);
+    }
+
+    if let Some(route_id) = route_path.strip_suffix("/dossier") {
+        if request.method != "GET" || route_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let dashboard = control.operator_dashboard(limit).await;
+        let mut dossier = dashboard.dossier;
+        let Some(route_dossier) = dossier
+            .routes
+            .iter()
+            .find(|packet| packet.route_id == route_id)
+            .cloned()
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        dossier.routes = vec![route_dossier];
+        dossier.destinations.clear();
+        return dossier_response(dossier);
     }
 
     if let Some(route_id) = route_path.strip_suffix("/lens") {

@@ -31,6 +31,7 @@ export function collectDashboardElements() {
     routeFocusDetail: document.getElementById("route-focus-detail"),
     routeBriefDetail: document.getElementById("route-brief-detail"),
     routeLensDetail: document.getElementById("route-lens-detail"),
+    routeDossierDetail: document.getElementById("route-dossier-detail"),
     routeTraceDetail: document.getElementById("route-trace-detail"),
     routeTimelineDetail: document.getElementById("route-timeline-detail"),
     routeHandoffDetail: document.getElementById("route-handoff-detail"),
@@ -41,6 +42,7 @@ export function collectDashboardElements() {
     destinationFocusDetail: document.getElementById("destination-focus-detail"),
     destinationBriefDetail: document.getElementById("destination-brief-detail"),
     destinationLensDetail: document.getElementById("destination-lens-detail"),
+    destinationDossierDetail: document.getElementById("destination-dossier-detail"),
     destinationTraceDetail: document.getElementById("destination-trace-detail"),
     destinationTimelineDetail: document.getElementById("destination-timeline-detail"),
     destinationHandoffDetail: document.getElementById("destination-handoff-detail"),
@@ -89,6 +91,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderFocus(elements, dashboard, context.focusState);
   renderBrief(elements, dashboard, context.focusState);
   renderLens(elements, dashboard, context.focusState);
+  renderDossier(elements, dashboard, context.focusState);
   renderTrace(elements, dashboard, context.focusState);
   renderFocusedTimeline(elements, dashboard.timeline_catalog, context.focusState);
   renderHandoff(elements, snapshot.handoff, context.focusState);
@@ -450,6 +453,17 @@ function renderBrief(elements, dashboard, focusState) {
   );
   renderRouteBrief(elements, routeBrief);
   renderDestinationBrief(elements, destinationBrief);
+}
+
+function renderDossier(elements, dashboard, focusState) {
+  const routeDossier = (dashboard.dossier?.routes || []).find(
+    (packet) => packet.route_id === focusState?.routeId,
+  );
+  const destinationDossier = (dashboard.dossier?.destinations || []).find(
+    (packet) => packet.destination_id === focusState?.destinationId,
+  );
+  renderRouteDossier(elements, routeDossier);
+  renderDestinationDossier(elements, destinationDossier);
 }
 
 function renderTrace(elements, dashboard, focusState) {
@@ -1456,6 +1470,105 @@ function renderDestinationCasebook(elements, casebook) {
   wrapper.appendChild(traceEventsBlock(casebook.recent_events, "Recent related events"));
   wrapper.appendChild(timelineEntriesBlock(casebook.timeline, "Recorded timeline"));
   elements.destinationCasebookDetail.replaceChildren(wrapper);
+}
+
+function renderRouteDossier(elements, dossier) {
+  if (!dossier) {
+    fillList(elements, elements.routeDossierDetail, []);
+    return;
+  }
+  elements.routeDossierDetail.replaceChildren(
+    dossierCard(
+      "Focused route dossier",
+      dossier.route_id,
+      dossier.state,
+      dossier.summary,
+      dossier.global_blockers,
+      dossier.scoped_blockers,
+      dossier.global_overrides,
+      dossier.incident_titles,
+      dossier.headline_timeline,
+      dossier.next_steps,
+      dossier.recommended_actions,
+      dossier.work_items,
+    ),
+  );
+}
+
+function renderDestinationDossier(elements, dossier) {
+  if (!dossier) {
+    fillList(elements, elements.destinationDossierDetail, []);
+    return;
+  }
+  elements.destinationDossierDetail.replaceChildren(
+    dossierCard(
+      "Focused destination dossier",
+      dossier.destination_id,
+      dossier.state,
+      dossier.summary,
+      dossier.global_blockers,
+      dossier.scoped_blockers,
+      dossier.global_overrides,
+      dossier.incident_titles,
+      dossier.headline_timeline,
+      dossier.next_steps,
+      dossier.recommended_actions,
+      dossier.work_items,
+    ),
+  );
+}
+
+function dossierCard(
+  label,
+  title,
+  level,
+  summary,
+  globalBlockers,
+  scopedBlockers,
+  globalOverrides,
+  incidentTitles,
+  headlineTimeline,
+  nextSteps,
+  actions,
+  workItems,
+) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">${escapeHtml(label)}</p>
+        <h4>${escapeHtml(title)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(String(level).toLowerCase())}">${escapeHtml(humanizeState(level))}</span>
+    </div>
+    <p class="summary">${escapeHtml(summary)}</p>
+  `;
+  wrapper.appendChild(traceSummaryBlock("Global blockers", globalBlockers));
+  wrapper.appendChild(traceSummaryBlock("Scoped blockers", scopedBlockers));
+  wrapper.appendChild(traceSummaryBlock("Global overrides", globalOverrides));
+  wrapper.appendChild(traceSummaryBlock("Incident titles", incidentTitles));
+  wrapper.appendChild(traceSummaryBlock("Headline timeline", headlineTimeline));
+  wrapper.appendChild(traceSummaryBlock("Next steps", nextSteps));
+  if (actions?.length > 0) {
+    const buttons = document.createElement("div");
+    buttons.className = "detail-actions";
+    buttons.replaceChildren(...actions.map((action) => worklistActionButton(action)));
+    wrapper.appendChild(buttons);
+  }
+  if (workItems?.length > 0) {
+    const stack = document.createElement("div");
+    stack.className = "worklist-stack";
+    stack.replaceChildren(
+      ...workItems.map((item) =>
+        operatorCard(item, {
+          label: "Linked work item",
+        }),
+      ),
+    );
+    wrapper.appendChild(stack);
+  }
+  return wrapper;
 }
 
 function traceSummaryBlock(title, reasons) {
