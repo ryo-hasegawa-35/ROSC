@@ -356,3 +356,25 @@ fn proxy_dossier_stdout_is_json_only() {
     assert!(value["routes"][0]["brief"].is_object());
     assert!(value["routes"][0]["lens"].is_object());
 }
+
+#[test]
+fn proxy_runbook_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-runbook",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("global").is_some());
+    assert!(value.get("routes").is_some());
+    assert!(value.get("destinations").is_some());
+    assert_eq!(value["routes"].as_array().unwrap().len(), 1);
+    assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
+    assert!(value["routes"][0]["dossier"].is_object());
+}

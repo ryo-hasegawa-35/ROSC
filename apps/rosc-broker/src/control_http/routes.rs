@@ -148,6 +148,13 @@ pub(crate) async fn route_request(
             let dashboard = control.operator_dashboard(limit).await;
             dossier_response(dashboard.dossier)
         }
+        ("GET", "/runbook") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            let dashboard = control.operator_dashboard(limit).await;
+            super::response::runbook_response(dashboard.runbook)
+        }
         ("GET", "/overrides") => {
             let report = control.operator_report().await;
             overrides_response(report.overrides)
@@ -194,6 +201,34 @@ async fn route_nested_request(
     query: Option<&str>,
     control: Arc<dyn ProxyControlPlane>,
 ) -> HttpResponse {
+    if let Some(destination_id) = path
+        .strip_prefix("/destinations/")
+        .and_then(|path| path.strip_suffix("/runbook"))
+    {
+        if request.method != "GET" || destination_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(destination_id) = decode_uri_component(destination_id) else {
+            return invalid_component_error("destination id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let dashboard = control.operator_dashboard(limit).await;
+        let mut runbook = dashboard.runbook;
+        let Some(destination_runbook) = runbook
+            .destinations
+            .iter()
+            .find(|packet| packet.destination_id == destination_id)
+            .cloned()
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        runbook.routes.clear();
+        runbook.destinations = vec![destination_runbook];
+        return super::response::runbook_response(runbook);
+    }
+
     if let Some(destination_id) = path
         .strip_prefix("/destinations/")
         .and_then(|path| path.strip_suffix("/dossier"))
@@ -522,6 +557,31 @@ async fn route_nested_request(
         brief.routes = vec![route_brief];
         brief.destinations.clear();
         return brief_response(brief);
+    }
+
+    if let Some(route_id) = route_path.strip_suffix("/runbook") {
+        if request.method != "GET" || route_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let dashboard = control.operator_dashboard(limit).await;
+        let mut runbook = dashboard.runbook;
+        let Some(route_runbook) = runbook
+            .routes
+            .iter()
+            .find(|packet| packet.route_id == route_id)
+            .cloned()
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        runbook.routes = vec![route_runbook];
+        runbook.destinations.clear();
+        return super::response::runbook_response(runbook);
     }
 
     if let Some(route_id) = route_path.strip_suffix("/dossier") {

@@ -9,8 +9,9 @@ use rosc_broker::{
     proxy_operator_focus_from_dashboard, proxy_operator_handoff,
     proxy_operator_incidents_from_histories, proxy_operator_lens_from_dashboard,
     proxy_operator_overview, proxy_operator_readiness, proxy_operator_recovery,
-    proxy_operator_report, proxy_operator_signals_view, proxy_operator_snapshot,
-    proxy_operator_timeline, proxy_operator_trace, proxy_status_from_config,
+    proxy_operator_report, proxy_operator_runbook_from_dashboard, proxy_operator_signals_view,
+    proxy_operator_snapshot, proxy_operator_timeline, proxy_operator_trace,
+    proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -1728,4 +1729,117 @@ fn operator_dossier_bundles_focus_brief_and_lens_with_scoped_context() {
             .any(|entry| entry.contains("udp_renderer"))
     );
     assert!(!destination.recommended_actions.is_empty());
+}
+
+#[test]
+fn operator_brief_uses_scoped_state_for_focused_entities() {
+    let config = rosc_config::BrokerConfig::from_toml_str(
+        r#"
+        [[udp_ingresses]]
+        id = "udp_localhost_in"
+        bind = "127.0.0.1:0"
+        mode = "osc1_0_strict"
+
+        [[udp_destinations]]
+        id = "udp_renderer"
+        bind = "127.0.0.1:0"
+        target = "127.0.0.1:9001"
+
+        [[routes]]
+        id = "camera"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "StatefulControl"
+
+        [routes.match]
+        ingress_ids = ["udp_localhost_in"]
+        address_patterns = ["/ue5/camera/fov"]
+        protocols = ["osc_udp"]
+
+        [routes.fallback]
+        direct_udp_target = "127.0.0.1:9101"
+
+        [[routes.destinations]]
+        target = "udp_renderer"
+        transport = "osc_udp"
+
+        [[routes]]
+        id = "unsafe"
+        enabled = true
+        mode = "osc1_0_strict"
+        class = "SensorStream"
+
+        [routes.match]
+        protocols = ["osc_udp"]
+
+        [[routes.destinations]]
+        target = "udp_renderer"
+        transport = "osc_udp"
+        "#,
+    )
+    .expect("config should parse");
+    let status = proxy_status_from_config(&config).expect("status should build");
+
+    let dashboard = proxy_operator_dashboard(&status, ProxyRuntimeSafetyPolicy::default(), Some(4));
+    let brief = proxy_operator_brief_from_dashboard(&dashboard);
+    assert_eq!(brief.state, "warning");
+
+    let camera_brief = brief
+        .routes
+        .iter()
+        .find(|entry| entry.route_id == "camera")
+        .expect("camera brief should exist");
+    assert_eq!(camera_brief.state, "healthy");
+
+    let unsafe_brief = brief
+        .routes
+        .iter()
+        .find(|entry| entry.route_id == "unsafe")
+        .expect("unsafe brief should exist");
+    assert_eq!(unsafe_brief.state, "warning");
+}
+
+#[test]
+fn operator_runbook_bundles_dossier_and_scoped_actions() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            queue_depth: [("udp_renderer".to_owned(), 3)].into_iter().collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let dashboard = proxy_operator_dashboard(&status, ProxyRuntimeSafetyPolicy::default(), Some(4));
+    let runbook = proxy_operator_runbook_from_dashboard(&dashboard);
+
+    assert_eq!(runbook.state, "warning");
+    assert!(
+        runbook
+            .global
+            .global_overrides
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+    let route = runbook
+        .routes
+        .iter()
+        .find(|entry| entry.route_id == "camera")
+        .expect("route runbook should exist");
+    assert_eq!(route.state, "warning");
+    assert!(!route.scoped_blockers.is_empty());
+    assert!(!route.next_steps.is_empty());
+    assert!(!route.board_highlights.is_empty());
+    assert_eq!(route.dossier.route_id, "camera");
+
+    let destination = runbook
+        .destinations
+        .iter()
+        .find(|entry| entry.destination_id == "udp_renderer")
+        .expect("destination runbook should exist");
+    assert!(!destination.linked_route_ids.is_empty());
+    assert!(!destination.recovery_surface.is_empty());
+    assert_eq!(destination.dossier.destination_id, "udp_renderer");
 }

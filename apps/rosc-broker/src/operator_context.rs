@@ -1,6 +1,7 @@
 use crate::{
     ProxyOperatorBoardItem, ProxyOperatorBoardScope, ProxyOperatorDashboard,
-    ProxyOperatorIncidentScope, ProxyOperatorSnapshot, ProxyOperatorWorkItem,
+    ProxyOperatorIncidentScope, ProxyOperatorSnapshot, ProxyOperatorState,
+    ProxyOperatorTraceEventLevel, ProxyOperatorWorkItem,
 };
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -21,13 +22,17 @@ pub fn snapshot_context(snapshot: &ProxyOperatorSnapshot) -> ProxyOperatorContex
 }
 
 pub fn scoped_route_blockers(snapshot: &ProxyOperatorSnapshot, route_id: &str) -> Vec<String> {
-    scoped_blockers(snapshot, |item| item.route_id.as_deref() == Some(route_id), |cluster| {
-        cluster.route_id.as_deref() == Some(route_id)
-            || matches!(
-                cluster.scope,
-                ProxyOperatorIncidentScope::Global | ProxyOperatorIncidentScope::Config
-            )
-    })
+    scoped_blockers(
+        snapshot,
+        |item| item.route_id.as_deref() == Some(route_id),
+        |cluster| {
+            cluster.route_id.as_deref() == Some(route_id)
+                || matches!(
+                    cluster.scope,
+                    ProxyOperatorIncidentScope::Global | ProxyOperatorIncidentScope::Config
+                )
+        },
+    )
 }
 
 pub fn scoped_destination_blockers(
@@ -127,6 +132,21 @@ pub fn destination_incident_titles(
                 ProxyOperatorIncidentScope::Global | ProxyOperatorIncidentScope::Config
             )
     })
+}
+
+pub fn route_state(snapshot: &ProxyOperatorSnapshot, route_id: &str) -> ProxyOperatorState {
+    scoped_state(scoped_board_items(snapshot, |item| {
+        item.route_id.as_deref() == Some(route_id)
+    }))
+}
+
+pub fn destination_state(
+    snapshot: &ProxyOperatorSnapshot,
+    destination_id: &str,
+) -> ProxyOperatorState {
+    scoped_state(scoped_board_items(snapshot, |item| {
+        item.destination_id.as_deref() == Some(destination_id)
+    }))
 }
 
 fn global_blockers(snapshot: &ProxyOperatorSnapshot) -> Vec<String> {
@@ -246,5 +266,18 @@ fn is_global_work_item(item: &ProxyOperatorWorkItem) -> bool {
 fn push_unique(target: &mut Vec<String>, value: String) {
     if !target.contains(&value) {
         target.push(value);
+    }
+}
+
+fn scoped_state(items: Vec<ProxyOperatorBoardItem>) -> ProxyOperatorState {
+    if items
+        .iter()
+        .any(|item| item.level == ProxyOperatorTraceEventLevel::Blocked)
+    {
+        ProxyOperatorState::Blocked
+    } else if !items.is_empty() {
+        ProxyOperatorState::Warning
+    } else {
+        ProxyOperatorState::Healthy
     }
 }

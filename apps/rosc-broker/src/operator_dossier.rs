@@ -7,9 +7,9 @@ use crate::{
     ProxyOperatorRouteLens, ProxyOperatorState, ProxyOperatorSuggestedAction,
     ProxyOperatorWorkItem,
     operator_context::{
-        dashboard_context, destination_board_items, destination_incident_titles,
-        destination_work_items, route_board_items, route_incident_titles, route_work_items,
-        scoped_destination_blockers, scoped_route_blockers,
+        dashboard_context, destination_board_items, destination_incident_titles, destination_state,
+        destination_work_items, route_board_items, route_incident_titles, route_state,
+        route_work_items, scoped_destination_blockers, scoped_route_blockers,
     },
 };
 
@@ -76,7 +76,7 @@ pub fn proxy_operator_dossier_from_dashboard(
             let lens = route_lens(dashboard, &focus.route_id);
             ProxyOperatorRouteDossier {
                 route_id: focus.route_id.clone(),
-                state: state_label(snapshot.overview.report.state.clone()).to_owned(),
+                state: state_label(route_state(snapshot, &focus.route_id)).to_owned(),
                 summary: brief
                     .as_ref()
                     .map(|entry| entry.summary.clone())
@@ -123,7 +123,7 @@ pub fn proxy_operator_dossier_from_dashboard(
             let lens = destination_lens(dashboard, &focus.destination_id);
             ProxyOperatorDestinationDossier {
                 destination_id: focus.destination_id.clone(),
-                state: state_label(snapshot.overview.report.state.clone()).to_owned(),
+                state: state_label(destination_state(snapshot, &focus.destination_id)).to_owned(),
                 summary: brief
                     .as_ref()
                     .map(|entry| entry.summary.clone())

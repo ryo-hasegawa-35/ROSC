@@ -6,7 +6,10 @@ use crate::{
     ProxyOperatorRouteCasebook, ProxyOperatorRouteFocusPacket, ProxyOperatorRouteHandoff,
     ProxyOperatorRouteLens, ProxyOperatorRouteTriage, ProxyOperatorState,
     ProxyOperatorSuggestedAction,
-    operator_context::{dashboard_context, scoped_destination_blockers, scoped_route_blockers},
+    operator_context::{
+        dashboard_context, destination_state, route_state, scoped_destination_blockers,
+        scoped_route_blockers,
+    },
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -74,7 +77,7 @@ pub fn proxy_operator_brief_from_dashboard(
 
             ProxyOperatorRouteBrief {
                 route_id: focus.route_id.clone(),
-                state: state_label(snapshot.overview.report.state.clone()).to_owned(),
+                state: state_label(route_state(snapshot, &focus.route_id)).to_owned(),
                 summary: route_summary(&focus, handoff, triage, casebook),
                 global_blockers: context.global_blockers.clone(),
                 scoped_blockers: scoped_route_blockers(snapshot, &focus.route_id),
@@ -106,7 +109,7 @@ pub fn proxy_operator_brief_from_dashboard(
 
             ProxyOperatorDestinationBrief {
                 destination_id: focus.destination_id.clone(),
-                state: state_label(snapshot.overview.report.state.clone()).to_owned(),
+                state: state_label(destination_state(snapshot, &focus.destination_id)).to_owned(),
                 summary: destination_summary(&focus, handoff, triage, casebook),
                 global_blockers: context.global_blockers.clone(),
                 scoped_blockers: scoped_destination_blockers(snapshot, &focus.destination_id),

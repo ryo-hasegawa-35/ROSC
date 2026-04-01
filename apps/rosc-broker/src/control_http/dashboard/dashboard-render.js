@@ -32,6 +32,7 @@ export function collectDashboardElements() {
     routeBriefDetail: document.getElementById("route-brief-detail"),
     routeLensDetail: document.getElementById("route-lens-detail"),
     routeDossierDetail: document.getElementById("route-dossier-detail"),
+    routeRunbookDetail: document.getElementById("route-runbook-detail"),
     routeTraceDetail: document.getElementById("route-trace-detail"),
     routeTimelineDetail: document.getElementById("route-timeline-detail"),
     routeHandoffDetail: document.getElementById("route-handoff-detail"),
@@ -43,6 +44,7 @@ export function collectDashboardElements() {
     destinationBriefDetail: document.getElementById("destination-brief-detail"),
     destinationLensDetail: document.getElementById("destination-lens-detail"),
     destinationDossierDetail: document.getElementById("destination-dossier-detail"),
+    destinationRunbookDetail: document.getElementById("destination-runbook-detail"),
     destinationTraceDetail: document.getElementById("destination-trace-detail"),
     destinationTimelineDetail: document.getElementById("destination-timeline-detail"),
     destinationHandoffDetail: document.getElementById("destination-handoff-detail"),
@@ -92,6 +94,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderBrief(elements, dashboard, context.focusState);
   renderLens(elements, dashboard, context.focusState);
   renderDossier(elements, dashboard, context.focusState);
+  renderRunbook(elements, dashboard, context.focusState);
   renderTrace(elements, dashboard, context.focusState);
   renderFocusedTimeline(elements, dashboard.timeline_catalog, context.focusState);
   renderHandoff(elements, snapshot.handoff, context.focusState);
@@ -464,6 +467,17 @@ function renderDossier(elements, dashboard, focusState) {
   );
   renderRouteDossier(elements, routeDossier);
   renderDestinationDossier(elements, destinationDossier);
+}
+
+function renderRunbook(elements, dashboard, focusState) {
+  const routeRunbook = (dashboard.runbook?.routes || []).find(
+    (packet) => packet.route_id === focusState?.routeId,
+  );
+  const destinationRunbook = (dashboard.runbook?.destinations || []).find(
+    (packet) => packet.destination_id === focusState?.destinationId,
+  );
+  renderRouteRunbook(elements, routeRunbook);
+  renderDestinationRunbook(elements, destinationRunbook);
 }
 
 function renderTrace(elements, dashboard, focusState) {
@@ -1518,6 +1532,50 @@ function renderDestinationDossier(elements, dossier) {
   );
 }
 
+function renderRouteRunbook(elements, runbook) {
+  if (!runbook) {
+    fillList(elements, elements.routeRunbookDetail, []);
+    return;
+  }
+  elements.routeRunbookDetail.replaceChildren(
+    runbookCard(
+      "Focused route runbook",
+      runbook.route_id,
+      runbook.state,
+      runbook.headline,
+      runbook.scoped_blockers,
+      runbook.linked_destination_ids,
+      runbook.recovery_surface,
+      runbook.board_highlights,
+      runbook.next_steps,
+      runbook.recommended_actions,
+      runbook.dossier.work_items,
+    ),
+  );
+}
+
+function renderDestinationRunbook(elements, runbook) {
+  if (!runbook) {
+    fillList(elements, elements.destinationRunbookDetail, []);
+    return;
+  }
+  elements.destinationRunbookDetail.replaceChildren(
+    runbookCard(
+      "Focused destination runbook",
+      runbook.destination_id,
+      runbook.state,
+      runbook.headline,
+      runbook.scoped_blockers,
+      runbook.linked_route_ids,
+      runbook.recovery_surface,
+      runbook.board_highlights,
+      runbook.next_steps,
+      runbook.recommended_actions,
+      runbook.dossier.work_items,
+    ),
+  );
+}
+
 function dossierCard(
   label,
   title,
@@ -1563,6 +1621,65 @@ function dossierCard(
       ...workItems.map((item) =>
         operatorCard(item, {
           label: "Linked work item",
+        }),
+      ),
+    );
+    wrapper.appendChild(stack);
+  }
+  return wrapper;
+}
+
+function runbookCard(
+  label,
+  title,
+  level,
+  headline,
+  scopedBlockers,
+  linkedEntities,
+  recoverySurface,
+  boardHighlights,
+  nextSteps,
+  actions,
+  workItems,
+) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">${escapeHtml(label)}</p>
+        <h4>${escapeHtml(title)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(String(level).toLowerCase())}">${escapeHtml(humanizeState(level))}</span>
+    </div>
+    <p class="summary">${escapeHtml(headline)}</p>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Scoped blockers", (scopedBlockers || []).length],
+      ["Linked entities", (linkedEntities || []).length],
+      ["Recovery items", (recoverySurface || []).length],
+      ["Actions", (actions || []).length],
+    ]),
+  );
+  wrapper.appendChild(traceSummaryBlock("Scoped blockers", scopedBlockers));
+  wrapper.appendChild(traceSummaryBlock("Linked entities", linkedEntities));
+  wrapper.appendChild(traceSummaryBlock("Recovery surface", recoverySurface));
+  wrapper.appendChild(traceSummaryBlock("Board highlights", boardHighlights));
+  wrapper.appendChild(traceSummaryBlock("Next steps", nextSteps));
+  if (actions?.length > 0) {
+    const buttons = document.createElement("div");
+    buttons.className = "detail-actions";
+    buttons.replaceChildren(...actions.map((action) => worklistActionButton(action)));
+    wrapper.appendChild(buttons);
+  }
+  if (workItems?.length > 0) {
+    const stack = document.createElement("div");
+    stack.className = "worklist-stack";
+    stack.replaceChildren(
+      ...workItems.map((item) =>
+        operatorCard(item, {
+          label: "Runbook work item",
         }),
       ),
     );

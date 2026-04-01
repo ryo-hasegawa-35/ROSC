@@ -24,6 +24,7 @@ mod operator_overview;
 mod operator_policy;
 mod operator_readiness;
 mod operator_recovery;
+mod operator_runbook;
 mod operator_runtime_summary;
 mod operator_snapshot;
 mod operator_timeline;
@@ -109,6 +110,10 @@ pub use operator_readiness::{
 pub use operator_recovery::{
     ProxyOperatorRecovery, ProxyOperatorRecoveryDestination, ProxyOperatorRecoveryRoute,
     proxy_operator_recovery,
+};
+pub use operator_runbook::{
+    ProxyOperatorDestinationRunbook, ProxyOperatorGlobalRunbook, ProxyOperatorRouteRunbook,
+    ProxyOperatorRunbookCatalog, proxy_operator_runbook_from_dashboard,
 };
 pub use operator_runtime_summary::{ProxyOperatorRuntimeSummary, proxy_operator_runtime_summary};
 pub use operator_snapshot::{

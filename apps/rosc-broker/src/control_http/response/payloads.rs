@@ -9,9 +9,9 @@ use crate::{
     ProxyOperatorDiagnostics, ProxyOperatorDossierCatalog, ProxyOperatorFocusCatalog,
     ProxyOperatorHandoffCatalog, ProxyOperatorIncidents, ProxyOperatorLensCatalog,
     ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
-    ProxyOperatorRouteTrace, ProxyOperatorSignalScope, ProxyOperatorSnapshot,
-    ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog,
-    UdpProxyStatusSnapshot,
+    ProxyOperatorRouteTrace, ProxyOperatorRunbookCatalog, ProxyOperatorSignalScope,
+    ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog,
+    ProxyOperatorTriageCatalog, UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -162,6 +162,12 @@ pub(crate) struct OperatorDossierResponse {
 }
 
 #[derive(Serialize)]
+pub(crate) struct OperatorRunbookResponse {
+    pub(crate) ok: bool,
+    pub(crate) runbook: ProxyOperatorRunbookCatalog,
+}
+
+#[derive(Serialize)]
 pub(crate) struct OperatorOverridesResponse {
     pub(crate) ok: bool,
     pub(crate) overrides: ProxyOperatorOverrides,
@@ -208,6 +214,7 @@ pub(crate) enum ResponseBody {
     OperatorLens(OperatorLensResponse),
     OperatorBrief(OperatorBriefResponse),
     OperatorDossier(OperatorDossierResponse),
+    OperatorRunbook(OperatorRunbookResponse),
     OperatorTrace(OperatorTraceResponse),
     OperatorRouteTrace(OperatorRouteTraceResponse),
     OperatorDestinationTrace(OperatorDestinationTraceResponse),
@@ -254,6 +261,7 @@ impl ResponseBody {
             Self::OperatorLens(body) => json_payload(body),
             Self::OperatorBrief(body) => json_payload(body),
             Self::OperatorDossier(body) => json_payload(body),
+            Self::OperatorRunbook(body) => json_payload(body),
             Self::OperatorTrace(body) => json_payload(body),
             Self::OperatorRouteTrace(body) => json_payload(body),
             Self::OperatorDestinationTrace(body) => json_payload(body),

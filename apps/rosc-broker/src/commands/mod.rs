@@ -14,8 +14,8 @@ pub(crate) struct ProxyCommandOptions {
     pub start_frozen: bool,
 }
 
-pub async fn run(command: Command) -> Result<()> {
-    match command {
+pub async fn run(command: Box<Command>) -> Result<()> {
+    match *command {
         Command::CheckConfig { path } => config::check_config(&path).await,
         Command::ProxyStatus {
             config,
@@ -370,6 +370,31 @@ pub async fn run(command: Command) -> Result<()> {
             destination_id,
         } => {
             config::proxy_dossier(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyRunbook {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_runbook(
                 &config,
                 resolve_bindings,
                 history_limit,

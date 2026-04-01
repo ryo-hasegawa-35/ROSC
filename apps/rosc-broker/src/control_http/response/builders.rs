@@ -8,9 +8,9 @@ use crate::{
     ProxyOperatorDiagnostics, ProxyOperatorDossierCatalog, ProxyOperatorFocusCatalog,
     ProxyOperatorHandoffCatalog, ProxyOperatorIncidents, ProxyOperatorLensCatalog,
     ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
-    ProxyOperatorRouteTrace, ProxyOperatorSignalsView, ProxyOperatorSnapshot,
-    ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog,
-    UdpProxyStatusSnapshot,
+    ProxyOperatorRouteTrace, ProxyOperatorRunbookCatalog, ProxyOperatorSignalsView,
+    ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog,
+    ProxyOperatorTriageCatalog, UdpProxyStatusSnapshot,
 };
 use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 
@@ -21,9 +21,10 @@ use super::payloads::{
     OperatorDossierResponse, OperatorFocusResponse, OperatorHandoffResponse,
     OperatorIncidentsResponse, OperatorLensResponse, OperatorOverridesResponse,
     OperatorOverviewResponse, OperatorReadinessResponse, OperatorReportResponse,
-    OperatorRouteTraceResponse, OperatorSignalsResponse, OperatorSnapshotResponse,
-    OperatorTimelineResponse, OperatorTraceResponse, OperatorTriageResponse,
-    RecentConfigEventsResponse, RecentOperatorActionsResponse, ResponseBody, StatusResponse,
+    OperatorRouteTraceResponse, OperatorRunbookResponse, OperatorSignalsResponse,
+    OperatorSnapshotResponse, OperatorTimelineResponse, OperatorTraceResponse,
+    OperatorTriageResponse, RecentConfigEventsResponse, RecentOperatorActionsResponse,
+    ResponseBody, StatusResponse,
 };
 
 pub(crate) fn status_response(status: UdpProxyStatusSnapshot) -> HttpResponse {
@@ -237,6 +238,13 @@ pub(crate) fn dossier_response(dossier: ProxyOperatorDossierCatalog) -> HttpResp
     HttpResponse {
         status: "200 OK",
         body: ResponseBody::OperatorDossier(OperatorDossierResponse { ok: true, dossier }),
+    }
+}
+
+pub(crate) fn runbook_response(runbook: ProxyOperatorRunbookCatalog) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorRunbook(OperatorRunbookResponse { ok: true, runbook }),
     }
 }
 

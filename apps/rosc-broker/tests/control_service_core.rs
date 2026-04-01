@@ -191,6 +191,7 @@ async fn control_service_serves_dashboard_assets() {
     assert!(dashboard.contains("Route next steps"));
     assert!(dashboard.contains("Route focus packet"));
     assert!(dashboard.contains("Route operator brief"));
+    assert!(dashboard.contains("Route operator runbook"));
     assert!(dashboard.contains("Route-linked event history"));
 
     let css = request(
@@ -324,6 +325,11 @@ async fn control_service_serves_dashboard_assets() {
             .is_some()
     );
     assert!(
+        dashboard_data["dashboard"]["runbook"]["routes"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
         dashboard_data["dashboard"]["focus"]["destinations"]
             .as_array()
             .is_some()
@@ -340,6 +346,11 @@ async fn control_service_serves_dashboard_assets() {
     );
     assert!(
         dashboard_data["dashboard"]["lens"]["destinations"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["runbook"]["destinations"]
             .as_array()
             .is_some()
     );
@@ -798,6 +809,30 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|entry| entry["destination_id"] == "udp_renderer")
     );
 
+    let runbook = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /runbook?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(runbook["ok"], true);
+    assert_eq!(runbook["runbook"]["global"]["state"], "warning");
+    assert!(
+        runbook["runbook"]["routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["route_id"] == "camera")
+    );
+    assert!(
+        runbook["runbook"]["destinations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["destination_id"] == "udp_renderer")
+    );
+
     let timeline = json_body(
         &request(
             service.listen_addr(),
@@ -919,6 +954,19 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert_eq!(route_dossier["dossier"]["destinations"], json!([]));
     assert!(route_dossier["dossier"]["routes"][0]["brief"].is_object());
     assert!(route_dossier["dossier"]["routes"][0]["lens"].is_object());
+
+    let route_runbook = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/runbook?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_runbook["ok"], true);
+    assert_eq!(route_runbook["runbook"]["routes"][0]["route_id"], "camera");
+    assert_eq!(route_runbook["runbook"]["destinations"], json!([]));
+    assert!(route_runbook["runbook"]["routes"][0]["dossier"].is_object());
+    assert_eq!(route_runbook["runbook"]["routes"][0]["state"], "warning");
 
     let route_board = json_body(
         &request(
@@ -1050,9 +1098,7 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .iter()
             .any(|entry| entry == "traffic_frozen")
     );
-    assert!(
-        destination_brief["brief"]["destinations"][0]["scoped_blockers"].is_array()
-    );
+    assert!(destination_brief["brief"]["destinations"][0]["scoped_blockers"].is_array());
 
     let destination_dossier = json_body(
         &request(
@@ -1069,6 +1115,21 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert_eq!(destination_dossier["dossier"]["routes"], json!([]));
     assert!(destination_dossier["dossier"]["destinations"][0]["brief"].is_object());
     assert!(destination_dossier["dossier"]["destinations"][0]["lens"].is_object());
+
+    let destination_runbook = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/runbook?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_runbook["ok"], true);
+    assert_eq!(
+        destination_runbook["runbook"]["destinations"][0]["destination_id"],
+        "udp_renderer"
+    );
+    assert_eq!(destination_runbook["runbook"]["routes"], json!([]));
+    assert!(destination_runbook["runbook"]["destinations"][0]["dossier"].is_object());
 
     let destination_board = json_body(
         &request(

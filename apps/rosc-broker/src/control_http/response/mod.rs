@@ -10,8 +10,9 @@ pub(crate) use builders::{
     dossier_response, focus_response, handoff_response, incidents_response,
     invalid_component_error, invalid_query_error, lens_response, map_action_result,
     operator_actions_response, operator_signals_response, overrides_response, overview_response,
-    readiness_response, readyz_response, report_response, route_trace_response, snapshot_response,
-    status_response, timeline_response, trace_response, triage_response, unsupported_route_error,
+    readiness_response, readyz_response, report_response, route_trace_response, runbook_response,
+    snapshot_response, status_response, timeline_response, trace_response, triage_response,
+    unsupported_route_error,
 };
 pub(crate) use payloads::{HttpResponse, ResponseBody};
 pub(crate) use transport::{
