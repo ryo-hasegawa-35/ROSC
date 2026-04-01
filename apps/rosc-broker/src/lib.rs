@@ -20,6 +20,7 @@ mod operator_history;
 mod operator_incident_digest;
 mod operator_incidents;
 mod operator_lens;
+mod operator_mission;
 mod operator_overview;
 mod operator_policy;
 mod operator_readiness;
@@ -94,6 +95,10 @@ pub use operator_incidents::{
 pub use operator_lens::{
     ProxyOperatorDestinationLens, ProxyOperatorLensCatalog, ProxyOperatorRouteLens,
     proxy_operator_lens_from_dashboard,
+};
+pub use operator_mission::{
+    ProxyOperatorDestinationMission, ProxyOperatorGlobalMission, ProxyOperatorMissionCatalog,
+    ProxyOperatorRouteMission, proxy_operator_mission_from_dashboard,
 };
 pub use operator_overview::{ProxyOperatorOverview, proxy_operator_overview};
 pub use operator_policy::{

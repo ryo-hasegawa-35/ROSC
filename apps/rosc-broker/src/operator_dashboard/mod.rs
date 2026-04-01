@@ -11,11 +11,12 @@ pub use traffic::{ProxyOperatorCounterEntry, ProxyOperatorTrafficSummary};
 
 use crate::{
     ProxyOperatorBriefCatalog, ProxyOperatorDossierCatalog, ProxyOperatorFocusCatalog,
-    ProxyOperatorLensCatalog, ProxyOperatorRunbookCatalog, ProxyOperatorSnapshot,
-    ProxyOperatorTimelineCatalog, ProxyOperatorTimelineEntry, ProxyOperatorTraceCatalog,
-    ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot, proxy_operator_brief_from_dashboard,
-    proxy_operator_dossier_from_dashboard, proxy_operator_focus_from_dashboard,
-    proxy_operator_lens_from_dashboard, proxy_operator_runbook_from_dashboard,
+    ProxyOperatorLensCatalog, ProxyOperatorMissionCatalog, ProxyOperatorRunbookCatalog,
+    ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog, ProxyOperatorTimelineEntry,
+    ProxyOperatorTraceCatalog, ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot,
+    proxy_operator_brief_from_dashboard, proxy_operator_dossier_from_dashboard,
+    proxy_operator_focus_from_dashboard, proxy_operator_lens_from_dashboard,
+    proxy_operator_mission_from_dashboard, proxy_operator_runbook_from_dashboard,
     proxy_operator_snapshot, proxy_operator_timeline, proxy_operator_trace,
 };
 
@@ -39,6 +40,7 @@ pub struct ProxyOperatorDashboard {
     pub brief: ProxyOperatorBriefCatalog,
     pub dossier: ProxyOperatorDossierCatalog,
     pub runbook: ProxyOperatorRunbookCatalog,
+    pub mission: ProxyOperatorMissionCatalog,
 }
 
 pub fn proxy_operator_dashboard(
@@ -80,11 +82,13 @@ pub fn proxy_operator_dashboard_from_snapshot(
         brief: ProxyOperatorBriefCatalog::default(),
         dossier: ProxyOperatorDossierCatalog::default(),
         runbook: ProxyOperatorRunbookCatalog::default(),
+        mission: ProxyOperatorMissionCatalog::default(),
     };
     dashboard.focus = proxy_operator_focus_from_dashboard(&dashboard);
     dashboard.lens = proxy_operator_lens_from_dashboard(&dashboard);
     dashboard.brief = proxy_operator_brief_from_dashboard(&dashboard);
     dashboard.dossier = proxy_operator_dossier_from_dashboard(&dashboard);
     dashboard.runbook = proxy_operator_runbook_from_dashboard(&dashboard);
+    dashboard.mission = proxy_operator_mission_from_dashboard(&dashboard);
     dashboard
 }

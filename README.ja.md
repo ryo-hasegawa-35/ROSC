@@ -53,6 +53,7 @@ cargo run -p rosc-broker -- proxy-lens examples/phase-01-basic.toml --fail-on-wa
 cargo run -p rosc-broker -- proxy-brief examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- proxy-dossier examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- proxy-runbook examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
+cargo run -p rosc-broker -- proxy-mission examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
@@ -94,6 +95,7 @@ curl http://127.0.0.1:19292/routes/camera/trace?limit=10
 curl http://127.0.0.1:19292/routes/camera/brief?limit=10
 curl http://127.0.0.1:19292/routes/camera/dossier?limit=10
 curl http://127.0.0.1:19292/routes/camera/runbook?limit=10
+curl http://127.0.0.1:19292/routes/camera/mission?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/handoff?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/triage?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/casebook?limit=10
@@ -103,8 +105,10 @@ curl http://127.0.0.1:19292/destinations/udp_renderer/lens?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/brief?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/dossier?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/runbook?limit=10
+curl http://127.0.0.1:19292/destinations/udp_renderer/mission?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/timeline?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/trace?limit=10
+curl http://127.0.0.1:19292/mission?limit=10
 curl http://127.0.0.1:19292/overrides
 curl http://127.0.0.1:19292/signals
 curl http://127.0.0.1:19292/signals?scope=problematic
@@ -116,7 +120,7 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` は意図的に loopback 専用です。`127.0.0.1`、`::1`、`localhost` のような
 ローカル専用アドレスだけを使い、wildcard や外部から到達できる bind は拒否されます。
 
-`proxy-status`、`proxy-overview`、`proxy-readiness`、`proxy-assert-ready`、`proxy-snapshot`、`proxy-diagnostics`、`proxy-attention`、`proxy-incidents`、`proxy-handoff`、`proxy-timeline`、`proxy-triage`、`proxy-casebook`、`proxy-board`、`proxy-focus`、`proxy-lens`、`proxy-brief`、`proxy-dossier`、`proxy-runbook`
+`proxy-status`、`proxy-overview`、`proxy-readiness`、`proxy-assert-ready`、`proxy-snapshot`、`proxy-diagnostics`、`proxy-attention`、`proxy-incidents`、`proxy-handoff`、`proxy-timeline`、`proxy-triage`、`proxy-casebook`、`proxy-board`、`proxy-focus`、`proxy-lens`、`proxy-brief`、`proxy-dossier`、`proxy-runbook`、`proxy-mission`
 は、`jq` などへそのまま流せるように stdout へ JSON だけを出す契約にそろえています。
 
 Docker 経由で同じ確認を行う場合:
@@ -187,6 +191,7 @@ docker compose run --rm rosc-dev cargo test --workspace
 - snapshot と dashboard payload に operator brief catalog も追加し、`proxy-brief` と control-plane の `/brief`、`/routes/{id}/brief`、`/destinations/{id}/brief` から、focus と lens を headline timeline・next step・推奨 action 付きの compact な handoff packet として取得できるようにした
 - snapshot と dashboard payload に operator dossier catalog も追加し、`proxy-dossier` と control-plane の `/dossier`、`/routes/{id}/dossier`、`/destinations/{id}/dossier` から、global blocker と scoped blocker を分けつつ focus / brief / lens / work item / 推奨 action をまとめた fuller packet を取得できるようにした
 - snapshot と dashboard payload に operator runbook catalog も追加し、`proxy-runbook` と control-plane の `/runbook`、`/routes/{id}/runbook`、`/destinations/{id}/runbook` から、focused dossier をもとに headline / recovery surface / linked entity / next step をまとめた、より action-oriented な packet を取得できるようにした
+- dashboard payload に operator mission catalog も追加し、`proxy-mission` と control-plane の `/mission`、`/routes/{id}/mission`、`/destinations/{id}/mission` から、readiness、blocker、override、trace highlight、runbook guidance、focused dossier をひとつに束ねた、より上位の operator 向け contract を取得できるようにした
 - focused board slice でも `traffic_frozen` のような global blocker を保持するようにして、route / destination だけ見たときに全体要因を見落とさないようにした
 - `/signals?scope=problematic` で、operator が今見るべき route / destination signal だけに payload を絞れるようにした
 - config の reject / block / reload failure も counters だけでなく reason 付きの recent history として残るようになった

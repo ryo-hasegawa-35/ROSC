@@ -192,6 +192,7 @@ async fn control_service_serves_dashboard_assets() {
     assert!(dashboard.contains("Route focus packet"));
     assert!(dashboard.contains("Route operator brief"));
     assert!(dashboard.contains("Route operator runbook"));
+    assert!(dashboard.contains("Route operator mission"));
     assert!(dashboard.contains("Route-linked event history"));
 
     let css = request(
@@ -351,6 +352,16 @@ async fn control_service_serves_dashboard_assets() {
     );
     assert!(
         dashboard_data["dashboard"]["runbook"]["destinations"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["mission"]["routes"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["mission"]["destinations"]
             .as_array()
             .is_some()
     );
@@ -833,6 +844,36 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|entry| entry["destination_id"] == "udp_renderer")
     );
 
+    let mission = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /mission?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(mission["ok"], true);
+    assert_eq!(mission["mission"]["global"]["state"], "warning");
+    assert!(
+        !mission["mission"]["global"]["gate_reasons"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        mission["mission"]["routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["route_id"] == "camera")
+    );
+    assert!(
+        mission["mission"]["destinations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["destination_id"] == "udp_renderer")
+    );
+
     let timeline = json_body(
         &request(
             service.listen_addr(),
@@ -967,6 +1008,20 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert_eq!(route_runbook["runbook"]["destinations"], json!([]));
     assert!(route_runbook["runbook"]["routes"][0]["dossier"].is_object());
     assert_eq!(route_runbook["runbook"]["routes"][0]["state"], "warning");
+
+    let route_mission = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/mission?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_mission["ok"], true);
+    assert_eq!(route_mission["mission"]["routes"][0]["route_id"], "camera");
+    assert_eq!(route_mission["mission"]["destinations"], json!([]));
+    assert!(route_mission["mission"]["routes"][0]["brief"].is_object());
+    assert!(route_mission["mission"]["routes"][0]["dossier"].is_object());
+    assert!(route_mission["mission"]["routes"][0]["runbook"].is_object());
 
     let route_board = json_body(
         &request(
@@ -1130,6 +1185,23 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     );
     assert_eq!(destination_runbook["runbook"]["routes"], json!([]));
     assert!(destination_runbook["runbook"]["destinations"][0]["dossier"].is_object());
+
+    let destination_mission = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/mission?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_mission["ok"], true);
+    assert_eq!(
+        destination_mission["mission"]["destinations"][0]["destination_id"],
+        "udp_renderer"
+    );
+    assert_eq!(destination_mission["mission"]["routes"], json!([]));
+    assert!(destination_mission["mission"]["destinations"][0]["brief"].is_object());
+    assert!(destination_mission["mission"]["destinations"][0]["dossier"].is_object());
+    assert!(destination_mission["mission"]["destinations"][0]["runbook"].is_object());
 
     let destination_board = json_body(
         &request(

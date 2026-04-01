@@ -8,10 +8,10 @@ use rosc_broker::{
     proxy_operator_dashboard, proxy_operator_diagnostics, proxy_operator_dossier_from_dashboard,
     proxy_operator_focus_from_dashboard, proxy_operator_handoff,
     proxy_operator_incidents_from_histories, proxy_operator_lens_from_dashboard,
-    proxy_operator_overview, proxy_operator_readiness, proxy_operator_recovery,
-    proxy_operator_report, proxy_operator_runbook_from_dashboard, proxy_operator_signals_view,
-    proxy_operator_snapshot, proxy_operator_timeline, proxy_operator_trace,
-    proxy_status_from_config,
+    proxy_operator_mission_from_dashboard, proxy_operator_overview, proxy_operator_readiness,
+    proxy_operator_recovery, proxy_operator_report, proxy_operator_runbook_from_dashboard,
+    proxy_operator_signals_view, proxy_operator_snapshot, proxy_operator_timeline,
+    proxy_operator_trace, proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -1842,4 +1842,66 @@ fn operator_runbook_bundles_dossier_and_scoped_actions() {
     assert!(!destination.linked_route_ids.is_empty());
     assert!(!destination.recovery_surface.is_empty());
     assert_eq!(destination.dossier.destination_id, "udp_renderer");
+}
+
+#[test]
+fn operator_mission_bundles_runbook_dossier_and_readiness_context() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            queue_depth: [("udp_renderer".to_owned(), 3)].into_iter().collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let dashboard = proxy_operator_dashboard(&status, ProxyRuntimeSafetyPolicy::default(), Some(4));
+    let mission = proxy_operator_mission_from_dashboard(&dashboard);
+
+    assert_eq!(mission.state, "warning");
+    assert_eq!(mission.global.state, "warning");
+    assert_eq!(mission.global.readiness_level, "degraded");
+    assert!(
+        mission
+            .global
+            .overrides
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+    assert!(
+        mission
+            .global
+            .board_highlights
+            .iter()
+            .any(|entry| entry.contains("Traffic frozen"))
+    );
+
+    let route = mission
+        .routes
+        .iter()
+        .find(|entry| entry.route_id == "camera")
+        .expect("route mission should exist");
+    assert_eq!(route.state, "warning");
+    assert_eq!(route.readiness_level, "degraded");
+    assert!(!route.scoped_blockers.is_empty());
+    assert!(!route.trace_highlights.is_empty());
+    assert!(!route.recommended_actions.is_empty());
+    assert_eq!(route.brief.route_id, "camera");
+    assert_eq!(route.dossier.route_id, "camera");
+    assert_eq!(route.runbook.route_id, "camera");
+
+    let destination = mission
+        .destinations
+        .iter()
+        .find(|entry| entry.destination_id == "udp_renderer")
+        .expect("destination mission should exist");
+    assert_eq!(destination.readiness_level, "degraded");
+    assert!(!destination.global_overrides.is_empty());
+    assert!(!destination.trace_highlights.is_empty());
+    assert!(!destination.recovery_surface.is_empty());
+    assert_eq!(destination.brief.destination_id, "udp_renderer");
+    assert_eq!(destination.dossier.destination_id, "udp_renderer");
+    assert_eq!(destination.runbook.destination_id, "udp_renderer");
 }

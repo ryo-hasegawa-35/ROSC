@@ -33,6 +33,7 @@ export function collectDashboardElements() {
     routeLensDetail: document.getElementById("route-lens-detail"),
     routeDossierDetail: document.getElementById("route-dossier-detail"),
     routeRunbookDetail: document.getElementById("route-runbook-detail"),
+    routeMissionDetail: document.getElementById("route-mission-detail"),
     routeTraceDetail: document.getElementById("route-trace-detail"),
     routeTimelineDetail: document.getElementById("route-timeline-detail"),
     routeHandoffDetail: document.getElementById("route-handoff-detail"),
@@ -45,6 +46,7 @@ export function collectDashboardElements() {
     destinationLensDetail: document.getElementById("destination-lens-detail"),
     destinationDossierDetail: document.getElementById("destination-dossier-detail"),
     destinationRunbookDetail: document.getElementById("destination-runbook-detail"),
+    destinationMissionDetail: document.getElementById("destination-mission-detail"),
     destinationTraceDetail: document.getElementById("destination-trace-detail"),
     destinationTimelineDetail: document.getElementById("destination-timeline-detail"),
     destinationHandoffDetail: document.getElementById("destination-handoff-detail"),
@@ -95,6 +97,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderLens(elements, dashboard, context.focusState);
   renderDossier(elements, dashboard, context.focusState);
   renderRunbook(elements, dashboard, context.focusState);
+  renderMission(elements, dashboard, context.focusState);
   renderTrace(elements, dashboard, context.focusState);
   renderFocusedTimeline(elements, dashboard.timeline_catalog, context.focusState);
   renderHandoff(elements, snapshot.handoff, context.focusState);
@@ -478,6 +481,17 @@ function renderRunbook(elements, dashboard, focusState) {
   );
   renderRouteRunbook(elements, routeRunbook);
   renderDestinationRunbook(elements, destinationRunbook);
+}
+
+function renderMission(elements, dashboard, focusState) {
+  const routeMission = (dashboard.mission?.routes || []).find(
+    (packet) => packet.route_id === focusState?.routeId,
+  );
+  const destinationMission = (dashboard.mission?.destinations || []).find(
+    (packet) => packet.destination_id === focusState?.destinationId,
+  );
+  renderRouteMission(elements, routeMission);
+  renderDestinationMission(elements, destinationMission);
 }
 
 function renderTrace(elements, dashboard, focusState) {
@@ -1576,6 +1590,60 @@ function renderDestinationRunbook(elements, runbook) {
   );
 }
 
+function renderRouteMission(elements, mission) {
+  if (!mission) {
+    fillList(elements, elements.routeMissionDetail, []);
+    return;
+  }
+  elements.routeMissionDetail.replaceChildren(
+    missionCard(
+      "Focused route mission",
+      mission.route_id,
+      mission.state,
+      mission.headline,
+      mission.readiness_level,
+      mission.global_blockers,
+      mission.scoped_blockers,
+      mission.global_overrides,
+      mission.board_highlights,
+      mission.incident_titles,
+      mission.trace_highlights,
+      mission.linked_destination_ids,
+      mission.recovery_surface,
+      mission.next_steps,
+      mission.recommended_actions,
+      mission.dossier.work_items,
+    ),
+  );
+}
+
+function renderDestinationMission(elements, mission) {
+  if (!mission) {
+    fillList(elements, elements.destinationMissionDetail, []);
+    return;
+  }
+  elements.destinationMissionDetail.replaceChildren(
+    missionCard(
+      "Focused destination mission",
+      mission.destination_id,
+      mission.state,
+      mission.headline,
+      mission.readiness_level,
+      mission.global_blockers,
+      mission.scoped_blockers,
+      mission.global_overrides,
+      mission.board_highlights,
+      mission.incident_titles,
+      mission.trace_highlights,
+      mission.linked_route_ids,
+      mission.recovery_surface,
+      mission.next_steps,
+      mission.recommended_actions,
+      mission.dossier.work_items,
+    ),
+  );
+}
+
 function dossierCard(
   label,
   title,
@@ -1680,6 +1748,74 @@ function runbookCard(
       ...workItems.map((item) =>
         operatorCard(item, {
           label: "Runbook work item",
+        }),
+      ),
+    );
+    wrapper.appendChild(stack);
+  }
+  return wrapper;
+}
+
+function missionCard(
+  label,
+  title,
+  level,
+  headline,
+  readinessLevel,
+  globalBlockers,
+  scopedBlockers,
+  globalOverrides,
+  boardHighlights,
+  incidentTitles,
+  traceHighlights,
+  linkedEntities,
+  recoverySurface,
+  nextSteps,
+  actions,
+  workItems,
+) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">${escapeHtml(label)}</p>
+        <h4>${escapeHtml(title)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(String(level).toLowerCase())}">${escapeHtml(humanizeState(level))}</span>
+    </div>
+    <p class="summary">${escapeHtml(headline)}</p>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Readiness", humanizeState(readinessLevel)],
+      ["Linked entities", (linkedEntities || []).length],
+      ["Recovery items", (recoverySurface || []).length],
+      ["Actions", (actions || []).length],
+    ]),
+  );
+  wrapper.appendChild(traceSummaryBlock("Global blockers", globalBlockers));
+  wrapper.appendChild(traceSummaryBlock("Scoped blockers", scopedBlockers));
+  wrapper.appendChild(traceSummaryBlock("Global overrides", globalOverrides));
+  wrapper.appendChild(traceSummaryBlock("Board highlights", boardHighlights));
+  wrapper.appendChild(traceSummaryBlock("Incident titles", incidentTitles));
+  wrapper.appendChild(traceSummaryBlock("Trace highlights", traceHighlights));
+  wrapper.appendChild(traceSummaryBlock("Linked entities", linkedEntities));
+  wrapper.appendChild(traceSummaryBlock("Recovery surface", recoverySurface));
+  wrapper.appendChild(traceSummaryBlock("Next steps", nextSteps));
+  if (actions?.length > 0) {
+    const buttons = document.createElement("div");
+    buttons.className = "detail-actions";
+    buttons.replaceChildren(...actions.map((action) => worklistActionButton(action)));
+    wrapper.appendChild(buttons);
+  }
+  if (workItems?.length > 0) {
+    const stack = document.createElement("div");
+    stack.className = "worklist-stack";
+    stack.replaceChildren(
+      ...workItems.map((item) =>
+        operatorCard(item, {
+          label: "Mission work item",
         }),
       ),
     );

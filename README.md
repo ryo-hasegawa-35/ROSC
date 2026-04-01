@@ -55,6 +55,7 @@ cargo run -p rosc-broker -- proxy-lens examples/phase-01-basic.toml --fail-on-wa
 cargo run -p rosc-broker -- proxy-brief examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- proxy-dossier examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- proxy-runbook examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
+cargo run -p rosc-broker -- proxy-mission examples/phase-01-basic.toml --fail-on-warnings --require-fallback-ready --history-limit 10 --route-id camera
 cargo run -p rosc-broker -- watch-config examples/phase-01-basic.toml --poll-ms 1000 --fail-on-warnings
 cargo run -p rosc-broker -- watch-udp-proxy examples/phase-01-basic.toml --poll-ms 1000 --ingress-queue-depth 1024 --health-listen 127.0.0.1:19191 --control-listen 127.0.0.1:19292 --fail-on-warnings --require-fallback-ready --safe-mode
 cargo run -p rosc-broker -- diff-config examples/phase-01-basic.toml examples/phase-01-basic-changed.toml
@@ -96,6 +97,7 @@ curl http://127.0.0.1:19292/routes/camera/trace?limit=10
 curl http://127.0.0.1:19292/routes/camera/brief?limit=10
 curl http://127.0.0.1:19292/routes/camera/dossier?limit=10
 curl http://127.0.0.1:19292/routes/camera/runbook?limit=10
+curl http://127.0.0.1:19292/routes/camera/mission?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/handoff?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/triage?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/casebook?limit=10
@@ -105,8 +107,10 @@ curl http://127.0.0.1:19292/destinations/udp_renderer/lens?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/brief?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/dossier?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/runbook?limit=10
+curl http://127.0.0.1:19292/destinations/udp_renderer/mission?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/timeline?limit=10
 curl http://127.0.0.1:19292/destinations/udp_renderer/trace?limit=10
+curl http://127.0.0.1:19292/mission?limit=10
 curl http://127.0.0.1:19292/overrides
 curl http://127.0.0.1:19292/signals
 curl http://127.0.0.1:19292/signals?scope=problematic
@@ -118,7 +122,7 @@ curl http://127.0.0.1:19292/history/config-events
 `--control-listen` is intentionally loopback-only. Bind it to `127.0.0.1`, `::1`, or another
 local-only alias such as `localhost`; wildcard or externally reachable addresses are rejected.
 
-`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-assert-ready`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, `proxy-incidents`, `proxy-handoff`, `proxy-timeline`, `proxy-triage`, `proxy-casebook`, `proxy-board`, `proxy-focus`, `proxy-lens`, `proxy-brief`, `proxy-dossier`, and `proxy-runbook`
+`proxy-status`, `proxy-overview`, `proxy-readiness`, `proxy-assert-ready`, `proxy-snapshot`, `proxy-diagnostics`, `proxy-attention`, `proxy-incidents`, `proxy-handoff`, `proxy-timeline`, `proxy-triage`, `proxy-casebook`, `proxy-board`, `proxy-focus`, `proxy-lens`, `proxy-brief`, `proxy-dossier`, `proxy-runbook`, and `proxy-mission`
 intentionally write JSON only to stdout so they can be piped directly into tools such as `jq`
 without stripping summary lines first.
 
@@ -190,6 +194,7 @@ Current Phase 01 runtime coverage:
 - snapshot and dashboard payloads now also include an operator brief catalog, and `proxy-brief` plus control-plane `/brief`, `/routes/{id}/brief`, `/destinations/{id}/brief` tighten focus and lens into a compact handoff packet with headline timeline, next steps, and recommended actions
 - snapshot and dashboard payloads now also include an operator dossier catalog, and `proxy-dossier` plus control-plane `/dossier`, `/routes/{id}/dossier`, `/destinations/{id}/dossier` expose a fuller route/destination packet that separates global blockers from scoped blockers while bundling focus, brief, lens, work items, and recommended actions
 - snapshot and dashboard payloads now also include an operator runbook catalog, and `proxy-runbook` plus control-plane `/runbook`, `/routes/{id}/runbook`, `/destinations/{id}/runbook` expose a more action-oriented packet that turns focused dossier context into headline, recovery surface, linked entities, and next-step guidance
+- dashboard payloads now also include an operator mission catalog, and `proxy-mission` plus control-plane `/mission`, `/routes/{id}/mission`, `/destinations/{id}/mission` expose a higher-level packet that layers readiness, blockers, overrides, trace highlights, runbook guidance, and focused dossier context into one operator-facing contract
 - focused board slices now retain global blockers such as `traffic_frozen`, so route/destination-scoped investigation no longer hides the whole-system reason a path is still degraded
 - `/signals?scope=problematic` can now trim route/destination signal payloads down to only the entries that currently need operator attention
 - config rejection / block / reload-failure history now retains reason details instead of only counters
