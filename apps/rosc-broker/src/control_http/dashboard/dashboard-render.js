@@ -35,6 +35,7 @@ export function collectDashboardElements() {
     routeRunbookDetail: document.getElementById("route-runbook-detail"),
     routeMissionDetail: document.getElementById("route-mission-detail"),
     routeWorkspaceDetail: document.getElementById("route-workspace-detail"),
+    routeCockpitDetail: document.getElementById("route-cockpit-detail"),
     routeTraceDetail: document.getElementById("route-trace-detail"),
     routeTimelineDetail: document.getElementById("route-timeline-detail"),
     routeHandoffDetail: document.getElementById("route-handoff-detail"),
@@ -49,6 +50,7 @@ export function collectDashboardElements() {
     destinationRunbookDetail: document.getElementById("destination-runbook-detail"),
     destinationMissionDetail: document.getElementById("destination-mission-detail"),
     destinationWorkspaceDetail: document.getElementById("destination-workspace-detail"),
+    destinationCockpitDetail: document.getElementById("destination-cockpit-detail"),
     destinationTraceDetail: document.getElementById("destination-trace-detail"),
     destinationTimelineDetail: document.getElementById("destination-timeline-detail"),
     destinationHandoffDetail: document.getElementById("destination-handoff-detail"),
@@ -101,6 +103,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderRunbook(elements, dashboard, context.focusState);
   renderMission(elements, dashboard, context.focusState);
   renderWorkspace(elements, dashboard, context.focusState);
+  renderCockpit(elements, dashboard, context.focusState);
   renderTrace(elements, dashboard, context.focusState);
   renderFocusedTimeline(elements, dashboard.timeline_catalog, context.focusState);
   renderHandoff(elements, snapshot.handoff, context.focusState);
@@ -506,6 +509,17 @@ function renderWorkspace(elements, dashboard, focusState) {
   );
   renderRouteWorkspace(elements, routeWorkspace);
   renderDestinationWorkspace(elements, destinationWorkspace);
+}
+
+function renderCockpit(elements, dashboard, focusState) {
+  const routeCockpit = (dashboard.cockpit?.routes || []).find(
+    (packet) => packet.route_id === focusState?.routeId,
+  );
+  const destinationCockpit = (dashboard.cockpit?.destinations || []).find(
+    (packet) => packet.destination_id === focusState?.destinationId,
+  );
+  renderRouteCockpit(elements, routeCockpit);
+  renderDestinationCockpit(elements, destinationCockpit);
 }
 
 function renderTrace(elements, dashboard, focusState) {
@@ -1708,6 +1722,56 @@ function renderDestinationWorkspace(elements, workspace) {
   );
 }
 
+function renderRouteCockpit(elements, cockpit) {
+  if (!cockpit) {
+    fillList(elements, elements.routeCockpitDetail, []);
+    return;
+  }
+  elements.routeCockpitDetail.replaceChildren(
+    cockpitCard(
+      "Focused route cockpit",
+      cockpit.route_id,
+      cockpit.state,
+      cockpit.headline,
+      cockpit.readiness_level,
+      cockpit.global_blockers,
+      cockpit.scoped_blockers,
+      cockpit.global_overrides,
+      cockpit.incident_titles,
+      cockpit.board_titles,
+      cockpit.work_item_titles,
+      cockpit.next_steps,
+      cockpit.recommended_actions,
+      cockpit.linked_destination_ids,
+    ),
+  );
+}
+
+function renderDestinationCockpit(elements, cockpit) {
+  if (!cockpit) {
+    fillList(elements, elements.destinationCockpitDetail, []);
+    return;
+  }
+  elements.destinationCockpitDetail.replaceChildren(
+    cockpitCard(
+      "Focused destination cockpit",
+      cockpit.destination_id,
+      cockpit.state,
+      cockpit.headline,
+      cockpit.readiness_level,
+      cockpit.global_blockers,
+      cockpit.scoped_blockers,
+      cockpit.global_overrides,
+      cockpit.incident_titles,
+      cockpit.board_titles,
+      cockpit.work_item_titles,
+      cockpit.next_steps,
+      cockpit.recommended_actions,
+      cockpit.linked_route_ids,
+    ),
+  );
+}
+
 function dossierCard(
   label,
   title,
@@ -1968,6 +2032,59 @@ function workspaceCard(
       ),
     );
     wrapper.appendChild(workStack);
+  }
+  return wrapper;
+}
+
+function cockpitCard(
+  label,
+  title,
+  level,
+  headline,
+  readinessLevel,
+  globalBlockers,
+  scopedBlockers,
+  globalOverrides,
+  incidentTitles,
+  boardTitles,
+  workItemTitles,
+  nextSteps,
+  actions,
+  linkedEntities,
+) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">${escapeHtml(label)}</p>
+        <h4>${escapeHtml(title)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(String(level).toLowerCase())}">${escapeHtml(humanizeState(level))}</span>
+    </div>
+    <p class="summary">${escapeHtml(headline)}</p>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Readiness", humanizeState(readinessLevel)],
+      ["Board items", (boardTitles || []).length],
+      ["Work items", (workItemTitles || []).length],
+      ["Actions", (actions || []).length],
+    ]),
+  );
+  wrapper.appendChild(traceSummaryBlock("Global blockers", globalBlockers));
+  wrapper.appendChild(traceSummaryBlock("Scoped blockers", scopedBlockers));
+  wrapper.appendChild(traceSummaryBlock("Global overrides", globalOverrides));
+  wrapper.appendChild(traceSummaryBlock("Incident titles", incidentTitles));
+  wrapper.appendChild(traceSummaryBlock("Board titles", boardTitles));
+  wrapper.appendChild(traceSummaryBlock("Work item titles", workItemTitles));
+  wrapper.appendChild(traceSummaryBlock("Linked entities", linkedEntities));
+  wrapper.appendChild(traceSummaryBlock("Next steps", nextSteps));
+  if (actions?.length > 0) {
+    const buttons = document.createElement("div");
+    buttons.className = "detail-actions";
+    buttons.replaceChildren(...actions.map((action) => worklistActionButton(action)));
+    wrapper.appendChild(buttons);
   }
   return wrapper;
 }

@@ -194,6 +194,7 @@ async fn control_service_serves_dashboard_assets() {
     assert!(dashboard.contains("Route operator runbook"));
     assert!(dashboard.contains("Route operator mission"));
     assert!(dashboard.contains("Route operator workspace"));
+    assert!(dashboard.contains("Route operator cockpit"));
     assert!(dashboard.contains("Route-linked event history"));
 
     let css = request(
@@ -373,6 +374,16 @@ async fn control_service_serves_dashboard_assets() {
     );
     assert!(
         dashboard_data["dashboard"]["workspace"]["destinations"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["cockpit"]["routes"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["cockpit"]["destinations"]
             .as_array()
             .is_some()
     );
@@ -915,6 +926,30 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|entry| entry["destination_id"] == "udp_renderer")
     );
 
+    let cockpit = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /cockpit?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(cockpit["ok"], true);
+    assert_eq!(cockpit["cockpit"]["global"]["state"], "warning");
+    assert!(
+        cockpit["cockpit"]["routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["route_id"] == "camera")
+    );
+    assert!(
+        cockpit["cockpit"]["destinations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["destination_id"] == "udp_renderer")
+    );
+
     let timeline = json_body(
         &request(
             service.listen_addr(),
@@ -1080,6 +1115,21 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert!(route_workspace["workspace"]["routes"][0]["mission"].is_object());
     assert!(route_workspace["workspace"]["routes"][0]["board_items"].is_array());
     assert!(route_workspace["workspace"]["routes"][0]["work_items"].is_array());
+
+    let route_cockpit = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/cockpit?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_cockpit["ok"], true);
+    assert_eq!(route_cockpit["cockpit"]["routes"][0]["route_id"], "camera");
+    assert_eq!(route_cockpit["cockpit"]["destinations"], json!([]));
+    assert!(route_cockpit["cockpit"]["routes"][0]["mission"].is_object());
+    assert!(route_cockpit["cockpit"]["routes"][0]["workspace"].is_object());
+    assert!(route_cockpit["cockpit"]["routes"][0]["runbook"].is_object());
+    assert!(route_cockpit["cockpit"]["routes"][0]["focus"].is_object());
 
     let route_board = json_body(
         &request(
@@ -1277,6 +1327,24 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert!(destination_workspace["workspace"]["destinations"][0]["mission"].is_object());
     assert!(destination_workspace["workspace"]["destinations"][0]["board_items"].is_array());
     assert!(destination_workspace["workspace"]["destinations"][0]["work_items"].is_array());
+
+    let destination_cockpit = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/cockpit?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_cockpit["ok"], true);
+    assert_eq!(
+        destination_cockpit["cockpit"]["destinations"][0]["destination_id"],
+        "udp_renderer"
+    );
+    assert_eq!(destination_cockpit["cockpit"]["routes"], json!([]));
+    assert!(destination_cockpit["cockpit"]["destinations"][0]["mission"].is_object());
+    assert!(destination_cockpit["cockpit"]["destinations"][0]["workspace"].is_object());
+    assert!(destination_cockpit["cockpit"]["destinations"][0]["runbook"].is_object());
+    assert!(destination_cockpit["cockpit"]["destinations"][0]["focus"].is_object());
 
     let destination_board = json_body(
         &request(

@@ -5,13 +5,14 @@ use rosc_broker::{
     ProxyOperatorSignalScope, ProxyOperatorState, ProxyOperatorTimelineCategory,
     ProxyRuntimeSafetyPolicy, attach_runtime_status, proxy_operator_attention,
     proxy_operator_board, proxy_operator_brief_from_dashboard, proxy_operator_casebook,
-    proxy_operator_dashboard, proxy_operator_diagnostics, proxy_operator_dossier_from_dashboard,
-    proxy_operator_focus_from_dashboard, proxy_operator_handoff,
-    proxy_operator_incidents_from_histories, proxy_operator_lens_from_dashboard,
-    proxy_operator_mission_from_dashboard, proxy_operator_overview, proxy_operator_readiness,
-    proxy_operator_recovery, proxy_operator_report, proxy_operator_runbook_from_dashboard,
-    proxy_operator_signals_view, proxy_operator_snapshot, proxy_operator_timeline,
-    proxy_operator_trace, proxy_operator_workspace_from_dashboard, proxy_status_from_config,
+    proxy_operator_cockpit_from_dashboard, proxy_operator_dashboard, proxy_operator_diagnostics,
+    proxy_operator_dossier_from_dashboard, proxy_operator_focus_from_dashboard,
+    proxy_operator_handoff, proxy_operator_incidents_from_histories,
+    proxy_operator_lens_from_dashboard, proxy_operator_mission_from_dashboard,
+    proxy_operator_overview, proxy_operator_readiness, proxy_operator_recovery,
+    proxy_operator_report, proxy_operator_runbook_from_dashboard, proxy_operator_signals_view,
+    proxy_operator_snapshot, proxy_operator_timeline, proxy_operator_trace,
+    proxy_operator_workspace_from_dashboard, proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -1954,4 +1955,60 @@ fn operator_workspace_bundles_mission_board_and_work_items() {
     assert!(!destination.board_items.is_empty());
     assert!(!destination.work_items.is_empty());
     assert_eq!(destination.mission.destination_id, "udp_renderer");
+}
+
+#[test]
+fn operator_cockpit_bundles_focus_workspace_and_runbook_context() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            queue_depth: [("udp_renderer".to_owned(), 3)].into_iter().collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let dashboard = proxy_operator_dashboard(&status, ProxyRuntimeSafetyPolicy::default(), Some(4));
+    let cockpit = proxy_operator_cockpit_from_dashboard(&dashboard);
+
+    assert_eq!(cockpit.state, "warning");
+    assert_eq!(cockpit.global.readiness_level, "degraded");
+    assert!(
+        cockpit
+            .global
+            .overrides
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+    assert!(!cockpit.global.work_item_titles.is_empty());
+
+    let route = cockpit
+        .routes
+        .iter()
+        .find(|entry| entry.route_id == "camera")
+        .expect("route cockpit should exist");
+    assert_eq!(route.state, "warning");
+    assert!(!route.scoped_blockers.is_empty());
+    assert!(!route.board_titles.is_empty());
+    assert!(!route.work_item_titles.is_empty());
+    assert_eq!(route.workspace.route_id, "camera");
+    assert_eq!(route.mission.route_id, "camera");
+    assert_eq!(route.runbook.route_id, "camera");
+    assert_eq!(route.focus.route_id, "camera");
+
+    let destination = cockpit
+        .destinations
+        .iter()
+        .find(|entry| entry.destination_id == "udp_renderer")
+        .expect("destination cockpit should exist");
+    assert_eq!(destination.readiness_level, "degraded");
+    assert!(!destination.global_overrides.is_empty());
+    assert!(!destination.board_titles.is_empty());
+    assert!(!destination.work_item_titles.is_empty());
+    assert_eq!(destination.workspace.destination_id, "udp_renderer");
+    assert_eq!(destination.mission.destination_id, "udp_renderer");
+    assert_eq!(destination.runbook.destination_id, "udp_renderer");
+    assert_eq!(destination.focus.destination_id, "udp_renderer");
 }

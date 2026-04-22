@@ -10,6 +10,7 @@ mod operator_attention;
 mod operator_board;
 mod operator_brief;
 mod operator_casebook;
+mod operator_cockpit;
 mod operator_context;
 mod operator_dashboard;
 mod operator_diagnostics;
@@ -64,6 +65,10 @@ pub use operator_brief::{
 pub use operator_casebook::{
     ProxyOperatorCasebookCatalog, ProxyOperatorDestinationCasebook, ProxyOperatorRouteCasebook,
     proxy_operator_casebook,
+};
+pub use operator_cockpit::{
+    ProxyOperatorCockpitCatalog, ProxyOperatorDestinationCockpit, ProxyOperatorGlobalCockpit,
+    ProxyOperatorRouteCockpit, proxy_operator_cockpit_from_dashboard,
 };
 pub use operator_dashboard::{
     DASHBOARD_REFRESH_INTERVAL_MS, ProxyOperatorCounterEntry, ProxyOperatorDashboard,

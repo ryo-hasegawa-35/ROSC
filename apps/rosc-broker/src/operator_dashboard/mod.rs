@@ -10,15 +10,16 @@ pub use details::{
 pub use traffic::{ProxyOperatorCounterEntry, ProxyOperatorTrafficSummary};
 
 use crate::{
-    ProxyOperatorBriefCatalog, ProxyOperatorDossierCatalog, ProxyOperatorFocusCatalog,
-    ProxyOperatorLensCatalog, ProxyOperatorMissionCatalog, ProxyOperatorRunbookCatalog,
-    ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog, ProxyOperatorTimelineEntry,
-    ProxyOperatorTraceCatalog, ProxyOperatorWorkspaceCatalog, ProxyRuntimeSafetyPolicy,
-    UdpProxyStatusSnapshot, proxy_operator_brief_from_dashboard,
-    proxy_operator_dossier_from_dashboard, proxy_operator_focus_from_dashboard,
-    proxy_operator_lens_from_dashboard, proxy_operator_mission_from_dashboard,
-    proxy_operator_runbook_from_dashboard, proxy_operator_snapshot, proxy_operator_timeline,
-    proxy_operator_trace, proxy_operator_workspace_from_dashboard,
+    ProxyOperatorBriefCatalog, ProxyOperatorCockpitCatalog, ProxyOperatorDossierCatalog,
+    ProxyOperatorFocusCatalog, ProxyOperatorLensCatalog, ProxyOperatorMissionCatalog,
+    ProxyOperatorRunbookCatalog, ProxyOperatorSnapshot, ProxyOperatorTimelineCatalog,
+    ProxyOperatorTimelineEntry, ProxyOperatorTraceCatalog, ProxyOperatorWorkspaceCatalog,
+    ProxyRuntimeSafetyPolicy, UdpProxyStatusSnapshot, proxy_operator_brief_from_dashboard,
+    proxy_operator_cockpit_from_dashboard, proxy_operator_dossier_from_dashboard,
+    proxy_operator_focus_from_dashboard, proxy_operator_lens_from_dashboard,
+    proxy_operator_mission_from_dashboard, proxy_operator_runbook_from_dashboard,
+    proxy_operator_snapshot, proxy_operator_timeline, proxy_operator_trace,
+    proxy_operator_workspace_from_dashboard,
 };
 
 use self::details::{destination_details_from_snapshot, route_details_from_snapshot};
@@ -43,6 +44,7 @@ pub struct ProxyOperatorDashboard {
     pub runbook: ProxyOperatorRunbookCatalog,
     pub mission: ProxyOperatorMissionCatalog,
     pub workspace: ProxyOperatorWorkspaceCatalog,
+    pub cockpit: ProxyOperatorCockpitCatalog,
 }
 
 pub fn proxy_operator_dashboard(
@@ -86,6 +88,7 @@ pub fn proxy_operator_dashboard_from_snapshot(
         runbook: ProxyOperatorRunbookCatalog::default(),
         mission: ProxyOperatorMissionCatalog::default(),
         workspace: ProxyOperatorWorkspaceCatalog::default(),
+        cockpit: ProxyOperatorCockpitCatalog::default(),
     };
     dashboard.focus = proxy_operator_focus_from_dashboard(&dashboard);
     dashboard.lens = proxy_operator_lens_from_dashboard(&dashboard);
@@ -94,5 +97,6 @@ pub fn proxy_operator_dashboard_from_snapshot(
     dashboard.runbook = proxy_operator_runbook_from_dashboard(&dashboard);
     dashboard.mission = proxy_operator_mission_from_dashboard(&dashboard);
     dashboard.workspace = proxy_operator_workspace_from_dashboard(&dashboard);
+    dashboard.cockpit = proxy_operator_cockpit_from_dashboard(&dashboard);
     dashboard
 }

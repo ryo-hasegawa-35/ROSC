@@ -459,6 +459,31 @@ pub async fn run(command: Box<Command>) -> Result<()> {
             )
             .await
         }
+        Command::ProxyCockpit {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_cockpit(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
         Command::WatchConfig {
             path,
             poll_ms,

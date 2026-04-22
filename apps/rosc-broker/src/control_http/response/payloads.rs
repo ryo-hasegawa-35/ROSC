@@ -5,11 +5,11 @@ use serde::Serialize;
 
 use crate::{
     ProxyOperatorAttention, ProxyOperatorBoard, ProxyOperatorBriefCatalog,
-    ProxyOperatorCasebookCatalog, ProxyOperatorDashboard, ProxyOperatorDestinationTrace,
-    ProxyOperatorDiagnostics, ProxyOperatorDossierCatalog, ProxyOperatorFocusCatalog,
-    ProxyOperatorHandoffCatalog, ProxyOperatorIncidents, ProxyOperatorLensCatalog,
-    ProxyOperatorMissionCatalog, ProxyOperatorOverrides, ProxyOperatorOverview,
-    ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace,
+    ProxyOperatorCasebookCatalog, ProxyOperatorCockpitCatalog, ProxyOperatorDashboard,
+    ProxyOperatorDestinationTrace, ProxyOperatorDiagnostics, ProxyOperatorDossierCatalog,
+    ProxyOperatorFocusCatalog, ProxyOperatorHandoffCatalog, ProxyOperatorIncidents,
+    ProxyOperatorLensCatalog, ProxyOperatorMissionCatalog, ProxyOperatorOverrides,
+    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace,
     ProxyOperatorRunbookCatalog, ProxyOperatorSignalScope, ProxyOperatorSnapshot,
     ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog,
     ProxyOperatorWorkspaceCatalog, UdpProxyStatusSnapshot,
@@ -181,6 +181,12 @@ pub(crate) struct OperatorWorkspaceResponse {
 }
 
 #[derive(Serialize)]
+pub(crate) struct OperatorCockpitResponse {
+    pub(crate) ok: bool,
+    pub(crate) cockpit: ProxyOperatorCockpitCatalog,
+}
+
+#[derive(Serialize)]
 pub(crate) struct OperatorOverridesResponse {
     pub(crate) ok: bool,
     pub(crate) overrides: ProxyOperatorOverrides,
@@ -230,6 +236,7 @@ pub(crate) enum ResponseBody {
     OperatorRunbook(OperatorRunbookResponse),
     OperatorMission(OperatorMissionResponse),
     OperatorWorkspace(OperatorWorkspaceResponse),
+    OperatorCockpit(Box<OperatorCockpitResponse>),
     OperatorTrace(OperatorTraceResponse),
     OperatorRouteTrace(OperatorRouteTraceResponse),
     OperatorDestinationTrace(OperatorDestinationTraceResponse),
@@ -279,6 +286,7 @@ impl ResponseBody {
             Self::OperatorRunbook(body) => json_payload(body),
             Self::OperatorMission(body) => json_payload(body),
             Self::OperatorWorkspace(body) => json_payload(body),
+            Self::OperatorCockpit(body) => json_payload(body),
             Self::OperatorTrace(body) => json_payload(body),
             Self::OperatorRouteTrace(body) => json_payload(body),
             Self::OperatorDestinationTrace(body) => json_payload(body),
