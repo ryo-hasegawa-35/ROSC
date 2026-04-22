@@ -7,14 +7,33 @@ mod health_service;
 mod launch_profile;
 mod managed_proxy;
 mod operator_attention;
+mod operator_board;
+mod operator_brief;
+mod operator_casebook;
+mod operator_cockpit;
+mod operator_context;
+mod operator_dashboard;
 mod operator_diagnostics;
+mod operator_dossier;
+mod operator_focus;
+mod operator_handoff;
 mod operator_history;
+mod operator_incident_digest;
 mod operator_incidents;
+mod operator_lens;
+mod operator_mission;
 mod operator_overview;
 mod operator_policy;
 mod operator_readiness;
+mod operator_recovery;
+mod operator_runbook;
 mod operator_runtime_summary;
 mod operator_snapshot;
+mod operator_timeline;
+mod operator_trace;
+mod operator_triage;
+mod operator_worklist;
+mod operator_workspace;
 mod proxy_app;
 mod proxy_reload_supervisor;
 mod proxy_status;
@@ -36,11 +55,56 @@ pub use launch_profile::{
 };
 pub use managed_proxy::{FrozenStartupBehavior, ManagedProxyStartupOptions, ManagedUdpProxy};
 pub use operator_attention::{ProxyOperatorAttention, proxy_operator_attention};
+pub use operator_board::{
+    ProxyOperatorBoard, ProxyOperatorBoardItem, ProxyOperatorBoardScope, proxy_operator_board,
+};
+pub use operator_brief::{
+    ProxyOperatorBriefCatalog, ProxyOperatorDestinationBrief, ProxyOperatorRouteBrief,
+    proxy_operator_brief_from_dashboard,
+};
+pub use operator_casebook::{
+    ProxyOperatorCasebookCatalog, ProxyOperatorDestinationCasebook, ProxyOperatorRouteCasebook,
+    proxy_operator_casebook,
+};
+pub use operator_cockpit::{
+    ProxyOperatorCockpitCatalog, ProxyOperatorDestinationCockpit, ProxyOperatorGlobalCockpit,
+    ProxyOperatorRouteCockpit, proxy_operator_cockpit_from_dashboard,
+};
+pub use operator_dashboard::{
+    DASHBOARD_REFRESH_INTERVAL_MS, ProxyOperatorCounterEntry, ProxyOperatorDashboard,
+    ProxyOperatorDestinationDetail, ProxyOperatorDestinationDetailState, ProxyOperatorRouteDetail,
+    ProxyOperatorRouteDetailState, ProxyOperatorTrafficSummary, proxy_operator_dashboard,
+    proxy_operator_dashboard_from_snapshot,
+};
 pub use operator_diagnostics::{
     ProxyOperatorDiagnostics, proxy_operator_diagnostics, proxy_operator_diagnostics_from_overview,
 };
+pub use operator_dossier::{
+    ProxyOperatorDestinationDossier, ProxyOperatorDossierCatalog, ProxyOperatorRouteDossier,
+    proxy_operator_dossier_from_dashboard,
+};
+pub use operator_focus::{
+    ProxyOperatorDestinationFocusPacket, ProxyOperatorFocusCatalog, ProxyOperatorRouteFocusPacket,
+    proxy_operator_focus_from_dashboard,
+};
+pub use operator_handoff::{
+    ProxyOperatorDestinationHandoff, ProxyOperatorHandoffCatalog, ProxyOperatorRouteHandoff,
+    proxy_operator_handoff, proxy_operator_handoff_from_trace,
+};
+pub use operator_incident_digest::{
+    ProxyOperatorIncidentCluster, ProxyOperatorIncidentDigest, ProxyOperatorIncidentLevel,
+    ProxyOperatorIncidentScope, proxy_operator_incident_digest,
+};
 pub use operator_incidents::{
     ProxyOperatorIncidents, proxy_operator_incidents, proxy_operator_incidents_from_histories,
+};
+pub use operator_lens::{
+    ProxyOperatorDestinationLens, ProxyOperatorLensCatalog, ProxyOperatorRouteLens,
+    proxy_operator_lens_from_dashboard,
+};
+pub use operator_mission::{
+    ProxyOperatorDestinationMission, ProxyOperatorGlobalMission, ProxyOperatorMissionCatalog,
+    ProxyOperatorRouteMission, proxy_operator_mission_from_dashboard,
 };
 pub use operator_overview::{ProxyOperatorOverview, proxy_operator_overview};
 pub use operator_policy::{
@@ -54,9 +118,38 @@ pub use operator_readiness::{
     ProxyOperatorReadiness, ProxyOperatorReadinessCounts, ProxyOperatorReadinessFlags,
     ProxyOperatorReadinessLevel, proxy_operator_readiness, proxy_operator_readiness_from_overview,
 };
+pub use operator_recovery::{
+    ProxyOperatorRecovery, ProxyOperatorRecoveryDestination, ProxyOperatorRecoveryRoute,
+    proxy_operator_recovery,
+};
+pub use operator_runbook::{
+    ProxyOperatorDestinationRunbook, ProxyOperatorGlobalRunbook, ProxyOperatorRouteRunbook,
+    ProxyOperatorRunbookCatalog, proxy_operator_runbook_from_dashboard,
+};
 pub use operator_runtime_summary::{ProxyOperatorRuntimeSummary, proxy_operator_runtime_summary};
 pub use operator_snapshot::{
     ProxyOperatorSnapshot, proxy_operator_snapshot, proxy_operator_snapshot_from_overview,
+};
+pub use operator_timeline::{
+    ProxyOperatorDestinationTimeline, ProxyOperatorRouteTimeline, ProxyOperatorTimelineCatalog,
+    ProxyOperatorTimelineCategory, ProxyOperatorTimelineEntry, proxy_operator_timeline,
+};
+pub use operator_trace::{
+    ProxyOperatorDestinationTrace, ProxyOperatorRouteTrace, ProxyOperatorTraceCatalog,
+    ProxyOperatorTraceEvent, ProxyOperatorTraceEventKind, ProxyOperatorTraceEventLevel,
+    proxy_operator_trace,
+};
+pub use operator_triage::{
+    ProxyOperatorDestinationTriage, ProxyOperatorGlobalTriage, ProxyOperatorRouteTriage,
+    ProxyOperatorTriageCatalog, proxy_operator_triage,
+};
+pub use operator_worklist::{
+    ProxyOperatorSuggestedAction, ProxyOperatorSuggestedActionKind, ProxyOperatorWorkItem,
+    ProxyOperatorWorkItemLevel, ProxyOperatorWorklist, proxy_operator_worklist,
+};
+pub use operator_workspace::{
+    ProxyOperatorDestinationWorkspace, ProxyOperatorGlobalWorkspace, ProxyOperatorRouteWorkspace,
+    ProxyOperatorWorkspaceCatalog, proxy_operator_workspace_from_dashboard,
 };
 pub use proxy_app::UdpProxyApp;
 pub use proxy_reload_supervisor::{ManagedProxyFileSupervisor, ProxyReloadOutcome};

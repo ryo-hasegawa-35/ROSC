@@ -14,8 +14,8 @@ pub(crate) struct ProxyCommandOptions {
     pub start_frozen: bool,
 }
 
-pub async fn run(command: Command) -> Result<()> {
-    match command {
+pub async fn run(command: Box<Command>) -> Result<()> {
+    match *command {
         Command::CheckConfig { path } => config::check_config(&path).await,
         Command::ProxyStatus {
             config,
@@ -154,6 +154,327 @@ pub async fn run(command: Command) -> Result<()> {
                 &config,
                 resolve_bindings,
                 history_limit,
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyHandoff {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+        } => {
+            config::proxy_handoff(
+                &config,
+                resolve_bindings,
+                history_limit,
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyTimeline {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_timeline(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyTriage {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_triage(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyCasebook {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_casebook(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyBoard {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_board(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyFocus {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_focus(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyLens {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_lens(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyBrief {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_brief(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyDossier {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_dossier(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyRunbook {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_runbook(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyMission {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_mission(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyWorkspace {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_workspace(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
+                ProxyCommandOptions {
+                    fail_on_warnings,
+                    require_fallback_ready,
+                    safe_mode,
+                    start_frozen: false,
+                },
+            )
+            .await
+        }
+        Command::ProxyCockpit {
+            config,
+            resolve_bindings,
+            safe_mode,
+            fail_on_warnings,
+            require_fallback_ready,
+            history_limit,
+            route_id,
+            destination_id,
+        } => {
+            config::proxy_cockpit(
+                &config,
+                resolve_bindings,
+                history_limit,
+                route_id.as_deref(),
+                destination_id.as_deref(),
                 ProxyCommandOptions {
                     fail_on_warnings,
                     require_fallback_ready,

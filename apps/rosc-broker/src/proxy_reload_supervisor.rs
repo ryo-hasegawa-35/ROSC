@@ -85,6 +85,13 @@ impl ManagedProxyFileSupervisor {
         self.proxy.operator_diagnostics(history_limit)
     }
 
+    pub fn operator_dashboard(
+        &self,
+        history_limit: Option<usize>,
+    ) -> crate::ProxyOperatorDashboard {
+        self.proxy.operator_dashboard(history_limit)
+    }
+
     pub fn operator_incidents(
         &self,
         history_limit: Option<usize>,

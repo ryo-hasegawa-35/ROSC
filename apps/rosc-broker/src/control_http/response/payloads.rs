@@ -4,9 +4,15 @@ use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 use serde::Serialize;
 
 use crate::{
-    ProxyOperatorAttention, ProxyOperatorDiagnostics, ProxyOperatorIncidents,
-    ProxyOperatorOverrides, ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport,
-    ProxyOperatorSignalScope, ProxyOperatorSnapshot, UdpProxyStatusSnapshot,
+    ProxyOperatorAttention, ProxyOperatorBoard, ProxyOperatorBriefCatalog,
+    ProxyOperatorCasebookCatalog, ProxyOperatorCockpitCatalog, ProxyOperatorDashboard,
+    ProxyOperatorDestinationTrace, ProxyOperatorDiagnostics, ProxyOperatorDossierCatalog,
+    ProxyOperatorFocusCatalog, ProxyOperatorHandoffCatalog, ProxyOperatorIncidents,
+    ProxyOperatorLensCatalog, ProxyOperatorMissionCatalog, ProxyOperatorOverrides,
+    ProxyOperatorOverview, ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace,
+    ProxyOperatorRunbookCatalog, ProxyOperatorSignalScope, ProxyOperatorSnapshot,
+    ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog,
+    ProxyOperatorWorkspaceCatalog, UdpProxyStatusSnapshot,
 };
 
 #[derive(Serialize)]
@@ -61,6 +67,12 @@ pub(crate) struct OperatorSnapshotResponse {
 }
 
 #[derive(Serialize)]
+pub(crate) struct OperatorDashboardResponse {
+    pub(crate) ok: bool,
+    pub(crate) dashboard: Box<ProxyOperatorDashboard>,
+}
+
+#[derive(Serialize)]
 pub(crate) struct OperatorDiagnosticsResponse {
     pub(crate) ok: bool,
     pub(crate) diagnostics: Box<ProxyOperatorDiagnostics>,
@@ -76,6 +88,102 @@ pub(crate) struct OperatorAttentionResponse {
 pub(crate) struct OperatorIncidentsResponse {
     pub(crate) ok: bool,
     pub(crate) incidents: ProxyOperatorIncidents,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorTraceResponse {
+    pub(crate) ok: bool,
+    pub(crate) trace: ProxyOperatorTraceCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorRouteTraceResponse {
+    pub(crate) ok: bool,
+    pub(crate) route_trace: ProxyOperatorRouteTrace,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorDestinationTraceResponse {
+    pub(crate) ok: bool,
+    pub(crate) destination_trace: ProxyOperatorDestinationTrace,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorHandoffResponse {
+    pub(crate) ok: bool,
+    pub(crate) handoff: ProxyOperatorHandoffCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorTimelineResponse {
+    pub(crate) ok: bool,
+    pub(crate) timeline: ProxyOperatorTimelineCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorTriageResponse {
+    pub(crate) ok: bool,
+    pub(crate) triage: ProxyOperatorTriageCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorCasebookResponse {
+    pub(crate) ok: bool,
+    pub(crate) casebook: ProxyOperatorCasebookCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorBoardResponse {
+    pub(crate) ok: bool,
+    pub(crate) board: ProxyOperatorBoard,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorFocusResponse {
+    pub(crate) ok: bool,
+    pub(crate) focus: ProxyOperatorFocusCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorLensResponse {
+    pub(crate) ok: bool,
+    pub(crate) lens: ProxyOperatorLensCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorBriefResponse {
+    pub(crate) ok: bool,
+    pub(crate) brief: ProxyOperatorBriefCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorDossierResponse {
+    pub(crate) ok: bool,
+    pub(crate) dossier: ProxyOperatorDossierCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorRunbookResponse {
+    pub(crate) ok: bool,
+    pub(crate) runbook: ProxyOperatorRunbookCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorMissionResponse {
+    pub(crate) ok: bool,
+    pub(crate) mission: ProxyOperatorMissionCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorWorkspaceResponse {
+    pub(crate) ok: bool,
+    pub(crate) workspace: ProxyOperatorWorkspaceCatalog,
+}
+
+#[derive(Serialize)]
+pub(crate) struct OperatorCockpitResponse {
+    pub(crate) ok: bool,
+    pub(crate) cockpit: ProxyOperatorCockpitCatalog,
 }
 
 #[derive(Serialize)]
@@ -112,14 +220,35 @@ pub(crate) enum ResponseBody {
     OperatorOverview(Box<OperatorOverviewResponse>),
     OperatorReadiness(Box<OperatorReadinessResponse>),
     OperatorSnapshot(Box<OperatorSnapshotResponse>),
+    OperatorDashboard(Box<OperatorDashboardResponse>),
     OperatorDiagnostics(Box<OperatorDiagnosticsResponse>),
     OperatorAttention(OperatorAttentionResponse),
     OperatorIncidents(OperatorIncidentsResponse),
+    OperatorHandoff(OperatorHandoffResponse),
+    OperatorTimeline(OperatorTimelineResponse),
+    OperatorTriage(OperatorTriageResponse),
+    OperatorCasebook(OperatorCasebookResponse),
+    OperatorBoard(OperatorBoardResponse),
+    OperatorFocus(OperatorFocusResponse),
+    OperatorLens(OperatorLensResponse),
+    OperatorBrief(OperatorBriefResponse),
+    OperatorDossier(OperatorDossierResponse),
+    OperatorRunbook(OperatorRunbookResponse),
+    OperatorMission(OperatorMissionResponse),
+    OperatorWorkspace(OperatorWorkspaceResponse),
+    OperatorCockpit(Box<OperatorCockpitResponse>),
+    OperatorTrace(OperatorTraceResponse),
+    OperatorRouteTrace(OperatorRouteTraceResponse),
+    OperatorDestinationTrace(OperatorDestinationTraceResponse),
     OperatorOverrides(OperatorOverridesResponse),
     OperatorSignals(OperatorSignalsResponse),
     Blockers(BlockersResponse),
     RecentOperatorActions(RecentOperatorActionsResponse),
     RecentConfigEvents(RecentConfigEventsResponse),
+    StaticAsset {
+        content_type: &'static str,
+        body: &'static str,
+    },
     Error(ErrorResponse),
 }
 
@@ -133,24 +262,49 @@ impl ResponseBody {
         Self::Error(ErrorResponse { ok: false, error })
     }
 
-    pub(crate) fn to_json(&self) -> io::Result<Vec<u8>> {
+    pub(crate) fn to_http_payload(&self) -> io::Result<(&'static str, Vec<u8>)> {
         match self {
-            Self::Status(body) => serde_json::to_vec(body),
-            Self::Action(body) => serde_json::to_vec(body),
-            Self::OperatorReport(body) => serde_json::to_vec(body),
-            Self::OperatorOverview(body) => serde_json::to_vec(body),
-            Self::OperatorReadiness(body) => serde_json::to_vec(body),
-            Self::OperatorSnapshot(body) => serde_json::to_vec(body),
-            Self::OperatorDiagnostics(body) => serde_json::to_vec(body),
-            Self::OperatorAttention(body) => serde_json::to_vec(body),
-            Self::OperatorIncidents(body) => serde_json::to_vec(body),
-            Self::OperatorOverrides(body) => serde_json::to_vec(body),
-            Self::OperatorSignals(body) => serde_json::to_vec(body),
-            Self::Blockers(body) => serde_json::to_vec(body),
-            Self::RecentOperatorActions(body) => serde_json::to_vec(body),
-            Self::RecentConfigEvents(body) => serde_json::to_vec(body),
-            Self::Error(body) => serde_json::to_vec(body),
+            Self::Status(body) => json_payload(body),
+            Self::Action(body) => json_payload(body),
+            Self::OperatorReport(body) => json_payload(body),
+            Self::OperatorOverview(body) => json_payload(body),
+            Self::OperatorReadiness(body) => json_payload(body),
+            Self::OperatorSnapshot(body) => json_payload(body),
+            Self::OperatorDashboard(body) => json_payload(body),
+            Self::OperatorDiagnostics(body) => json_payload(body),
+            Self::OperatorAttention(body) => json_payload(body),
+            Self::OperatorIncidents(body) => json_payload(body),
+            Self::OperatorHandoff(body) => json_payload(body),
+            Self::OperatorTimeline(body) => json_payload(body),
+            Self::OperatorTriage(body) => json_payload(body),
+            Self::OperatorCasebook(body) => json_payload(body),
+            Self::OperatorBoard(body) => json_payload(body),
+            Self::OperatorFocus(body) => json_payload(body),
+            Self::OperatorLens(body) => json_payload(body),
+            Self::OperatorBrief(body) => json_payload(body),
+            Self::OperatorDossier(body) => json_payload(body),
+            Self::OperatorRunbook(body) => json_payload(body),
+            Self::OperatorMission(body) => json_payload(body),
+            Self::OperatorWorkspace(body) => json_payload(body),
+            Self::OperatorCockpit(body) => json_payload(body),
+            Self::OperatorTrace(body) => json_payload(body),
+            Self::OperatorRouteTrace(body) => json_payload(body),
+            Self::OperatorDestinationTrace(body) => json_payload(body),
+            Self::OperatorOverrides(body) => json_payload(body),
+            Self::OperatorSignals(body) => json_payload(body),
+            Self::Blockers(body) => json_payload(body),
+            Self::RecentOperatorActions(body) => json_payload(body),
+            Self::RecentConfigEvents(body) => json_payload(body),
+            Self::StaticAsset { content_type, body } => {
+                Ok((content_type, body.as_bytes().to_vec()))
+            }
+            Self::Error(body) => json_payload(body),
         }
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
     }
+}
+
+fn json_payload<T: Serialize>(value: &T) -> io::Result<(&'static str, Vec<u8>)> {
+    serde_json::to_vec(value)
+        .map(|payload| ("application/json", payload))
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
 }

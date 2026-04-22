@@ -172,3 +172,282 @@ fn proxy_incidents_stdout_is_json_only() {
     assert!(value.get("recent_operator_actions").is_some());
     assert!(value.get("recent_config_issues").is_some());
 }
+
+#[test]
+fn proxy_handoff_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-handoff",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("route_handoffs").is_some());
+    assert!(value.get("destination_handoffs").is_some());
+}
+
+#[test]
+fn proxy_timeline_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-timeline",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("global").is_some());
+    assert!(value.get("routes").is_some());
+    assert!(value.get("destinations").is_some());
+    assert_eq!(value["routes"].as_array().unwrap().len(), 1);
+    assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
+}
+
+#[test]
+fn proxy_triage_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-triage",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("global").is_some());
+    assert!(value.get("route_triage").is_some());
+    assert!(value.get("destination_triage").is_some());
+    assert_eq!(value["route_triage"].as_array().unwrap().len(), 1);
+    assert_eq!(value["route_triage"][0]["route_id"], "ue5_camera_fov");
+}
+
+#[test]
+fn proxy_casebook_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-casebook",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("route_casebooks").is_some());
+    assert!(value.get("destination_casebooks").is_some());
+    assert_eq!(value["route_casebooks"].as_array().unwrap().len(), 1);
+    assert_eq!(value["route_casebooks"][0]["route_id"], "ue5_camera_fov");
+}
+
+#[test]
+fn proxy_board_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-board",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("blocked_items").is_some());
+    assert!(value.get("degraded_items").is_some());
+    assert!(value.get("watch_items").is_some());
+}
+
+#[test]
+fn proxy_focus_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-focus",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("routes").is_some());
+    assert!(value.get("destinations").is_some());
+    assert_eq!(value["routes"].as_array().unwrap().len(), 1);
+    assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
+}
+
+#[test]
+fn proxy_lens_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-lens",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("global_blockers").is_some());
+    assert!(value.get("global_overrides").is_some());
+    assert!(value.get("routes").is_some());
+    assert!(value.get("destinations").is_some());
+    assert_eq!(value["routes"].as_array().unwrap().len(), 1);
+    assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
+}
+
+#[test]
+fn proxy_brief_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-brief",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("global_blockers").is_some());
+    assert!(value.get("global_overrides").is_some());
+    assert!(value.get("global_next_steps").is_some());
+    assert!(value.get("routes").is_some());
+    assert!(value.get("destinations").is_some());
+    assert_eq!(value["routes"].as_array().unwrap().len(), 1);
+    assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
+}
+
+#[test]
+fn proxy_dossier_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-dossier",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("global_blockers").is_some());
+    assert!(value.get("global_overrides").is_some());
+    assert!(value.get("routes").is_some());
+    assert!(value.get("destinations").is_some());
+    assert_eq!(value["routes"].as_array().unwrap().len(), 1);
+    assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
+    assert!(value["routes"][0]["brief"].is_object());
+    assert!(value["routes"][0]["lens"].is_object());
+}
+
+#[test]
+fn proxy_runbook_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-runbook",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("global").is_some());
+    assert!(value.get("routes").is_some());
+    assert!(value.get("destinations").is_some());
+    assert_eq!(value["routes"].as_array().unwrap().len(), 1);
+    assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
+    assert!(value["routes"][0]["dossier"].is_object());
+}
+
+#[test]
+fn proxy_mission_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-mission",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("global").is_some());
+    assert!(value.get("routes").is_some());
+    assert!(value.get("destinations").is_some());
+    assert_eq!(value["routes"].as_array().unwrap().len(), 1);
+    assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
+    assert!(value["routes"][0]["brief"].is_object());
+    assert!(value["routes"][0]["dossier"].is_object());
+    assert!(value["routes"][0]["runbook"].is_object());
+}
+
+#[test]
+fn proxy_workspace_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-workspace",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("global").is_some());
+    assert!(value.get("routes").is_some());
+    assert!(value.get("destinations").is_some());
+    assert_eq!(value["routes"].as_array().unwrap().len(), 1);
+    assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
+    assert!(value["routes"][0]["mission"].is_object());
+    assert!(value["routes"][0]["board_items"].is_array());
+    assert!(value["routes"][0]["work_items"].is_array());
+}
+
+#[test]
+fn proxy_cockpit_stdout_is_json_only() {
+    let value = json_stdout_for(&[
+        "proxy-cockpit",
+        "examples/phase-01-basic.toml",
+        "--fail-on-warnings",
+        "--require-fallback-ready",
+        "--history-limit",
+        "5",
+        "--route-id",
+        "ue5_camera_fov",
+    ]);
+
+    assert!(value.get("state").is_some());
+    assert!(value.get("global").is_some());
+    assert!(value.get("routes").is_some());
+    assert!(value.get("destinations").is_some());
+    assert_eq!(value["routes"].as_array().unwrap().len(), 1);
+    assert_eq!(value["routes"][0]["route_id"], "ue5_camera_fov");
+    assert!(value["routes"][0]["mission"].is_object());
+    assert!(value["routes"][0]["workspace"].is_object());
+    assert!(value["routes"][0]["runbook"].is_object());
+    assert!(value["routes"][0]["focus"].is_object());
+}

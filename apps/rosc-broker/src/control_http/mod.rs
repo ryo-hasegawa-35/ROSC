@@ -1,3 +1,4 @@
+mod dashboard;
 mod request;
 mod response;
 mod routes;
@@ -53,7 +54,7 @@ async fn serve_control_connection_impl(
     };
 
     let response = routes::route_request(request, control).await;
-    response::write_json_response(&mut stream, response.status, &response.body).await?;
+    response::write_response(&mut stream, response.status, &response.body).await?;
     Ok(())
 }
 

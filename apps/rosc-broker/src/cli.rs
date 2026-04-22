@@ -106,6 +106,223 @@ pub enum Command {
         #[arg(long)]
         history_limit: Option<usize>,
     },
+    ProxyHandoff {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+    },
+    ProxyTimeline {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
+    ProxyTriage {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
+    ProxyCasebook {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
+    ProxyBoard {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
+    ProxyFocus {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
+    ProxyLens {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
+    ProxyBrief {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
+    ProxyDossier {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
+    ProxyRunbook {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
+    ProxyMission {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
+    ProxyWorkspace {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
+    ProxyCockpit {
+        config: PathBuf,
+        #[arg(long)]
+        resolve_bindings: bool,
+        #[arg(long)]
+        safe_mode: bool,
+        #[arg(long)]
+        fail_on_warnings: bool,
+        #[arg(long)]
+        require_fallback_ready: bool,
+        #[arg(long)]
+        history_limit: Option<usize>,
+        #[arg(long)]
+        route_id: Option<String>,
+        #[arg(long)]
+        destination_id: Option<String>,
+    },
     WatchConfig {
         path: PathBuf,
         #[arg(long, default_value_t = 1000)]
