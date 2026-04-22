@@ -20,7 +20,7 @@ use super::response::{
     mission_response, operator_actions_response, operator_signals_response, overrides_response,
     overview_response, readiness_response, report_response, route_trace_response,
     snapshot_response, status_response, timeline_response, trace_response, triage_response,
-    unsupported_route_error,
+    unsupported_route_error, workspace_response,
 };
 
 pub(crate) async fn route_request(
@@ -163,6 +163,13 @@ pub(crate) async fn route_request(
             let dashboard = control.operator_dashboard(limit).await;
             mission_response(dashboard.mission)
         }
+        ("GET", "/workspace") => {
+            let Ok(limit) = history_limit(query) else {
+                return invalid_query_error("limit");
+            };
+            let dashboard = control.operator_dashboard(limit).await;
+            workspace_response(dashboard.workspace)
+        }
         ("GET", "/overrides") => {
             let report = control.operator_report().await;
             overrides_response(report.overrides)
@@ -209,6 +216,34 @@ async fn route_nested_request(
     query: Option<&str>,
     control: Arc<dyn ProxyControlPlane>,
 ) -> HttpResponse {
+    if let Some(destination_id) = path
+        .strip_prefix("/destinations/")
+        .and_then(|path| path.strip_suffix("/workspace"))
+    {
+        if request.method != "GET" || destination_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(destination_id) = decode_uri_component(destination_id) else {
+            return invalid_component_error("destination id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let dashboard = control.operator_dashboard(limit).await;
+        let mut workspace = dashboard.workspace;
+        let Some(destination_workspace) = workspace
+            .destinations
+            .iter()
+            .find(|packet| packet.destination_id == destination_id)
+            .cloned()
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        workspace.routes.clear();
+        workspace.destinations = vec![destination_workspace];
+        return workspace_response(workspace);
+    }
+
     if let Some(destination_id) = path
         .strip_prefix("/destinations/")
         .and_then(|path| path.strip_suffix("/mission"))
@@ -618,6 +653,31 @@ async fn route_nested_request(
         mission.routes = vec![route_mission];
         mission.destinations.clear();
         return mission_response(mission);
+    }
+
+    if let Some(route_id) = route_path.strip_suffix("/workspace") {
+        if request.method != "GET" || route_id.is_empty() {
+            return unsupported_route_error(&request.path);
+        }
+        let Ok(route_id) = decode_uri_component(route_id) else {
+            return invalid_component_error("route id");
+        };
+        let Ok(limit) = history_limit(query) else {
+            return invalid_query_error("limit");
+        };
+        let dashboard = control.operator_dashboard(limit).await;
+        let mut workspace = dashboard.workspace;
+        let Some(route_workspace) = workspace
+            .routes
+            .iter()
+            .find(|packet| packet.route_id == route_id)
+            .cloned()
+        else {
+            return unsupported_route_error(&request.path);
+        };
+        workspace.routes = vec![route_workspace];
+        workspace.destinations.clear();
+        return workspace_response(workspace);
     }
 
     if let Some(route_id) = route_path.strip_suffix("/runbook") {

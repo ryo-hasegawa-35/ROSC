@@ -12,7 +12,7 @@ pub(crate) use builders::{
     mission_response, operator_actions_response, operator_signals_response, overrides_response,
     overview_response, readiness_response, readyz_response, report_response, route_trace_response,
     runbook_response, snapshot_response, status_response, timeline_response, trace_response,
-    triage_response, unsupported_route_error,
+    triage_response, unsupported_route_error, workspace_response,
 };
 pub(crate) use payloads::{HttpResponse, ResponseBody};
 pub(crate) use transport::{

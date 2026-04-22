@@ -34,6 +34,7 @@ export function collectDashboardElements() {
     routeDossierDetail: document.getElementById("route-dossier-detail"),
     routeRunbookDetail: document.getElementById("route-runbook-detail"),
     routeMissionDetail: document.getElementById("route-mission-detail"),
+    routeWorkspaceDetail: document.getElementById("route-workspace-detail"),
     routeTraceDetail: document.getElementById("route-trace-detail"),
     routeTimelineDetail: document.getElementById("route-timeline-detail"),
     routeHandoffDetail: document.getElementById("route-handoff-detail"),
@@ -47,6 +48,7 @@ export function collectDashboardElements() {
     destinationDossierDetail: document.getElementById("destination-dossier-detail"),
     destinationRunbookDetail: document.getElementById("destination-runbook-detail"),
     destinationMissionDetail: document.getElementById("destination-mission-detail"),
+    destinationWorkspaceDetail: document.getElementById("destination-workspace-detail"),
     destinationTraceDetail: document.getElementById("destination-trace-detail"),
     destinationTimelineDetail: document.getElementById("destination-timeline-detail"),
     destinationHandoffDetail: document.getElementById("destination-handoff-detail"),
@@ -98,6 +100,7 @@ export function renderDashboard(elements, dashboard, context) {
   renderDossier(elements, dashboard, context.focusState);
   renderRunbook(elements, dashboard, context.focusState);
   renderMission(elements, dashboard, context.focusState);
+  renderWorkspace(elements, dashboard, context.focusState);
   renderTrace(elements, dashboard, context.focusState);
   renderFocusedTimeline(elements, dashboard.timeline_catalog, context.focusState);
   renderHandoff(elements, snapshot.handoff, context.focusState);
@@ -492,6 +495,17 @@ function renderMission(elements, dashboard, focusState) {
   );
   renderRouteMission(elements, routeMission);
   renderDestinationMission(elements, destinationMission);
+}
+
+function renderWorkspace(elements, dashboard, focusState) {
+  const routeWorkspace = (dashboard.workspace?.routes || []).find(
+    (packet) => packet.route_id === focusState?.routeId,
+  );
+  const destinationWorkspace = (dashboard.workspace?.destinations || []).find(
+    (packet) => packet.destination_id === focusState?.destinationId,
+  );
+  renderRouteWorkspace(elements, routeWorkspace);
+  renderDestinationWorkspace(elements, destinationWorkspace);
 }
 
 function renderTrace(elements, dashboard, focusState) {
@@ -1644,6 +1658,56 @@ function renderDestinationMission(elements, mission) {
   );
 }
 
+function renderRouteWorkspace(elements, workspace) {
+  if (!workspace) {
+    fillList(elements, elements.routeWorkspaceDetail, []);
+    return;
+  }
+  elements.routeWorkspaceDetail.replaceChildren(
+    workspaceCard(
+      "Focused route workspace",
+      workspace.route_id,
+      workspace.state,
+      workspace.headline,
+      workspace.readiness_level,
+      workspace.global_blockers,
+      workspace.scoped_blockers,
+      workspace.global_overrides,
+      workspace.board_items,
+      workspace.work_items,
+      workspace.incident_titles,
+      workspace.linked_destination_ids,
+      workspace.next_steps,
+      workspace.recommended_actions,
+    ),
+  );
+}
+
+function renderDestinationWorkspace(elements, workspace) {
+  if (!workspace) {
+    fillList(elements, elements.destinationWorkspaceDetail, []);
+    return;
+  }
+  elements.destinationWorkspaceDetail.replaceChildren(
+    workspaceCard(
+      "Focused destination workspace",
+      workspace.destination_id,
+      workspace.state,
+      workspace.headline,
+      workspace.readiness_level,
+      workspace.global_blockers,
+      workspace.scoped_blockers,
+      workspace.global_overrides,
+      workspace.board_items,
+      workspace.work_items,
+      workspace.incident_titles,
+      workspace.linked_route_ids,
+      workspace.next_steps,
+      workspace.recommended_actions,
+    ),
+  );
+}
+
 function dossierCard(
   label,
   title,
@@ -1820,6 +1884,90 @@ function missionCard(
       ),
     );
     wrapper.appendChild(stack);
+  }
+  return wrapper;
+}
+
+function workspaceCard(
+  label,
+  title,
+  level,
+  headline,
+  readinessLevel,
+  globalBlockers,
+  scopedBlockers,
+  globalOverrides,
+  boardItems,
+  workItems,
+  incidentTitles,
+  linkedEntities,
+  nextSteps,
+  actions,
+) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "trace-shell";
+  wrapper.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <p class="panel-label">${escapeHtml(label)}</p>
+        <h4>${escapeHtml(title)}</h4>
+      </div>
+      <span class="entity-state" data-level="${escapeHtml(String(level).toLowerCase())}">${escapeHtml(humanizeState(level))}</span>
+    </div>
+    <p class="summary">${escapeHtml(headline)}</p>
+  `;
+  wrapper.appendChild(
+    metricGrid([
+      ["Readiness", humanizeState(readinessLevel)],
+      ["Board items", (boardItems || []).length],
+      ["Work items", (workItems || []).length],
+      ["Actions", (actions || []).length],
+    ]),
+  );
+  wrapper.appendChild(traceSummaryBlock("Global blockers", globalBlockers));
+  wrapper.appendChild(traceSummaryBlock("Scoped blockers", scopedBlockers));
+  wrapper.appendChild(traceSummaryBlock("Global overrides", globalOverrides));
+  wrapper.appendChild(traceSummaryBlock("Incident titles", incidentTitles));
+  wrapper.appendChild(traceSummaryBlock("Linked entities", linkedEntities));
+  wrapper.appendChild(traceSummaryBlock("Next steps", nextSteps));
+  if (actions?.length > 0) {
+    const buttons = document.createElement("div");
+    buttons.className = "detail-actions";
+    buttons.replaceChildren(...actions.map((action) => worklistActionButton(action)));
+    wrapper.appendChild(buttons);
+  }
+  if (boardItems?.length > 0) {
+    const boardStack = document.createElement("div");
+    boardStack.className = "worklist-stack";
+    boardStack.replaceChildren(
+      ...boardItems.map((item) =>
+        operatorCard(
+          {
+            level: String(item.level || "info").toLowerCase(),
+            title: item.title,
+            summary: item.summary,
+            reasons: item.reasons,
+            action: item.actions?.[0] || null,
+          },
+          {
+            label: "Workspace board item",
+          },
+        ),
+      ),
+    );
+    wrapper.appendChild(boardStack);
+  }
+  if (workItems?.length > 0) {
+    const workStack = document.createElement("div");
+    workStack.className = "worklist-stack";
+    workStack.replaceChildren(
+      ...workItems.map((item) =>
+        operatorCard(item, {
+          label: "Workspace work item",
+        }),
+      ),
+    );
+    wrapper.appendChild(workStack);
   }
   return wrapper;
 }

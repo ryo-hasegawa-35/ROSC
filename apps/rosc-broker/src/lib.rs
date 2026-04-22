@@ -32,6 +32,7 @@ mod operator_timeline;
 mod operator_trace;
 mod operator_triage;
 mod operator_worklist;
+mod operator_workspace;
 mod proxy_app;
 mod proxy_reload_supervisor;
 mod proxy_status;
@@ -140,6 +141,10 @@ pub use operator_triage::{
 pub use operator_worklist::{
     ProxyOperatorSuggestedAction, ProxyOperatorSuggestedActionKind, ProxyOperatorWorkItem,
     ProxyOperatorWorkItemLevel, ProxyOperatorWorklist, proxy_operator_worklist,
+};
+pub use operator_workspace::{
+    ProxyOperatorDestinationWorkspace, ProxyOperatorGlobalWorkspace, ProxyOperatorRouteWorkspace,
+    ProxyOperatorWorkspaceCatalog, proxy_operator_workspace_from_dashboard,
 };
 pub use proxy_app::UdpProxyApp;
 pub use proxy_reload_supervisor::{ManagedProxyFileSupervisor, ProxyReloadOutcome};

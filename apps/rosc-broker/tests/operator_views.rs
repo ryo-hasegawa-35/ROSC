@@ -11,7 +11,7 @@ use rosc_broker::{
     proxy_operator_mission_from_dashboard, proxy_operator_overview, proxy_operator_readiness,
     proxy_operator_recovery, proxy_operator_report, proxy_operator_runbook_from_dashboard,
     proxy_operator_signals_view, proxy_operator_snapshot, proxy_operator_timeline,
-    proxy_operator_trace, proxy_status_from_config,
+    proxy_operator_trace, proxy_operator_workspace_from_dashboard, proxy_status_from_config,
 };
 use rosc_telemetry::{
     HealthSnapshot, RecentConfigEvent, RecentConfigEventKind, RecentOperatorAction,
@@ -1904,4 +1904,54 @@ fn operator_mission_bundles_runbook_dossier_and_readiness_context() {
     assert_eq!(destination.brief.destination_id, "udp_renderer");
     assert_eq!(destination.dossier.destination_id, "udp_renderer");
     assert_eq!(destination.runbook.destination_id, "udp_renderer");
+}
+
+#[test]
+fn operator_workspace_bundles_mission_board_and_work_items() {
+    let config = broad_scope_config();
+    let status = attach_runtime_status(
+        proxy_status_from_config(&config).expect("status should build"),
+        &HealthSnapshot {
+            traffic_frozen: true,
+            route_isolated: [("camera".to_owned(), true)].into_iter().collect(),
+            queue_depth: [("udp_renderer".to_owned(), 3)].into_iter().collect(),
+            ..HealthSnapshot::default()
+        },
+    );
+
+    let dashboard = proxy_operator_dashboard(&status, ProxyRuntimeSafetyPolicy::default(), Some(4));
+    let workspace = proxy_operator_workspace_from_dashboard(&dashboard);
+
+    assert_eq!(workspace.state, "warning");
+    assert_eq!(workspace.global.state, "warning");
+    assert_eq!(workspace.global.readiness_level, "degraded");
+    assert!(
+        workspace
+            .global
+            .overrides
+            .iter()
+            .any(|entry| entry == "traffic_frozen")
+    );
+    assert!(!workspace.global.work_items.is_empty());
+
+    let route = workspace
+        .routes
+        .iter()
+        .find(|entry| entry.route_id == "camera")
+        .expect("route workspace should exist");
+    assert_eq!(route.state, "warning");
+    assert!(!route.board_items.is_empty());
+    assert!(!route.work_items.is_empty());
+    assert!(!route.recommended_actions.is_empty());
+    assert_eq!(route.mission.route_id, "camera");
+
+    let destination = workspace
+        .destinations
+        .iter()
+        .find(|entry| entry.destination_id == "udp_renderer")
+        .expect("destination workspace should exist");
+    assert_eq!(destination.readiness_level, "degraded");
+    assert!(!destination.board_items.is_empty());
+    assert!(!destination.work_items.is_empty());
+    assert_eq!(destination.mission.destination_id, "udp_renderer");
 }

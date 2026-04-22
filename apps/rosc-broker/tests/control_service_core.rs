@@ -193,6 +193,7 @@ async fn control_service_serves_dashboard_assets() {
     assert!(dashboard.contains("Route operator brief"));
     assert!(dashboard.contains("Route operator runbook"));
     assert!(dashboard.contains("Route operator mission"));
+    assert!(dashboard.contains("Route operator workspace"));
     assert!(dashboard.contains("Route-linked event history"));
 
     let css = request(
@@ -362,6 +363,16 @@ async fn control_service_serves_dashboard_assets() {
     );
     assert!(
         dashboard_data["dashboard"]["mission"]["destinations"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["workspace"]["routes"]
+            .as_array()
+            .is_some()
+    );
+    assert!(
+        dashboard_data["dashboard"]["workspace"]["destinations"]
             .as_array()
             .is_some()
     );
@@ -874,6 +885,36 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
             .any(|entry| entry["destination_id"] == "udp_renderer")
     );
 
+    let workspace = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /workspace?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(workspace["ok"], true);
+    assert_eq!(workspace["workspace"]["global"]["state"], "warning");
+    assert!(
+        !workspace["workspace"]["global"]["work_items"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        workspace["workspace"]["routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["route_id"] == "camera")
+    );
+    assert!(
+        workspace["workspace"]["destinations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["destination_id"] == "udp_renderer")
+    );
+
     let timeline = json_body(
         &request(
             service.listen_addr(),
@@ -1022,6 +1063,23 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert!(route_mission["mission"]["routes"][0]["brief"].is_object());
     assert!(route_mission["mission"]["routes"][0]["dossier"].is_object());
     assert!(route_mission["mission"]["routes"][0]["runbook"].is_object());
+
+    let route_workspace = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /routes/camera/workspace?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(route_workspace["ok"], true);
+    assert_eq!(
+        route_workspace["workspace"]["routes"][0]["route_id"],
+        "camera"
+    );
+    assert_eq!(route_workspace["workspace"]["destinations"], json!([]));
+    assert!(route_workspace["workspace"]["routes"][0]["mission"].is_object());
+    assert!(route_workspace["workspace"]["routes"][0]["board_items"].is_array());
+    assert!(route_workspace["workspace"]["routes"][0]["work_items"].is_array());
 
     let route_board = json_body(
         &request(
@@ -1202,6 +1260,23 @@ async fn control_service_exposes_operator_report_blockers_and_scoped_signals() {
     assert!(destination_mission["mission"]["destinations"][0]["brief"].is_object());
     assert!(destination_mission["mission"]["destinations"][0]["dossier"].is_object());
     assert!(destination_mission["mission"]["destinations"][0]["runbook"].is_object());
+
+    let destination_workspace = json_body(
+        &request(
+            service.listen_addr(),
+            "GET /destinations/udp_renderer/workspace?limit=4 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        )
+        .await,
+    );
+    assert_eq!(destination_workspace["ok"], true);
+    assert_eq!(
+        destination_workspace["workspace"]["destinations"][0]["destination_id"],
+        "udp_renderer"
+    );
+    assert_eq!(destination_workspace["workspace"]["routes"], json!([]));
+    assert!(destination_workspace["workspace"]["destinations"][0]["mission"].is_object());
+    assert!(destination_workspace["workspace"]["destinations"][0]["board_items"].is_array());
+    assert!(destination_workspace["workspace"]["destinations"][0]["work_items"].is_array());
 
     let destination_board = json_body(
         &request(

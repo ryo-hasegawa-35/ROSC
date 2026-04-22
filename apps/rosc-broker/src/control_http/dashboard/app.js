@@ -3,9 +3,11 @@ import {
   fetchDashboardData,
   globalActionRequest,
   normalizeFocusState,
+  parseFocusStateFromUrl,
   postControlAction,
   retryDelayMs,
   routeActionRequest,
+  syncFocusStateToUrl,
 } from "/dashboard/dashboard-state.js";
 import {
   collectDashboardElements,
@@ -33,25 +35,31 @@ let connectionState = {
   lastError: null,
   lastSuccessAt: null,
 };
-let focusState = {
-  routeId: null,
-  destinationId: null,
-};
+let focusState = parseFocusStateFromUrl();
 
 elements.refreshButton.addEventListener("click", () => refreshDashboard());
 elements.routeFocusSelect.addEventListener("change", (event) => {
   focusState.routeId = event.target.value || null;
+  syncFocusStateToUrl(focusState);
   if (lastDashboard) {
     renderCurrentDashboard();
   }
 });
 elements.destinationFocusSelect.addEventListener("change", (event) => {
   focusState.destinationId = event.target.value || null;
+  syncFocusStateToUrl(focusState);
   if (lastDashboard) {
     renderCurrentDashboard();
   }
 });
 window.addEventListener("hashchange", () => syncActiveSection(elements));
+window.addEventListener("popstate", () => {
+  focusState = parseFocusStateFromUrl();
+  if (lastDashboard) {
+    focusState = normalizeFocusState(lastDashboard, focusState);
+    renderCurrentDashboard();
+  }
+});
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
     refreshDashboard();
@@ -83,6 +91,7 @@ document.body.addEventListener("click", async (event) => {
   const focusRouteButton = event.target.closest("[data-focus-route-id]");
   if (focusRouteButton) {
     focusState.routeId = focusRouteButton.dataset.focusRouteId || null;
+    syncFocusStateToUrl(focusState);
     window.location.hash = "#focus";
     renderCurrentDashboard();
     return;
@@ -91,6 +100,7 @@ document.body.addEventListener("click", async (event) => {
   const focusDestinationButton = event.target.closest("[data-focus-destination-id]");
   if (focusDestinationButton) {
     focusState.destinationId = focusDestinationButton.dataset.focusDestinationId || null;
+    syncFocusStateToUrl(focusState);
     window.location.hash = "#focus";
     renderCurrentDashboard();
   }
@@ -129,6 +139,7 @@ async function refreshDashboard() {
         lastSuccessAt: refreshedAt,
       };
       focusState = normalizeFocusState(dashboard, focusState);
+      syncFocusStateToUrl(focusState);
       lastRenderContext = { refreshedAt, trafficPulse };
       renderCurrentDashboard();
       scheduleRefresh(refreshIntervalMs);

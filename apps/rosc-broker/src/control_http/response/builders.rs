@@ -11,7 +11,7 @@ use crate::{
     ProxyOperatorReadiness, ProxyOperatorReport, ProxyOperatorRouteTrace,
     ProxyOperatorRunbookCatalog, ProxyOperatorSignalsView, ProxyOperatorSnapshot,
     ProxyOperatorTimelineCatalog, ProxyOperatorTraceCatalog, ProxyOperatorTriageCatalog,
-    UdpProxyStatusSnapshot,
+    ProxyOperatorWorkspaceCatalog, UdpProxyStatusSnapshot,
 };
 use rosc_telemetry::{RecentConfigEvent, RecentOperatorAction};
 
@@ -24,8 +24,8 @@ use super::payloads::{
     OperatorOverridesResponse, OperatorOverviewResponse, OperatorReadinessResponse,
     OperatorReportResponse, OperatorRouteTraceResponse, OperatorRunbookResponse,
     OperatorSignalsResponse, OperatorSnapshotResponse, OperatorTimelineResponse,
-    OperatorTraceResponse, OperatorTriageResponse, RecentConfigEventsResponse,
-    RecentOperatorActionsResponse, ResponseBody, StatusResponse,
+    OperatorTraceResponse, OperatorTriageResponse, OperatorWorkspaceResponse,
+    RecentConfigEventsResponse, RecentOperatorActionsResponse, ResponseBody, StatusResponse,
 };
 
 pub(crate) fn status_response(status: UdpProxyStatusSnapshot) -> HttpResponse {
@@ -253,6 +253,16 @@ pub(crate) fn mission_response(mission: ProxyOperatorMissionCatalog) -> HttpResp
     HttpResponse {
         status: "200 OK",
         body: ResponseBody::OperatorMission(OperatorMissionResponse { ok: true, mission }),
+    }
+}
+
+pub(crate) fn workspace_response(workspace: ProxyOperatorWorkspaceCatalog) -> HttpResponse {
+    HttpResponse {
+        status: "200 OK",
+        body: ResponseBody::OperatorWorkspace(OperatorWorkspaceResponse {
+            ok: true,
+            workspace,
+        }),
     }
 }
 

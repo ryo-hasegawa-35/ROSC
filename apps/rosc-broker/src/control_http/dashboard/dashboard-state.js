@@ -91,6 +91,22 @@ export function normalizeFocusState(dashboard, focusState = {}) {
   };
 }
 
+export function parseFocusStateFromUrl() {
+  const url = new URL(window.location.href);
+  return {
+    routeId: normalizeUrlValue(url.searchParams.get("route")),
+    destinationId: normalizeUrlValue(url.searchParams.get("destination")),
+  };
+}
+
+export function syncFocusStateToUrl(focusState) {
+  const url = new URL(window.location.href);
+  setOrDelete(url.searchParams, "route", focusState?.routeId);
+  setOrDelete(url.searchParams, "destination", focusState?.destinationId);
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState(null, "", next);
+}
+
 export function buildTrafficPulse(traffic, previousSample, recordedAtUnixMs) {
   const sample = {
     recordedAtUnixMs,
@@ -180,4 +196,20 @@ function normalizeFocusId(currentId, details, preferredIds, key) {
     }
   }
   return details[0][key];
+}
+
+function normalizeUrlValue(value) {
+  if (!value) {
+    return null;
+  }
+  const trimmed = String(value).trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function setOrDelete(searchParams, key, value) {
+  if (value) {
+    searchParams.set(key, value);
+  } else {
+    searchParams.delete(key);
+  }
 }
